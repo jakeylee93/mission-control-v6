@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { api, type Plan } from '@/lib/api'
 
@@ -355,21 +355,100 @@ function PlanCard({ plan, category, onUpdate, onDelete, onMove, isFirst, isLast 
   )
 }
 
+// ─── Venture Logo ─────────────────────────────────────────────────────────────
+
+function toSlug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+function VentureLogo({ name, color }: { name: string; color: string }) {
+  const slug = toSlug(name)
+  const initials = name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+
+  const [src, setSrc] = useState(`/logos/${slug}.png`)
+  const [failed, setFailed] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('venture', name)
+    const res = await fetch('/api/logos', { method: 'POST', body: fd })
+    const data = await res.json()
+    setSrc(data.path + '?t=' + Date.now())
+    setFailed(false)
+    setUploading(false)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  return (
+    <div
+      className="relative group cursor-pointer shrink-0"
+      style={{ width: 36, height: 36 }}
+      onClick={(e) => { e.stopPropagation(); fileRef.current?.click() }}
+      title={`Tap to upload ${name} logo`}
+    >
+      {!failed ? (
+        <img
+          src={src}
+          alt={name}
+          className="w-full h-full rounded-lg object-cover"
+          style={{ border: `1px solid ${color}30` }}
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <div
+          className="w-full h-full rounded-lg flex items-center justify-center text-[11px] font-bold"
+          style={{ background: color + '22', color, border: `1px solid ${color}40` }}
+        >
+          {initials}
+        </div>
+      )}
+
+      {/* Upload overlay on hover */}
+      <div className="absolute inset-0 rounded-lg bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+        {uploading ? (
+          <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+        ) : (
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" className="w-3.5 h-3.5">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+        )}
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleUpload}
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  )
+}
+
 // ─── Subcategory Section ──────────────────────────────────────────────────────
 
 interface SubcategorySectionProps {
   sub: Subcategory
   category: CategoryId
   defaultOpen: boolean
+  isVenture?: boolean
   onUpdate: (id: string, data: Partial<Plan>) => void
   onDelete: (id: string) => void
   onMove: (id: string, direction: 'up' | 'down') => void
 }
 
-function SubcategorySection({ sub, category, defaultOpen, onUpdate, onDelete, onMove }: SubcategorySectionProps) {
+function SubcategorySection({ sub, category, defaultOpen, isVenture, onUpdate, onDelete, onMove }: SubcategorySectionProps) {
   const [open, setOpen] = useState(defaultOpen)
 
-  const doneCount = sub.plans.filter((p) => p.status === 'done').length
   const activeCount = sub.plans.filter((p) => p.status === 'in-progress').length
 
   return (
@@ -380,7 +459,11 @@ function SubcategorySection({ sub, category, defaultOpen, onUpdate, onDelete, on
         onClick={() => setOpen(!open)}
       >
         <div className="flex items-center gap-2.5">
-          <span className="text-base">{sub.icon}</span>
+          {isVenture ? (
+            <VentureLogo name={sub.label} color={sub.color} />
+          ) : (
+            <span className="text-base">{sub.icon}</span>
+          )}
           <span className="font-semibold text-sm" style={{ color: 'var(--c-text)' }}>
             {sub.label}
           </span>
@@ -717,6 +800,7 @@ export default function PlansTab() {
                 sub={sub}
                 category={activeCategory}
                 defaultOpen={idx === 0 || sub.id === 'in-progress'}
+                isVenture={activeCategory === 'companies'}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
                 onMove={handleMove}
