@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { api, formatCost, formatTokens, type CostSummary, type AgentStatus, type ApiService, type CostEntry } from '@/lib/api'
+import { api, formatCost, formatTokens, type CostSummary, type AgentStatus, type ApiService, type CostEntry, type ProviderUsage } from '@/lib/api'
+import CostHistoryPanel from '@/components/CostHistoryPanel'
 
 const agentDefs = [
   {
@@ -78,12 +79,147 @@ function UsageRow({ label, calls, tokens, cost, color }: { label: string; calls:
   )
 }
 
+// ─── Live API Usage Panel ─────────────────────────────────────────────────────
+function LiveUsagePanel({ data, color, label, icon }: {
+  data: ProviderUsage | null
+  color: string
+  label: string
+  icon: string
+}) {
+  if (!data) {
+    return (
+      <div className="flex flex-col gap-3 p-4 rounded-xl animate-pulse" style={{ background: 'var(--c-surface)', border: '1px solid var(--c-border)' }}>
+        <div className="h-4 rounded w-1/2" style={{ background: 'var(--c-panel)' }} />
+        <div className="h-8 rounded w-1/3" style={{ background: 'var(--c-panel)' }} />
+      </div>
+    )
+  }
+
+  const todayCost   = data.apiTodayCost_gbp ?? data.todayLocal_gbp
+  const balance     = data.balance_gbp
+  const weekAvg     = data.weeklyAvg_gbp
+  const isLive      = data.source === 'api'
+  const updatedTime = new Date(data.updatedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+
+  // All-time: prefer real consumed_gbp from balance API (Moonshot), else local history sum
+  const allTimeCost = (data.consumed_gbp != null && data.consumed_gbp > 0)
+    ? data.consumed_gbp
+    : (data.allTimeLocal_gbp ?? null)
+  const allTimeLabel = (data.consumed_gbp != null && data.consumed_gbp > 0) ? 'All Time (API)' : 'All Time (tracked)'
+
+  return (
+    <div className="flex flex-col gap-3 p-4 rounded-xl" style={{ background: 'var(--c-surface)', border: `1px solid ${color}28` }}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-base">{icon}</span>
+          <span className="text-xs font-semibold" style={{ color }}>{label}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span
+            className="text-[9px] font-semibold px-1.5 py-0.5 rounded uppercase tracking-wider"
+            style={isLive
+              ? { background: 'rgba(22,163,74,0.12)', color: '#16A34A' }
+              : { background: 'rgba(245,158,11,0.12)', color: '#F59E0B' }
+            }
+          >
+            {isLive ? 'live' : 'local'}
+          </span>
+          <span className="text-[9px]" style={{ color: 'var(--c-dim)' }}>{updatedTime}</span>
+        </div>
+      </div>
+
+      {/* All-time total — most prominent */}
+      {allTimeCost != null && (
+        <div className="rounded-lg px-3 py-2" style={{ background: `${color}10`, border: `1px solid ${color}28` }}>
+          <div className="text-[10px] uppercase tracking-wider mb-0.5" style={{ color: 'var(--c-dim)' }}>{allTimeLabel}</div>
+          <div className="text-2xl font-bold tabular-nums" style={{ color }}>
+            {formatCost(allTimeCost)}
+          </div>
+          {data.allTimeCalls != null && data.allTimeCalls > 0 && (
+            <div className="text-[9px] font-mono mt-0.5" style={{ color: 'var(--c-dim)' }}>
+              {data.allTimeCalls} calls tracked
+            </div>
+          )}
+          {data.consumed_cny != null && data.consumed_cny > 0 && (
+            <div className="text-[9px] font-mono" style={{ color: 'var(--c-dim)' }}>
+              ¥{data.consumed_cny.toFixed(2)} CNY consumed
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Balance + Today cost */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-dim)' }}>Balance</div>
+          <div className="text-xl font-bold tabular-nums" style={{ color: balance != null ? color : 'var(--c-dim)' }}>
+            {balance != null ? formatCost(balance) : '—'}
+          </div>
+          {data.balance_cny != null && (
+            <div className="text-[9px] font-mono mt-0.5" style={{ color: 'var(--c-dim)' }}>
+              ¥{data.balance_cny.toFixed(2)} CNY
+            </div>
+          )}
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-dim)' }}>Today&apos;s Usage</div>
+          <div className="text-xl font-bold tabular-nums" style={{ color }}>
+            {formatCost(todayCost)}
+          </div>
+          <div className="text-[9px] font-mono mt-0.5" style={{ color: 'var(--c-dim)' }}>
+            {data.todayLocal_calls} calls · {formatTokens(data.todayLocal_tokens)} tok
+          </div>
+        </div>
+      </div>
+
+      {/* Weekly avg */}
+      <div className="pt-2.5" style={{ borderTop: '1px solid var(--c-border)' }}>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--c-dim)' }}>7-day avg / day</span>
+          <span className="text-xs font-bold tabular-nums" style={{ color: weekAvg > 0 ? color : 'var(--c-dim)' }}>
+            {weekAvg > 0 ? formatCost(weekAvg) : '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Standard key note */}
+      {data.keyType === 'inference' && (
+        <div className="text-[9px] rounded px-2 py-1" style={{ background: 'rgba(245,158,11,0.08)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.2)' }}>
+          Standard API key — billing data not available via API. Showing locally tracked usage only.
+        </div>
+      )}
+
+      {/* Key indicator */}
+      <div className="text-[9px] font-mono truncate" style={{ color: 'var(--c-dim)' }}>
+        key: {data.keyMasked}
+      </div>
+    </div>
+  )
+}
+
 export default function SystemTab() {
   const [costs, setCosts] = useState<CostSummary | null>(null)
   const [agents, setAgents] = useState<Record<string, AgentStatus>>({})
   const [apis, setApis] = useState<ApiService[]>([])
   const [costEntries, setCostEntries] = useState<CostEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [usageMoonshot, setUsageMoonshot] = useState<ProviderUsage | null>(null)
+  const [usageAnthropic, setUsageAnthropic] = useState<ProviderUsage | null>(null)
+  const [usageLoading, setUsageLoading] = useState(true)
+  const [usageLastUpdated, setUsageLastUpdated] = useState<Date | null>(null)
+
+  const loadUsage = useCallback(async () => {
+    setUsageLoading(true)
+    const [m, a] = await Promise.allSettled([
+      api.usageMoonshot(),
+      api.usageAnthropic(),
+    ])
+    if (m.status === 'fulfilled') setUsageMoonshot(m.value)
+    if (a.status === 'fulfilled') setUsageAnthropic(a.value)
+    setUsageLastUpdated(new Date())
+    setUsageLoading(false)
+  }, [])
 
   const load = useCallback(async () => {
     const [c, a, sv] = await Promise.allSettled([
@@ -102,9 +238,13 @@ export default function SystemTab() {
 
   useEffect(() => {
     load()
-    const timer = setInterval(load, 30000)
-    return () => clearInterval(timer)
-  }, [load])
+    loadUsage()
+    // Refresh usage every 30 minutes
+    const usageTimer = setInterval(loadUsage, 30 * 60 * 1000)
+    // Refresh main metrics every 30s
+    const mainTimer  = setInterval(load, 30000)
+    return () => { clearInterval(usageTimer); clearInterval(mainTimer) }
+  }, [load, loadUsage])
 
   const totalCost = costs?.total.cost || 0
 
@@ -129,6 +269,69 @@ export default function SystemTab() {
           </div>
         </div>
 
+        {/* Live API Compute Panel */}
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--c-muted)' }}>
+              AI Compute Today
+            </h2>
+            <div className="flex items-center gap-2">
+              {usageLastUpdated && (
+                <span className="text-[9px]" style={{ color: 'var(--c-dim)' }}>
+                  updated {usageLastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+              <button
+                onClick={loadUsage}
+                disabled={usageLoading}
+                className="text-[10px] px-2 py-1 rounded transition-opacity"
+                style={{
+                  background: 'var(--c-surface)',
+                  border: '1px solid var(--c-border)',
+                  color: 'var(--c-muted)',
+                  opacity: usageLoading ? 0.5 : 1,
+                  cursor: usageLoading ? 'wait' : 'pointer',
+                }}
+              >
+                {usageLoading ? '↻ …' : '↻ Refresh'}
+              </button>
+            </div>
+          </div>
+
+          {/* Combined totals */}
+          <div className="mb-4 p-4 rounded-xl" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)' }}>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>All Time (tracked)</div>
+                <div className="text-3xl font-bold tabular-nums text-glow-gold" style={{ color: '#FFD700' }}>
+                  {formatCost(
+                    ((usageMoonshot?.consumed_gbp ?? usageMoonshot?.allTimeLocal_gbp) || 0) +
+                    (usageAnthropic?.allTimeLocal_gbp || 0)
+                  )}
+                </div>
+                <div className="text-[9px] mt-0.5" style={{ color: 'var(--c-dim)' }}>
+                  {((usageMoonshot?.allTimeCalls || 0) + (usageAnthropic?.allTimeCalls || 0))} total calls logged
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: 'var(--c-muted)' }}>Today</div>
+                <div className="text-3xl font-bold tabular-nums" style={{ color: '#FFD700' }}>
+                  {formatCost((usageMoonshot?.todayLocal_gbp || 0) + (usageAnthropic?.todayLocal_gbp || 0))}
+                </div>
+                <div className="text-right text-[9px] mt-0.5" style={{ color: 'var(--c-dim)' }}>
+                  <div>{(usageMoonshot?.todayLocal_calls || 0) + (usageAnthropic?.todayLocal_calls || 0)} calls · {formatTokens((usageMoonshot?.todayLocal_tokens || 0) + (usageAnthropic?.todayLocal_tokens || 0))} tok</div>
+                  <div className="mt-0.5 text-[9px]">auto-refreshes every 30m</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <LiveUsagePanel data={usageMoonshot} color="#FFD700" label="Moonshot AI (Kimi)" icon="🧠" />
+            <LiveUsagePanel data={usageAnthropic} color="#A855F7" label="Anthropic (Claude)" icon="⚡" />
+          </div>
+        </section>
+
         {/* Real API Usage — per provider */}
         <section className="mb-8">
           <h2 className="text-xs font-semibold tracking-widest uppercase mb-4" style={{ color: 'var(--c-muted)' }}>
@@ -150,6 +353,14 @@ export default function SystemTab() {
               color="#A855F7"
             />
           </div>
+        </section>
+
+        {/* Cost History */}
+        <section className="mb-8">
+          <h2 className="text-xs font-semibold tracking-widest uppercase mb-4" style={{ color: 'var(--c-muted)' }}>
+            Spending History
+          </h2>
+          <CostHistoryPanel />
         </section>
 
         {/* AI Core Section */}

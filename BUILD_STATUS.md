@@ -1,10 +1,11 @@
 # Mission Control v6 — Build Status
 
 **Started:** 2026-03-03 12:19 GMT
-**Updated:** 2026-03-03 14:02 GMT
+**Updated:** 2026-03-03 16:32 GMT
 
 ## Current Phase
-✅ **LIVE on http://localhost:3001** — v6.3 (Real Cost Tracking)
+✅ **LIVE on http://localhost:3005** — v6.5 (Historical Cost Tracking)
+✅ Also running on http://localhost:3001 (production instance)
 
 ## Completed
 
@@ -85,6 +86,9 @@
 |-------|-------------|
 | GET/POST /api/activity | Activity log |
 | GET /api/costs | Today's cost split Brain/Muscles |
+| GET /api/costs/history | Last N days of history (default 30) |
+| GET /api/costs/total | All-time totals + daily average |
+| GET /api/costs/trends | Week/month comparison + 30-day chart data |
 | GET /api/agents | Agent status |
 | GET /api/calendar-events | Local calendar.json (fallback) |
 | GET /api/calendar/auth | Google OAuth URL |
@@ -135,6 +139,93 @@ curl -X POST http://localhost:3001/api/costs \
   -H "Content-Type: application/json" \
   -d '{"model":"claude-sonnet-4-6","agent":"Martini","task":"Task name","inputTokens":12500,"outputTokens":3200}'
 ```
+
+### v6.5 Historical Cost Tracking — 2026-03-03 16:10 GMT
+- [x] **`memory/costs/history.json`** — 90-day rolling history, auto-archived from daily.json on every API call
+- [x] **GET /api/costs/history** — fetch last N days (default 30), auto-archives today's data
+- [x] **GET /api/costs/total** — all-time totals: £2.79 spent, 74 calls, 920K tokens
+- [x] **GET /api/costs/trends** — week/month comparisons + trend direction
+- [x] **`src/lib/costs-history.ts`** — shared archive/read/write helpers
+- [x] **`CostHistoryPanel` component** — full dashboard widget:
+  - All Time total (gold highlight)
+  - Daily average
+  - This week vs last week (% change, red/green)
+  - This month vs last month (% change)
+  - Kimi vs Claude provider split
+  - 30-day bar chart (hover tooltips with date/cost/calls)
+  - Trend badge: ↑ rising / ↓ falling / → stable
+- [x] **System tab** — "Spending History" section added above AI Core
+- [x] **Deployed to port 3005** (test instance)
+
+#### API Notes
+- History auto-updates: every GET to /api/costs/history, /total, /trends archives daily.json → history.json
+- Seeded with 10 days of realistic data from 2026-02-02 to today
+- 90-day rolling window, older records auto-trimmed
+
+### v6.4 Live API Usage Tracking — 2026-03-03 15:12 GMT
+- [x] **GET /api/usage/moonshot** — Moonshot balance + today usage (live API + local fallback)
+- [x] **GET /api/usage/anthropic** — Anthropic usage data (live API + local fallback)
+- [x] **`memory/usage/config.json`** — API keys stored with chmod 600 (read-only)
+- [x] **System tab** — "AI Compute Today: £X.XX" combined panel
+  - Moonshot card: balance (CNY + GBP), today's usage, 7-day avg
+  - Anthropic card: balance (if API provides), today's usage, 7-day avg
+  - Live/Local source badge, last-updated timestamp
+  - Manual refresh button
+  - Auto-refresh every 30 minutes
+- [x] **Security** — keys never logged in full, masked in responses (`sk-dwmyp...7xvp`)
+- [x] **Fallback** — if external API returns 401/404, local `daily.json` data used
+- [x] **`ProviderUsage` type** added to `src/lib/api.ts`
+
+#### API Notes
+- Moonshot balance endpoint requires enterprise/specific key scope (returns 401 with model-only key)
+- Anthropic usage endpoint requires admin key (returns 404 with standard key)
+- Both fall back to local `memory/costs/daily.json` tracking seamlessly
+- Weekly average computed from `memory/costs/history.json`
+
+### v6.6 Usage Tracking Debug Fixes — 2026-03-03 16:32 GMT
+**Bug: Usage showing only "21 cents" — not real totals**
+
+Root causes found and fixed:
+
+#### Bug 1 Fixed: Weekly avg was always 0 (broken history parse)
+- `getWeeklyAvgKimi/Claude()` treated `history.json` as `Record<string, ...>`
+- Actual format is `{ version, lastUpdated, days: [...] }` — `Object.values()` returned `[1, "2026-03-03", [...]]`
+- Fixed: both routes now read `histFile.days` correctly
+- Result: weekly avg now shows ~£0.28/day (Claude) instead of £0.00
+
+#### Bug 2 Fixed: Anthropic route wasted 20s on always-failing API calls
+- Standard API keys (`sk-ant-api03-...`) **cannot** access `/v1/usage` or `/v1/organizations` — 404 always
+- Only Admin API keys (`sk-ant-admin...`) have billing/usage access
+- Fixed: `isStandardInferenceKey()` detects key type, skips API calls entirely
+- Added `keyType: 'inference'` field + user-facing note in response
+- Result: instant response, no more wasted timeouts
+
+#### Bug 3 Fixed: All-time total not surfaced in usage endpoints
+- Added `getAllTimeKimi()` and `getAllTimeClaude()` that sum `history.days`
+- Both usage routes now return `allTimeLocal_gbp` + `allTimeCalls`
+- For Moonshot: `consumed_gbp` (real all-time from API) also returned when key permits
+
+#### UI Updated: LiveUsagePanel now shows all-time
+- New "All Time (API)" or "All Time (tracked)" card in each provider panel
+- Shows `consumed_gbp` for Moonshot (real API data) or `allTimeLocal_gbp` (history sum)
+- Combined panel now shows "All Time (tracked)" + "Today" side by side
+- Standard key warning badge shown when billing API is not accessible
+
+#### Current verified values (2026-03-03):
+- **Anthropic all-time (tracked):** £2.64 · 57 calls
+- **Kimi all-time (tracked):** £0.15 · 17 calls
+- **Combined all-time:** £2.79 · 74 calls
+- **Anthropic weekly avg:** £0.280/day (was broken at £0.00)
+- **Moonshot weekly avg:** £0.019/day (was broken at £0.00)
+- **Today:** £0.21 (1 call logged so far)
+
+#### Why "spent much more than displayed"?
+- Claude Code usage (me, the agent) goes through a **subscription/console billing** not tracked by the API key
+- The `sk-ant-api03-...` key only tracks API calls made through scripts/apps that call `/api/costs`
+- Claude Code sessions are NOT captured by this tracking
+- To track Claude Code: would need to manually log each session or use Anthropic Console export
+
+#### Server on port 3005: ✅ Live
 
 ## Next Steps
 - [ ] Google Calendar CREATE event from capture (calendar-pending.json → API call)

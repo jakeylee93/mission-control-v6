@@ -82,6 +82,69 @@ export interface ApiService {
   color?: string
 }
 
+export interface CostHistoryDay {
+  date: string
+  cost_gbp: number
+  calls: number
+  kimi: number
+  claude: number
+}
+
+export interface CostHistory {
+  days: CostHistoryDay[]
+  total: number
+  oldest: string | null
+  newest: string | null
+}
+
+export interface CostTotal {
+  allTime:    { calls: number; totalTokens: number; cost_gbp: number }
+  kimi:       { calls: number; cost_gbp: number }
+  claude:     { calls: number; cost_gbp: number }
+  dailyAvg:   number
+  activeDays: number
+  totalDays:  number
+  firstDate:  string | null
+  lastDate:   string | null
+}
+
+export interface CostTrends {
+  thisWeek:   { cost: number; days: number }
+  lastWeek:   { cost: number; days: number }
+  weekChange: number | null
+  thisMonth:  { cost: number; days: number }
+  lastMonth:  { cost: number; days: number }
+  monthChange: number | null
+  trend:      'up' | 'down' | 'flat'
+  last30:     CostHistoryDay[]
+}
+
+export interface ProviderUsage {
+  provider: 'moonshot' | 'anthropic'
+  keyMasked: string
+  keyType?: 'inference' | 'admin'
+  note?: string
+  // API-sourced (when available)
+  balance_cny?: number | null
+  balance_gbp?: number | null
+  consumed_cny?: number | null
+  consumed_gbp?: number | null      // real all-time spend from Moonshot balance API
+  apiTodayCost_gbp?: number | null
+  apiInputTokens?: number | null
+  apiOutputTokens?: number | null
+  // Local tracking totals
+  todayLocal_gbp: number
+  todayLocal_calls: number
+  todayLocal_tokens: number
+  allTimeLocal_gbp?: number | null  // sum of history.json for this provider
+  allTimeCalls?: number | null
+  weeklyAvg_gbp: number
+  source: 'api' | 'local'
+  apiError?: string
+  apiErrors?: string[]
+  updatedAt: string
+}
+
 const BASE = ''
 
 async function fetchJSON<T>(path: string): Promise<T> {
@@ -124,6 +187,11 @@ export const api = {
   deletePlan: (cat: string, id: string) =>
     fetch(`/api/categories/${cat}/plans/${id}`, { method: 'DELETE' }).then((r) => r.json()),
   apisStatus: () => fetchJSON<ApiService[]>('/api/apis-status'),
+  usageMoonshot: () => fetchJSON<ProviderUsage>('/api/usage/moonshot'),
+  usageAnthropic: () => fetchJSON<ProviderUsage>('/api/usage/anthropic'),
+  costsHistory: (days = 30) => fetchJSON<CostHistory>(`/api/costs/history?days=${days}`),
+  costsTotal: () => fetchJSON<CostTotal>('/api/costs/total'),
+  costsTrends: () => fetchJSON<CostTrends>('/api/costs/trends'),
   logCost: (data: { model: string; agent?: string; task?: string; inputTokens: number; outputTokens: number }) =>
     fetch('/api/costs', {
       method: 'POST',
