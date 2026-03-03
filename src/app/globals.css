@@ -1,0 +1,277 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================
+   THEME VARIABLES
+   ============================================= */
+:root {
+  /* Night mode (default) */
+  --c-bg: #000000;
+  --c-surface: #0A0A0A;
+  --c-panel: #111111;
+  --c-border: #1A1A1A;
+  --c-border-2: #2A2A2A;
+  --c-text: #F0EEE8;
+  --c-text-2: #AAAAAA;
+  --c-muted: #666666;
+  --c-dim: #444444;
+
+  /* Accent palette */
+  --c-gold: #FFD700;
+  --c-purple: #A855F7;
+  --c-red: #DC2626;
+  --c-green: #16A34A;
+
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+}
+
+.day-mode {
+  /* Day mode overrides */
+  --c-bg: #FFFFFF;
+  --c-surface: #F8F8F8;
+  --c-panel: #F0F0F0;
+  --c-border: #E8E8E8;
+  --c-border-2: #CCCCCC;
+  --c-text: #111111;
+  --c-text-2: #555555;
+  --c-muted: #888888;
+  --c-dim: #BBBBBB;
+}
+
+/* =============================================
+   BASE RESETS
+   ============================================= */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-body);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+/* =============================================
+   TYPOGRAPHY
+   ============================================= */
+.font-heading,
+h1, h2 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* =============================================
+   GRAIN TEXTURE (night mode only)
+   ============================================= */
+body:not(.day-mode)::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* =============================================
+   SCROLLBARS
+   ============================================= */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--c-border-2);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-muted);
+}
+
+/* =============================================
+   CARD
+   ============================================= */
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+}
+
+.card-glow-purple:hover {
+  border-color: rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.1);
+}
+
+.card-glow-yellow:hover {
+  border-color: rgba(255, 215, 0, 0.3);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.1);
+}
+
+/* =============================================
+   DAY MODE CARD ADJUSTMENTS
+   ============================================= */
+.day-mode .card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* =============================================
+   STATUS DOTS
+   ============================================= */
+.dot-active {
+  background: #22C55E;
+  box-shadow: 0 0 6px #22C55E;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+.dot-idle {
+  background: var(--c-dim);
+}
+.dot-thinking {
+  background: #A855F7;
+  box-shadow: 0 0 6px #A855F7;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+.dot-error {
+  background: #EF4444;
+  box-shadow: 0 0 6px #EF4444;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+/* =============================================
+   GLOW TEXT
+   ============================================= */
+.text-glow-yellow {
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.55);
+}
+.text-glow-gold {
+  text-shadow: 0 0 12px rgba(255, 215, 0, 0.55);
+}
+.text-glow-purple {
+  text-shadow: 0 0 12px rgba(168, 85, 247, 0.55);
+}
+.text-glow-green {
+  text-shadow: 0 0 12px rgba(22, 163, 74, 0.5);
+}
+.text-glow-red {
+  text-shadow: 0 0 12px rgba(220, 38, 38, 0.5);
+}
+.day-mode .text-glow-yellow,
+.day-mode .text-glow-gold,
+.day-mode .text-glow-purple,
+.day-mode .text-glow-green,
+.day-mode .text-glow-red {
+  text-shadow: none;
+}
+
+/* =============================================
+   TAB BAR ACTIVE STATE
+   ============================================= */
+.tab-active-bar {
+  background: #FFD700;
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+}
+
+/* =============================================
+   FEED EVENT TYPES
+   ============================================= */
+.feed-chat { border-left-color: #FFD700; }
+.feed-task { border-left-color: #A855F7; }
+.feed-api  { border-left-color: #16A34A; }
+.feed-error { border-left-color: #DC2626; }
+
+/* =============================================
+   PRIORITY BADGE
+   ============================================= */
+.priority-high   { color: #EF4444; background: rgba(239, 68, 68, 0.1); }
+.priority-medium { color: #F59E0B; background: rgba(245, 158, 11, 0.1); }
+.priority-low    { color: var(--c-muted); background: rgba(102, 102, 102, 0.08); }
+
+/* =============================================
+   STATUS BADGE
+   ============================================= */
+.status-active, .status-in-progress { color: #A855F7; background: rgba(168, 85, 247, 0.1); }
+.status-done, .status-complete      { color: #22C55E; background: rgba(34, 197, 94, 0.1); }
+.status-not-started                 { color: var(--c-muted); background: rgba(102, 102, 102, 0.08); }
+.status-blocked                     { color: #EF4444; background: rgba(239, 68, 68, 0.1); }
+
+/* =============================================
+   PLAN SUBCATEGORY SECTION
+   ============================================= */
+.subcategory-section {
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--c-surface);
+}
+
+.subcategory-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.subcategory-header:hover {
+  background: var(--c-panel);
+}
+
+/* =============================================
+   DAY MODE — HARDCODED DARK COLOR OVERRIDES
+   Fix Tailwind utility classes that hardcode dark-mode colors
+   ============================================= */
+.day-mode .text-\[\#F0EEE8\] { color: var(--c-text) !important; }
+.day-mode .text-\[\#AAAAAA\] { color: var(--c-text-2) !important; }
+.day-mode .text-\[\#666\]    { color: var(--c-muted) !important; }
+.day-mode .text-\[\#444\]    { color: var(--c-dim) !important; }
+.day-mode .text-\[\#333\]    { color: var(--c-dim) !important; }
+
+.day-mode .bg-\[\#0A0A0A\]   { background-color: var(--c-surface) !important; }
+.day-mode .bg-\[\#111\]      { background-color: var(--c-panel) !important; }
+.day-mode .bg-\[\#111111\]   { background-color: var(--c-panel) !important; }
+.day-mode .bg-\[\#1A1A1A\]   { background-color: var(--c-border) !important; }
+
+.day-mode .border-\[\#1A1A1A\]  { border-color: var(--c-border) !important; }
+.day-mode .border-\[\#0D0D0D\]  { border-color: var(--c-surface) !important; }
+.day-mode .border-\[\#0A0A0A\]  { border-color: var(--c-surface) !important; }
+.day-mode .border-\[\#111\]     { border-color: var(--c-border) !important; }
+
+.day-mode .hover\:bg-\[\#111\]:hover { background-color: var(--c-panel) !important; }
+
+/* Inline-style fixes for day mode — applied via class overrides */
+.day-mode .mc-text-primary   { color: var(--c-text) !important; }
+.day-mode .mc-text-secondary { color: var(--c-text-2) !important; }
+.day-mode .mc-text-muted     { color: var(--c-muted) !important; }
+.day-mode .mc-bg-surface     { background-color: var(--c-surface) !important; }
+.day-mode .mc-border         { border-color: var(--c-border) !important; }
+
+/* =============================================
+   UTILITY
+   ============================================= */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
