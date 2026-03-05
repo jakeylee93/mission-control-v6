@@ -95,6 +95,20 @@ const TABS: TabDef[] = [
     ),
   },
   {
+    id: 'PROPERTY',
+    label: 'Property',
+    activeIcon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+        <path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z" />
+      </svg>
+    ),
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5">
+        <path d="M3 11.5 12 4l9 7.5V21h-6v-6H9v6H3z" />
+      </svg>
+    ),
+  },
+  {
     id: 'CAPTURE',
     label: 'Capture',
     activeIcon: (

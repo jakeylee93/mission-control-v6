@@ -126,7 +126,7 @@ export default function DocsTab() {
   async function loadFolders() {
     setLoadingFolders(true)
     try {
-      const res = await fetch('/api/docs/folders', { cache: 'no-store' })
+      const res = await fetch(`/api/docs/folders?t=${Date.now()}`, { cache: 'no-store' })
       const data = await res.json() as { files?: DriveFile[] }
       setDriveFolders(data.files || [])
     } catch {
@@ -417,7 +417,7 @@ export default function DocsTab() {
                   No files yet — upload or connect Google Drive
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                   {visibleFiles.map((file) => (
                     <div
                       key={file.id}

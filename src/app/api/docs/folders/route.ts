@@ -118,7 +118,7 @@ function runDriveSearch(query: string, max: number): DriveFile[] {
 
 export async function GET() {
   try {
-    const files = runDriveSearch("mimeType='application/vnd.google-apps.folder'", 50)
+    const files = runDriveSearch("mimeType='application/vnd.google-apps.folder'", 100)
     return NextResponse.json({ files })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to fetch folders from Google Drive'
