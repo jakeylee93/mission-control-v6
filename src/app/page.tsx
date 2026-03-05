@@ -11,7 +11,8 @@ import BrainTab from '@/components/tabs/BrainTab'
 import DocsTab from '@/components/tabs/DocsTab'
 import BelongingsTab from '@/components/tabs/BelongingsTab'
 import PropertyTab from '@/components/tabs/PropertyTab'
-export type Tab = 'TEAMS' | 'PLANS' | 'BRAIN' | 'DOCS' | 'BELONGINGS' | 'PROPERTY' | 'CAPTURE' | 'SYSTEM'
+import LovelyTab from '@/components/tabs/LovelyTab'
+export type Tab = 'TEAMS' | 'PLANS' | 'BRAIN' | 'DOCS' | 'BELONGINGS' | 'LOVELY' | 'PROPERTY' | 'CAPTURE' | 'SYSTEM'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('TEAMS')
@@ -64,6 +65,7 @@ export default function Home() {
             {activeTab === 'BRAIN' && <BrainTab />}
             {activeTab === 'DOCS' && <DocsTab />}
             {activeTab === 'BELONGINGS' && <BelongingsTab />}
+            {activeTab === 'LOVELY' && <LovelyTab />}
             {activeTab === 'PROPERTY' && <PropertyTab />}
             {activeTab === 'CAPTURE' && <CaptureTab />}
             {activeTab === 'SYSTEM' && <SystemTab />}
