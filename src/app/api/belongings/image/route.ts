@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const braveKey = process.env.BRAVE_SEARCH_API_KEY
     if (braveKey) {
       try {
-        const searchUrl = `https://api.search.brave.com/res/v1/images/search?q=${encodeURIComponent(query + ' product')}&count=8&country=gb&safesearch=strict`
+        const searchUrl = `https://api.search.brave.com/res/v1/images/search?q=${encodeURIComponent(query + ' product white background')}&count=8&country=gb&safesearch=strict`
         const res = await fetch(searchUrl, {
           headers: { 'X-Subscription-Token': braveKey, Accept: 'application/json' },
         })
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
             model: 'gpt-4o-mini',
             messages: [{
               role: 'user',
-              content: `I need a direct image URL for this product: "${query}". Give me 3 direct URLs to product images (jpg/png) from major retailers (Amazon, Boots, Superdrug, Tesco, etc). Return ONLY a JSON array of URL strings, nothing else.`
+              content: `I need a direct image URL for this product: "${query}". I need a product photo on a WHITE BACKGROUND (like an Amazon/retailer listing image). Give me 3 direct URLs to product images (jpg/png) from major retailers (Amazon, Boots, Superdrug, Tesco, etc). Return ONLY a JSON array of URL strings, nothing else.`
             }],
             max_tokens: 500,
             temperature: 0.3,

@@ -692,7 +692,7 @@ export default function BelongingsTab() {
                     {/* Running low badge */}
                     {item.runningLow && <div className="absolute top-1.5 left-1.5 z-10 text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: '#EF444430', color: '#EF4444' }}>LOW</div>}
 
-                    <div className="rounded-lg mb-1.5 aspect-square w-full flex items-center justify-center overflow-hidden" style={{ background: '#1E1E1E' }}>
+                    <div className="rounded-lg mb-1.5 aspect-square w-full flex items-center justify-center overflow-hidden" style={{ background: '#FFFFFF' }}>
                       {(item.productImage || item.imagePath) ? <img src={item.productImage || item.imagePath} alt={item.name} className="w-full h-full object-cover" /> : <span className="text-2xl">📷</span>}
                     </div>
                     <div className="text-xs font-semibold mb-0.5 truncate pr-5" style={{ color: 'var(--c-text)' }}>{item.name}</div>
@@ -768,7 +768,7 @@ export default function BelongingsTab() {
                 {/* Photo section — product image header + gallery */}
                 <div className="mb-4">
                   {/* Main product image */}
-                  <div className="rounded-xl aspect-square max-h-[300px] w-full flex items-center justify-center overflow-hidden relative" style={{ background: '#1E1E1E', border: '1px solid var(--c-border)' }}>
+                  <div className="rounded-xl aspect-square max-h-[300px] w-full flex items-center justify-center overflow-hidden relative" style={{ background: '#FFFFFF', border: '1px solid var(--c-border)' }}>
                     {(selectedItem.productImage || selectedItem.imagePath) ? (
                       <>
                         <img src={selectedItem.productImage || selectedItem.imagePath} alt={selectedItem.name} className="w-full h-full object-cover" />
