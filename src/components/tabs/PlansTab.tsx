@@ -19,14 +19,21 @@ const CATEGORIES = [
 type CategoryId = typeof CATEGORIES[number]['id']
 
 const VENTURES = [
-  { name: 'The Bar People',  icon: '🍺', color: '#F59E0B' },
-  { name: 'AnyVendor',       icon: '🛒', color: '#A855F7' },
-  { name: 'Future Climbing', icon: '🧗', color: '#22C55E' },
-  { name: 'Margarita AI',    icon: '🤖', color: '#FFD700' },
-  { name: 'Bar People Honey',icon: '🍯', color: '#F97316' },
-  { name: 'Safety Device',   icon: '🛡️', color: '#60A5FA' },
-  { name: 'Butterfly App',   icon: '🦋', color: '#FF6B6B' },
+  { name: 'The Bar People',  icon: '🍺', color: '#F59E0B', tier: 'Live' as const },
+  { name: 'AnyVendor',       icon: '🛒', color: '#A855F7', tier: 'Live' as const },
+  { name: 'AnyOS',           icon: '💻', color: '#06B6D4', tier: 'Live' as const },
+  { name: 'Margarita AI',    icon: '🤖', color: '#FFD700', tier: 'Pipeline' as const },
+  { name: 'Future Climbing', icon: '🧗', color: '#22C55E', tier: 'Pipeline' as const },
+  { name: 'Bar People Honey',icon: '🍯', color: '#F97316', tier: 'Pipeline' as const },
+  { name: 'Safety Device',   icon: '🛡️', color: '#60A5FA', tier: 'Pipeline' as const },
+  { name: 'Butterfly App',   icon: '🦋', color: '#FF6B6B', tier: 'Pipeline' as const },
 ]
+
+const TIERS = [
+  { id: 'Live',     label: '🟢 Live',     color: '#22C55E' },
+  { id: 'Pipeline', label: '🟡 Pipeline', color: '#F59E0B' },
+  { id: 'Archived', label: '📦 Archived', color: '#666666' },
+] as const
 
 const STATUSES = ['not-started', 'in-progress', 'done', 'blocked'] as const
 const PRIORITIES = ['high', 'medium', 'low'] as const
@@ -43,32 +50,55 @@ interface Subcategory {
 
 function getSubcategories(categoryId: CategoryId, plans: Plan[]): Subcategory[] {
   if (categoryId === 'companies') {
-    const order = VENTURES.map((v) => v.name)
-    const groups: Record<string, Plan[]> = {}
-    for (const plan of plans) {
-      const key = plan.company || 'Other'
-      if (!groups[key]) groups[key] = []
-      groups[key].push(plan)
-    }
-    return Object.entries(groups)
-      .sort(([a], [b]) => {
-        const ia = order.indexOf(a)
-        const ib = order.indexOf(b)
+    const result: Subcategory[] = []
+    for (const tier of TIERS) {
+      const tierVentures = VENTURES.filter((v) => v.tier === tier.id)
+      const tierPlans = plans.filter((p) => {
+        const v = VENTURES.find((v) => v.name === p.company)
+        const planTier = p.subcategory || v?.tier || 'Pipeline'
+        return planTier === tier.id
+      })
+      if (tierVentures.length === 0 && tierPlans.length === 0) continue
+      // Group by company within this tier
+      const companyGroups: Record<string, Plan[]> = {}
+      for (const plan of tierPlans) {
+        const key = plan.company || 'Other'
+        if (!companyGroups[key]) companyGroups[key] = []
+        companyGroups[key].push(plan)
+      }
+      // Add tier header as a subcategory
+      const tierOrder = tierVentures.map((v) => v.name)
+      const sortedCompanies = Object.entries(companyGroups).sort(([a], [b]) => {
+        const ia = tierOrder.indexOf(a)
+        const ib = tierOrder.indexOf(b)
         if (ia === -1 && ib === -1) return a.localeCompare(b)
         if (ia === -1) return 1
         if (ib === -1) return -1
         return ia - ib
       })
-      .map(([name, plans]) => {
+      for (const [name, compPlans] of sortedCompanies) {
         const venture = VENTURES.find((v) => v.name === name)
-        return {
-          id: name,
-          label: name,
-          plans,
+        result.push({
+          id: `${tier.id}-${name}`,
+          label: `${tier.label} › ${name}`,
+          plans: compPlans.filter((p) => !p.isExpansion),
           color: venture?.color || '#666',
           icon: venture?.icon || '🏢',
+        })
+        // Add expansions as separate sub-section
+        const expansions = compPlans.filter((p) => p.isExpansion)
+        if (expansions.length > 0) {
+          result.push({
+            id: `${tier.id}-${name}-expansions`,
+            label: `   ↳ ${name} Expansions`,
+            plans: expansions,
+            color: venture?.color || '#666',
+            icon: '🔄',
+          })
         }
-      })
+      }
+    }
+    return result
   }
 
   // Status-based subcategories for all other categories

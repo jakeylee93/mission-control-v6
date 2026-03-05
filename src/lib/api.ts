@@ -22,10 +22,33 @@ export interface AgentStatus {
 }
 
 export interface CostSummary {
+  moonshot?: { calls: number; cost: number; tokens: number; inputTokens?: number; outputTokens?: number }
+  anthropic?: { calls: number; cost: number; tokens: number; inputTokens?: number; outputTokens?: number }
+  openai?: { calls: number; cost: number; tokens: number; inputTokens?: number; outputTokens?: number }
   brain:   { calls: number; cost: number; tokens: number; inputTokens?: number; outputTokens?: number }
   muscles: { calls: number; cost: number; tokens: number; inputTokens?: number; outputTokens?: number }
   total:   { calls: number; cost: number; tokens: number; inputTokens?: number; outputTokens?: number }
+  avgCostPerCall?: number
+  currentModel?: string | null
   entries?: CostEntry[]
+  modelBreakdown?: Array<{
+    model: string
+    provider: 'kimi' | 'claude' | 'openai'
+    calls: number
+    inputTokens: number
+    outputTokens: number
+    totalTokens: number
+    cost_gbp: number
+  }>
+  last7Days?: Array<{
+    date: string
+    cost_gbp: number
+    calls: number
+    kimi: number
+    claude: number
+    openai?: number
+  }>
+  source?: 'supabase' | 'local'
   date?: string
   hasRealData?: boolean
 }
@@ -40,7 +63,7 @@ export interface CostEntry {
   outputTokens: number
   totalTokens: number
   cost_gbp: number
-  provider: 'kimi' | 'claude'
+  provider: 'kimi' | 'claude' | 'openai'
 }
 
 export interface CalendarEvent {
@@ -70,6 +93,7 @@ export interface Plan {
   notes?: string
   subcategory?: string
   company?: string
+  isExpansion?: boolean
 }
 
 export interface ApiService {
@@ -88,6 +112,7 @@ export interface CostHistoryDay {
   calls: number
   kimi: number
   claude: number
+  openai?: number
 }
 
 export interface CostHistory {
@@ -101,6 +126,7 @@ export interface CostTotal {
   allTime:    { calls: number; totalTokens: number; cost_gbp: number }
   kimi:       { calls: number; cost_gbp: number }
   claude:     { calls: number; cost_gbp: number }
+  openai?:    { calls: number; cost_gbp: number }
   dailyAvg:   number
   activeDays: number
   totalDays:  number
@@ -158,19 +184,6 @@ export const api = {
   costs: () => fetchJSON<CostSummary>('/api/costs'),
   agents: () => fetchJSON<Record<string, AgentStatus>>('/api/agents'),
   calendarEvents: () => fetchJSON<CalendarEvent[]>('/api/calendar-events'),
-  chat: () => fetchJSON<{ messages: ChatMessage[]; typing: Record<string, boolean> }>('/api/chat'),
-  sendMessage: (text: string, sender: string) =>
-    fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, sender }),
-    }).then((r) => r.json()),
-  typing: (sender: string, typing: boolean) =>
-    fetch('/api/chat/typing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sender, typing }),
-    }),
   categories: () => fetchJSON<Record<string, Plan[]>>('/api/categories'),
   addPlan: (cat: string, plan: Omit<Plan, 'id'>) =>
     fetch(`/api/categories/${cat}/plans`, {

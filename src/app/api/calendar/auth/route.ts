@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 const CREDS_FILE = path.join(process.cwd(), '..', 'google-credentials.json')
 const REDIRECT_URI = 'http://localhost:3001/api/calendar/callback'
-const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+const SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 
 function getOAuthClient() {
   const creds = JSON.parse(fs.readFileSync(CREDS_FILE, 'utf8'))

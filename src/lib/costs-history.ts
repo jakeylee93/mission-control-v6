@@ -9,6 +9,7 @@ export interface HistoryDay {
   date: string
   kimi:   { calls: number; inputTokens: number; outputTokens: number; totalTokens: number; cost_gbp: number }
   claude: { calls: number; inputTokens: number; outputTokens: number; totalTokens: number; cost_gbp: number }
+  openai: { calls: number; inputTokens: number; outputTokens: number; totalTokens: number; cost_gbp: number }
   total:  { calls: number; inputTokens: number; outputTokens: number; totalTokens: number; cost_gbp: number }
 }
 
@@ -43,6 +44,7 @@ export function archiveToday(history: HistoryFile): HistoryFile {
         date:   daily.date,
         kimi:   daily.totals.kimi   || EMPTY(),
         claude: daily.totals.claude || EMPTY(),
+        openai: daily.totals.openai || EMPTY(),
         total:  daily.totals.total  || EMPTY(),
       }
       const idx = history.days.findIndex(d => d.date === daily.date)

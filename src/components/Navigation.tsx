@@ -95,6 +95,22 @@ const TABS: TabDef[] = [
       </svg>
     ),
   },
+  {
+    id: 'BRAIN',
+    label: 'Brain',
+    activeIcon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="w-5 h-5">
+        <path d="M9.5 8.5c0-2.3 1.6-4 3.8-4 1.8 0 3.2 1.1 3.7 2.8a3.2 3.2 0 0 1 2.9 3.2c0 2-1.6 3.6-3.6 3.6h-1" />
+        <path d="M14.5 15.7A3.7 3.7 0 0 1 8.2 18a3 3 0 0 1-3.1-3 3 3 0 0 1 2.1-2.9V11a4 4 0 0 1 7.2-2.4" />
+      </svg>
+    ),
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5">
+        <path d="M9.5 8.5c0-2.3 1.6-4 3.8-4 1.8 0 3.2 1.1 3.7 2.8a3.2 3.2 0 0 1 2.9 3.2c0 2-1.6 3.6-3.6 3.6h-1" />
+        <path d="M14.5 15.7A3.7 3.7 0 0 1 8.2 18a3 3 0 0 1-3.1-3 3 3 0 0 1 2.1-2.9V11a4 4 0 0 1 7.2-2.4" />
+      </svg>
+    ),
+  },
 ]
 
 interface Props {

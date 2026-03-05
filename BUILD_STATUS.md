@@ -227,6 +227,79 @@ Root causes found and fixed:
 
 #### Server on port 3005: ✅ Live
 
+### Phase 1: Media Upload — 2026-03-03 17:37 GMT ✅
+- [x] **`memory/uploads/`** directory created
+- [x] **POST `/api/upload`** — multipart form upload, saves file + metadata JSON
+  - Filename format: `YYYY-MM-DD-HHmmss-originalname.ext`
+  - Metadata JSON: `YYYY-MM-DD-HHmmss-originalname.json` (date, category, note, fileType, size)
+- [x] **GET `/api/uploads`** — returns last 50 uploads with metadata
+- [x] **`MediaUpload` component** (`src/components/MediaUpload.tsx`):
+  - Drag & drop zone (accepts image/*, video/*)
+  - Click-to-browse fallback
+  - Thumbnail preview (image + video)
+  - Category selector: Business / Personal
+  - Note field (optional)
+  - Animated progress bar
+  - Recent uploads list (lazy-loaded)
+  - Error / success toast feedback
+- [x] **CaptureTab updated** — MediaUpload block inserted above "How it works"
+- [x] **next.config.js updated** — `bodySizeLimit: '50mb'` for uploads
+- [x] **Build clean** — no errors, 2 warnings (viewport meta — pre-existing)
+- [x] **Deployed to port 3005** — `http://localhost:3005`
+
+### Phase 2: Summarize & Enhance — 2026-03-03 18:43 GMT ✅
+- [x] **`@anthropic-ai/sdk`** installed (npm)
+- [x] **`.env.local`** — `ANTHROPIC_API_KEY` stored for server-side use
+- [x] **POST `/api/enhance`** — AI text enhancement endpoint
+  - `type: 'summarize'` — bullet-point key points, filler stripped
+  - `type: 'enhance'` — clear, professional, actionable rewrite
+  - `type: 'expand'` — full context, implied tasks, deadlines extracted
+  - Uses `claude-haiku-4-5-20251001` (fast + cheap)
+  - Returns: `originalText`, `enhancedText`, `enhancementType`, `timestamp`, `usage`
+- [x] **CaptureTab updated** — AI button row above Attach:
+  - Summarize (blue), Enhance (green), Expand (purple)
+  - Loading spinner per button while AI is processing
+  - Preview panel: original (struck through) + enhanced side-by-side
+  - **Accept** → replaces textarea text with enhanced
+  - **Keep original** → dismisses preview
+  - **Edit before saving** → loads enhanced into textarea for manual editing
+  - Queue items show "AI enhanced/summarized/expanded" badge + original text (italic, small)
+- [x] **Capture API updated** — stores `originalText`, `enhancedText`, `enhancementType` when present
+- [x] **Build clean** — no errors, 2 pre-existing viewport warnings
+- [x] **Deployed to port 3005** — `http://localhost:3005`
+
+### Phase 3: Nightly Media Processing — 2026-03-03 19:08 GMT ✅
+- [x] **`scripts/nightly-process.js` v3** — full media pipeline
+  - Claude Vision API (Haiku) for image analysis: OCR, objects, receipts, products
+  - Intent routing: expense → `expenses/`, lyrics → `lyrics/`, product → `business/Tag/`, general → `processed/`
+  - Video description via Claude (filename + note context)
+  - Auto-tag extraction from note text (`tag as BarPeople-Honey` → `processed/business/BarPeople/Honey/`)
+  - Metadata JSON saved alongside moved files
+  - Morning report includes `### Media Processed` section
+- [x] **UI Fix** — paperclip moved into action row
+  - Row: `[📎 Upload] | [Summarize] [Enhance] [Expand] ──── [Capture]`
+  - Removed separate Attach row, Submit moved to action row
+- [x] **Cron:** `0 1 * * * node scripts/nightly-process.js`
+- [x] **GitHub issue #3** updated
+- [x] **Discord** notified
+- [x] **Deployed to port 3005** ✅
+
+#### Folder structure (processed):
+```
+memory/capture/
+  processed/
+    business/
+      BarPeople/Honey/   ← tag as BarPeople-Honey
+      receipts/
+    personal/
+      receipts/
+      media/
+  lyrics/
+    song-name-2026-03-03.txt
+  expenses/
+    2026-03-03-receipt.json
+```
+
 ## Next Steps
 - [ ] Google Calendar CREATE event from capture (calendar-pending.json → API call)
 - [ ] Drag-to-reorder plans

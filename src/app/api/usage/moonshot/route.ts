@@ -1,124 +1,125 @@
 import { NextResponse } from 'next/server'
-import path from 'path'
 import fs from 'fs'
+import path from 'path'
+import { loadDailyCosts, loadHistoryDays } from '@/lib/costs-store'
 
-// ─── Paths ────────────────────────────────────────────────────────────────────
 const CONFIG_FILE = path.join(process.cwd(), '..', 'memory', 'usage', 'config.json')
-const DAILY_FILE  = path.join(process.cwd(), '..', 'memory', 'costs', 'daily.json')
-const HISTORY_FILE = path.join(process.cwd(), '..', 'memory', 'costs', 'history.json')
+const MOONSHOT_BASE = process.env.MOONSHOT_BASE_URL?.trim() || 'https://api.moonshot.cn/v1'
+const CNY_TO_GBP = 0.11
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function getKey(): string {
+type JsonObject = Record<string, unknown>
+
+function readConfigKey(): string {
   try {
-    const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'))
-    return cfg.moonshot?.key || ''
-  } catch { return '' }
+    const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) as { moonshot?: { key?: string } }
+    return cfg.moonshot?.key?.trim() || ''
+  } catch {
+    return ''
+  }
+}
+
+function getKey(): string {
+  return process.env.MOONSHOT_API_KEY?.trim() || readConfigKey()
 }
 
 function maskKey(key: string): string {
   if (!key || key.length < 12) return '***'
-  return key.slice(0, 8) + '...' + key.slice(-4)
+  return `${key.slice(0, 8)}...${key.slice(-4)}`
 }
 
-function getLocalTodayKimi(): { cost_gbp: number; calls: number; tokens: number } {
-  try {
-    const daily = JSON.parse(fs.readFileSync(DAILY_FILE, 'utf8'))
-    const today = new Date().toISOString().slice(0, 10)
-    if (daily.date !== today) return { cost_gbp: 0, calls: 0, tokens: 0 }
-    return {
-      cost_gbp: daily.totals?.kimi?.cost_gbp || 0,
-      calls:    daily.totals?.kimi?.calls    || 0,
-      tokens:   daily.totals?.kimi?.totalTokens || 0,
-    }
-  } catch { return { cost_gbp: 0, calls: 0, tokens: 0 } }
+function asNumber(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const n = Number.parseFloat(value)
+    return Number.isFinite(n) ? n : 0
+  }
+  return 0
 }
 
-function getWeeklyAvgKimi(): number {
-  try {
-    const histFile = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'))
-    const days = (histFile.days || []) as Array<{ kimi?: { cost_gbp?: number } }>
-    const last7 = days.slice(-7)
-    if (!last7.length) return 0
-    const sum = last7.reduce((acc, d) => acc + (d.kimi?.cost_gbp || 0), 0)
-    return sum / last7.length
-  } catch { return 0 }
-}
-
-function getAllTimeKimi(): { cost_gbp: number; calls: number } {
-  try {
-    const histFile = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'))
-    const days = (histFile.days || []) as Array<{ kimi?: { cost_gbp?: number; calls?: number } }>
-    return {
-      cost_gbp: days.reduce((s, d) => s + (d.kimi?.cost_gbp || 0), 0),
-      calls:    days.reduce((s, d) => s + (d.kimi?.calls    || 0), 0),
-    }
-  } catch { return { cost_gbp: 0, calls: 0 } }
-}
-
-// ─── Fetch balance from Moonshot ──────────────────────────────────────────────
-async function fetchBalance(key: string) {
-  const res = await fetch('https://api.moonshot.cn/v1/users/me/balance', {
-    headers: { 'Authorization': `Bearer ${key}` },
-    signal: AbortSignal.timeout(10000),
-    // @ts-ignore
+async function moonshotFetch(pathname: string, key: string): Promise<JsonObject> {
+  const res = await fetch(`${MOONSHOT_BASE}${pathname}`, {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
     cache: 'no-store',
+    signal: AbortSignal.timeout(10000),
   })
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text().catch(() => '')}`)
-  return res.json()
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status} ${pathname}: ${body.slice(0, 180)}`)
+  }
+
+  return res.json() as Promise<JsonObject>
 }
 
-// ─── GET /api/usage/moonshot ──────────────────────────────────────────────────
+function extractBalance(payload: JsonObject): {
+  balanceCny: number | null
+  consumedCny: number | null
+} {
+  const data = (payload.data as JsonObject) || payload
+  const cash = (data.cash as JsonObject) || data
+
+  const balance = asNumber(cash.balance ?? cash.total_balance ?? data.balance)
+  const consumed = asNumber(cash.total_consumed ?? data.total_consumed ?? data.consumed)
+
+  return {
+    balanceCny: balance > 0 ? balance : null,
+    consumedCny: consumed > 0 ? consumed : null,
+  }
+}
+
 export async function GET() {
   const key = getKey()
   if (!key) {
     return NextResponse.json({ error: 'Moonshot key not configured' }, { status: 400 })
   }
 
-  const local    = getLocalTodayKimi()
-  const weekAvg  = getWeeklyAvgKimi()
-  const allTime  = getAllTimeKimi()
+  const [{ daily }, { days }] = await Promise.all([loadDailyCosts(), loadHistoryDays()])
+  const localToday = daily.totals.kimi
+  const allTime = days.reduce((acc, d) => {
+    acc.calls += d.kimi?.calls || 0
+    acc.cost_gbp += d.kimi?.cost_gbp || 0
+    return acc
+  }, { calls: 0, cost_gbp: 0 })
 
-  try {
-    const data = await fetchBalance(key)
-    const cash = data?.data?.cash || {}
+  const weekRows = days.slice(-7)
+  const weeklyAvg = weekRows.length
+    ? weekRows.reduce((sum, d) => sum + (d.kimi?.cost_gbp || 0), 0) / weekRows.length
+    : 0
 
-    // Moonshot balances are in CNY — convert to GBP (≈ 0.11)
-    const CNY_TO_GBP = 0.11
-    const balanceCny   = parseFloat(cash.balance || cash.total_balance || '0')
-    const consumedCny  = parseFloat(cash.total_consumed || '0')
-    const balanceGbp   = balanceCny * CNY_TO_GBP
-    const consumedGbp  = consumedCny * CNY_TO_GBP
+  const errors: string[] = []
+  let balancePayload: JsonObject | null = null
 
-    return NextResponse.json({
-      provider:           'moonshot',
-      keyMasked:          maskKey(key),
-      balance_cny:        balanceCny,
-      balance_gbp:        balanceGbp,
-      consumed_cny:       consumedCny,
-      consumed_gbp:       consumedGbp,          // real all-time spend from API
-      todayLocal_gbp:     local.cost_gbp,
-      todayLocal_calls:   local.calls,
-      todayLocal_tokens:  local.tokens,
-      allTimeLocal_gbp:   allTime.cost_gbp,
-      allTimeCalls:       allTime.calls,
-      weeklyAvg_gbp:      weekAvg,
-      source:             'api',
-      updatedAt:          new Date().toISOString(),
-    })
-  } catch (err: any) {
-    // Fallback to local tracked data
-    return NextResponse.json({
-      provider:           'moonshot',
-      keyMasked:          maskKey(key),
-      apiError:           err.message,
-      todayLocal_gbp:     local.cost_gbp,
-      todayLocal_calls:   local.calls,
-      todayLocal_tokens:  local.tokens,
-      allTimeLocal_gbp:   allTime.cost_gbp,
-      allTimeCalls:       allTime.calls,
-      weeklyAvg_gbp:      weekAvg,
-      source:             'local',
-      updatedAt:          new Date().toISOString(),
-    })
+  const candidatePaths = ['/users/me/balance', '/account/balance']
+  for (const p of candidatePaths) {
+    try {
+      balancePayload = await moonshotFetch(p, key)
+      break
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'request failed'
+      errors.push(message)
+    }
   }
+
+  const extracted = balancePayload ? extractBalance(balancePayload) : { balanceCny: null, consumedCny: null }
+
+  return NextResponse.json({
+    provider: 'moonshot',
+    keyMasked: maskKey(key),
+    balance_cny: extracted.balanceCny,
+    balance_gbp: extracted.balanceCny != null ? extracted.balanceCny * CNY_TO_GBP : null,
+    consumed_cny: extracted.consumedCny,
+    consumed_gbp: extracted.consumedCny != null ? extracted.consumedCny * CNY_TO_GBP : null,
+    todayLocal_gbp: localToday.cost_gbp,
+    todayLocal_calls: localToday.calls,
+    todayLocal_tokens: localToday.totalTokens,
+    allTimeLocal_gbp: allTime.cost_gbp,
+    allTimeCalls: allTime.calls,
+    weeklyAvg_gbp: weeklyAvg,
+    source: balancePayload ? 'api' : 'local',
+    apiError: errors[0],
+    updatedAt: new Date().toISOString(),
+  })
 }

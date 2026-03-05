@@ -150,6 +150,11 @@ body:not(.day-mode)::before {
   50% { opacity: 0.6; transform: scale(0.85); }
 }
 
+@keyframes glow-ring {
+  0%, 100% { box-shadow: 0 0 20px rgba(255,215,0,0.15), 0 0 40px rgba(255,215,0,0.05); }
+  50% { box-shadow: 0 0 30px rgba(255,215,0,0.3), 0 0 60px rgba(255,215,0,0.1); }
+}
+
 /* =============================================
    GLOW TEXT
    ============================================= */

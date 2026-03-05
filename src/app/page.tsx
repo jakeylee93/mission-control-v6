@@ -3,16 +3,17 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Navigation from '@/components/Navigation'
-import DashTab from '@/components/tabs/DashTab'
+import TeamsTab from '@/components/tabs/TeamsTab'
 import SystemTab from '@/components/tabs/SystemTab'
 import PlansTab from '@/components/tabs/PlansTab'
-import CalendarTab from '@/components/tabs/CalendarTab'
 import CaptureTab from '@/components/tabs/CaptureTab'
-
-export type Tab = 'DASH' | 'SYSTEM' | 'PLANS' | 'CALENDAR' | 'CAPTURE'
+import BrainTab from '@/components/tabs/BrainTab'
+import DocsTab from '@/components/tabs/DocsTab'
+import BelongingsTab from '@/components/tabs/BelongingsTab'
+export type Tab = 'TEAMS' | 'PLANS' | 'BRAIN' | 'DOCS' | 'BELONGINGS' | 'CAPTURE' | 'SYSTEM'
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<Tab>('DASH')
+  const [activeTab, setActiveTab] = useState<Tab>('TEAMS')
   const [time, setTime] = useState(new Date())
   const [isDayMode, setIsDayMode] = useState(false)
 
@@ -57,11 +58,13 @@ export default function Home() {
             exit="exit"
             transition={{ duration: 0.18, ease: 'easeOut' }}
           >
-            {activeTab === 'DASH' && <DashTab />}
-            {activeTab === 'SYSTEM' && <SystemTab />}
+            {activeTab === 'TEAMS' && <TeamsTab />}
             {activeTab === 'PLANS' && <PlansTab />}
-            {activeTab === 'CALENDAR' && <CalendarTab />}
+            {activeTab === 'BRAIN' && <BrainTab />}
+            {activeTab === 'DOCS' && <DocsTab />}
+            {activeTab === 'BELONGINGS' && <BelongingsTab />}
             {activeTab === 'CAPTURE' && <CaptureTab />}
+            {activeTab === 'SYSTEM' && <SystemTab />}
           </motion.div>
         </AnimatePresence>
       </main>
