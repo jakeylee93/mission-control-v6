@@ -32,6 +32,7 @@ interface InventoryItem {
   favourite?: boolean
   warrantyExpiry?: string
   runningLow?: boolean
+  business?: string // null = personal, 'barpeople' | 'anyvendor' | 'anyos'
 }
 
 interface QueueItem {
@@ -88,6 +89,12 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 
 const LOCATIONS = ['Home', 'Van', 'Office', 'Storage Unit', 'Gear Bag', 'Kitchen', 'Workshop', 'Bathroom', 'Bedroom', 'Car']
+
+const BUSINESSES = [
+  { id: 'barpeople', name: 'The Bar People', icon: '🍸', color: '#FFD700', tag: 'bar-people' },
+  { id: 'anyvendor', name: 'AnyVendor', icon: '🎪', color: '#A855F7', tag: 'anyvendor' },
+  { id: 'anyos', name: 'AnyOS', icon: '💻', color: '#06B6D4', tag: 'anyos' },
+]
 
 function matchCategory(aiCategory: string): string {
   const lower = aiCategory.toLowerCase()
@@ -163,6 +170,8 @@ export default function BelongingsTab() {
   const [filterFavs, setFilterFavs] = useState(false)
   const [filterRestock, setFilterRestock] = useState(false)
   const [detailTab, setDetailTab] = useState<'info' | 'notes' | 'value'>('info')
+  const [mode, setMode] = useState<'personal' | 'business'>('personal')
+  const [activeBusiness, setActiveBusiness] = useState<string | null>(null)
   const scanInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -366,6 +375,10 @@ export default function BelongingsTab() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return items.filter(item => {
+      // Mode filter
+      if (mode === 'personal' && item.business) return false
+      if (mode === 'business' && !item.business) return false
+      if (mode === 'business' && activeBusiness && item.business !== activeBusiness) return false
       if (activeCategory && item.category !== activeCategory) return false
       if (filterFavs && !item.favourite) return false
       if (filterRestock && !item.runningLow) return false
@@ -376,7 +389,7 @@ export default function BelongingsTab() {
         (item.tags || []).some(t => t.toLowerCase().includes(q)) ||
         (item.notes || '').toLowerCase().includes(q)
     })
-  }, [search, items, activeCategory, filterFavs, filterRestock])
+  }, [search, items, activeCategory, filterFavs, filterRestock, mode, activeBusiness])
 
   const totalValue = useMemo(() => {
     let sum = 0
@@ -517,100 +530,140 @@ export default function BelongingsTab() {
           <button onClick={() => setShowAddModal(true)} className="px-3 py-2 rounded-lg text-sm font-semibold" style={{ background: 'var(--c-panel)', color: 'var(--c-text)', border: '1px solid var(--c-border)' }}>➕ Add</button>
         </div>
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
-          {/* Categories sidebar */}
-          <aside className="card rounded-xl p-3">
-            <div className="text-xs uppercase tracking-widest mb-3" style={{ color: 'var(--c-muted)' }}>Categories</div>
-            <button onClick={() => { setActiveCategory(null); setFilterFavs(false); setFilterRestock(false) }} className="w-full text-left px-3 py-2 rounded-lg text-sm mb-1" style={{ background: !activeCategory && !filterFavs && !filterRestock ? '#FFD70020' : 'transparent', color: !activeCategory && !filterFavs && !filterRestock ? '#FFD700' : 'var(--c-muted)' }}>
-              All ({items.length})
-            </button>
-            {CATEGORIES.map(cat => {
-              const count = categoryCounts[cat] || 0
-              if (count === 0) return null
-              const active = activeCategory === cat
-              const accent = CATEGORY_COLORS[cat] || '#666'
+        {/* Personal / Business Toggle */}
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => { setMode('personal'); setActiveBusiness(null); setActiveCategory(null) }}
+            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+            style={{
+              background: mode === 'personal' ? '#FFD700' : 'var(--c-panel)',
+              color: mode === 'personal' ? '#000' : 'var(--c-muted)',
+              border: `1px solid ${mode === 'personal' ? '#FFD700' : 'var(--c-border)'}`,
+            }}
+          >
+            🏠 Personal
+          </button>
+          <button
+            onClick={() => { setMode('business'); setActiveCategory(null) }}
+            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+            style={{
+              background: mode === 'business' ? '#A855F7' : 'var(--c-panel)',
+              color: mode === 'business' ? '#fff' : 'var(--c-muted)',
+              border: `1px solid ${mode === 'business' ? '#A855F7' : 'var(--c-border)'}`,
+            }}
+          >
+            💼 Business
+          </button>
+        </div>
+
+        {/* Business Company Cubes */}
+        {mode === 'business' && (
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {BUSINESSES.map(biz => {
+              const active = activeBusiness === biz.id
+              const count = items.filter(i => i.business === biz.id).length
               return (
-                <button key={cat} onClick={() => setActiveCategory(active ? null : cat)} className="w-full text-left px-3 py-1.5 rounded-lg text-sm mb-0.5 flex items-center justify-between" style={{ background: active ? `${accent}15` : 'transparent', color: active ? accent : 'var(--c-muted)' }}>
-                  <span className="truncate">{cat}</span>
-                  <span className="text-xs font-semibold shrink-0">{count}</span>
-                </button>
+                <motion.button
+                  key={biz.id}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setActiveBusiness(active ? null : biz.id)}
+                  className="card rounded-xl p-4 text-center aspect-square flex flex-col items-center justify-center gap-2 transition-all"
+                  style={{
+                    borderColor: active ? biz.color : 'var(--c-border)',
+                    borderWidth: active ? '2px' : '1px',
+                    background: active ? `${biz.color}10` : undefined,
+                  }}
+                >
+                  <span className="text-3xl">{biz.icon}</span>
+                  <span className="text-sm font-semibold" style={{ color: active ? biz.color : 'var(--c-text)' }}>{biz.name}</span>
+                  <span className="text-xs" style={{ color: 'var(--c-muted)' }}>{count} items</span>
+                </motion.button>
               )
             })}
-          </aside>
+          </div>
+        )}
 
-          {/* Items grid */}
-          <section>
-            {filtered.length === 0 ? (
-              <div className="card rounded-xl p-8 text-center">
-                <div className="text-5xl mb-3">📷</div>
-                <div className="text-lg font-semibold mb-2" style={{ color: 'var(--c-text)' }}>
-                  {items.length === 0 ? 'Scan your first items' : 'No items match'}
-                </div>
-                <div className="text-sm mb-4" style={{ color: 'var(--c-muted)' }}>Photos → Queue → Sync → AI identifies everything</div>
-                <button onClick={() => scanInputRef.current?.click()} className="px-4 py-2 rounded-lg font-semibold" style={{ background: '#FFD700', color: '#000' }}>📸 Scan Items</button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                {filtered.map(item => {
-                  const accent = CATEGORY_COLORS[item.category] || '#666'
-                  const cpu = costPerUse(item.estimatedValue, item.usageFrequency)
-                  return (
-                    <motion.button key={item.id} whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.985 }} className="card rounded-xl p-3 text-left relative" style={{ borderColor: item.favourite ? '#FFD70060' : `${accent}20` }} onClick={() => { setSelectedItem(item); setDetailTab('info') }}>
-                      {/* Favourite star */}
-                      <button onClick={(e) => toggleFavourite(e, item.id)} className="absolute top-2 right-2 z-10 text-lg" style={{ color: item.favourite ? '#FFD700' : '#333' }}>
-                        {item.favourite ? '★' : '☆'}
-                      </button>
-                      {/* Running low badge */}
-                      {item.runningLow && <div className="absolute top-2 left-2 z-10 text-[10px] px-1.5 py-0.5 rounded-lg font-semibold" style={{ background: '#EF444430', color: '#EF4444' }}>LOW</div>}
-
-                      <div className="rounded-lg mb-2 aspect-square w-full flex items-center justify-center overflow-hidden" style={{ background: '#1E1E1E' }}>
-                        {(item.productImage || item.imagePath) ? <img src={item.productImage || item.imagePath} alt={item.name} className="w-full h-full object-cover" /> : <span className="text-3xl">📷</span>}
-                      </div>
-                      <div className="text-sm font-semibold mb-1 truncate pr-6" style={{ color: 'var(--c-text)' }}>{item.name}</div>
-
-                      {/* Rating (compact) */}
-                      {(item.rating || 0) > 0 && (
-                        <div className="flex items-center gap-0.5 mb-1">
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
-                            <span key={n} className="text-[8px]" style={{ color: n <= (item.rating || 0) ? '#FFD700' : '#333' }}>★</span>
-                          ))}
-                          <span className="text-[10px] ml-0.5 font-semibold" style={{ color: '#FFD700' }}>{item.rating}</span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-lg" style={{ background: `${accent}20`, color: accent }}>{item.category.replace(/^[^\s]+\s/, '')}</span>
-                        {item.size && <span className="text-[10px] font-semibold" style={{ color: '#60A5FA' }}>{item.size}</span>}
-                        {item.condition && <span className="text-[10px]" style={{ color: 'var(--c-muted)' }}>{item.condition}</span>}
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {item.estimatedValue && <span className="text-xs font-semibold" style={{ color: '#22C55E' }}>{item.estimatedValue}</span>}
-                          {cpu && <span className="text-[10px]" style={{ color: 'var(--c-muted)' }}>{cpu}</span>}
-                          {item.wouldRepurchase === true && <span className="text-[10px]">👍</span>}
-                          {item.wouldRepurchase === false && <span className="text-[10px]">👎</span>}
-                        </div>
-                        <span className="text-[10px]" style={{ color: 'var(--c-dim)' }}>{item.location}</span>
-                      </div>
-
-                      {/* Tags */}
-                      {item.tags && item.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1.5">
-                          {item.tags.slice(0, 3).map(t => (
-                            <span key={t} className="text-[9px] px-1.5 py-0.5 rounded-lg" style={{ background: '#ffffff10', color: 'var(--c-muted)' }}>#{t}</span>
-                          ))}
-                          {item.tags.length > 3 && <span className="text-[9px]" style={{ color: 'var(--c-muted)' }}>+{item.tags.length - 3}</span>}
-                        </div>
-                      )}
-                    </motion.button>
-                  )
-                })}
-              </div>
-            )}
-          </section>
+        {/* Categories row */}
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+          <button onClick={() => { setActiveCategory(null); setFilterFavs(false); setFilterRestock(false) }} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: !activeCategory ? '#FFD70020' : 'var(--c-panel)', color: !activeCategory ? '#FFD700' : 'var(--c-muted)', border: '1px solid var(--c-border)' }}>
+            All ({filtered.length})
+          </button>
+          {CATEGORIES.map(cat => {
+            const count = items.filter(i => {
+              if (mode === 'personal' && i.business) return false
+              if (mode === 'business' && !i.business) return false
+              if (mode === 'business' && activeBusiness && i.business !== activeBusiness) return false
+              return i.category === cat
+            }).length
+            const active = activeCategory === cat
+            const accent = CATEGORY_COLORS[cat] || '#666'
+            return (
+              <button key={cat} onClick={() => setActiveCategory(active ? null : cat)} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ background: active ? `${accent}20` : 'var(--c-panel)', color: active ? accent : 'var(--c-muted)', border: `1px solid ${active ? `${accent}40` : 'var(--c-border)'}` }}>
+                {cat} {count > 0 ? `(${count})` : ''}
+              </button>
+            )
+          })}
         </div>
+
+        {/* Items grid — compact */}
+        <section>
+          {filtered.length === 0 ? (
+            <div className="card rounded-xl p-8 text-center">
+              <div className="text-5xl mb-3">📷</div>
+              <div className="text-lg font-semibold mb-2" style={{ color: 'var(--c-text)' }}>
+                {items.length === 0 ? 'Scan your first items' : 'No items in this view'}
+              </div>
+              <div className="text-sm mb-4" style={{ color: 'var(--c-muted)' }}>Photos → Queue → Sync → AI identifies everything</div>
+              <button onClick={() => scanInputRef.current?.click()} className="px-4 py-2 rounded-lg font-semibold" style={{ background: '#FFD700', color: '#000' }}>📸 Scan Items</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2.5">
+              {filtered.map(item => {
+                const accent = CATEGORY_COLORS[item.category] || '#666'
+                const cpu = costPerUse(item.estimatedValue, item.usageFrequency)
+                return (
+                  <motion.button key={item.id} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="card rounded-xl p-2 text-left relative" style={{ borderColor: item.favourite ? '#FFD70060' : `${accent}15` }} onClick={() => { setSelectedItem(item); setDetailTab('info') }}>
+                    {/* Favourite star */}
+                    <button onClick={(e) => toggleFavourite(e, item.id)} className="absolute top-1.5 right-1.5 z-10 text-sm" style={{ color: item.favourite ? '#FFD700' : '#333' }}>
+                      {item.favourite ? '★' : '☆'}
+                    </button>
+                    {/* Running low badge */}
+                    {item.runningLow && <div className="absolute top-1.5 left-1.5 z-10 text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: '#EF444430', color: '#EF4444' }}>LOW</div>}
+
+                    <div className="rounded-lg mb-1.5 aspect-square w-full flex items-center justify-center overflow-hidden" style={{ background: '#1E1E1E' }}>
+                      {(item.productImage || item.imagePath) ? <img src={item.productImage || item.imagePath} alt={item.name} className="w-full h-full object-cover" /> : <span className="text-2xl">📷</span>}
+                    </div>
+                    <div className="text-xs font-semibold mb-0.5 truncate pr-5" style={{ color: 'var(--c-text)' }}>{item.name}</div>
+
+                    {/* Rating (tiny) */}
+                    {(item.rating || 0) > 0 && (
+                      <div className="flex items-center gap-px mb-0.5">
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                          <span key={n} className="text-[6px]" style={{ color: n <= (item.rating || 0) ? '#FFD700' : '#333' }}>★</span>
+                        ))}
+                        <span className="text-[9px] ml-0.5 font-semibold" style={{ color: '#FFD700' }}>{item.rating}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-1 flex-wrap mb-0.5">
+                      <span className="text-[9px] px-1 py-px rounded" style={{ background: `${accent}20`, color: accent }}>{item.category.replace(/^[^\s]+\s/, '')}</span>
+                      {item.size && <span className="text-[9px] font-semibold" style={{ color: '#60A5FA' }}>{item.size}</span>}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        {item.estimatedValue && <span className="text-[10px] font-semibold" style={{ color: '#22C55E' }}>{item.estimatedValue}</span>}
+                        {item.wouldRepurchase === true && <span className="text-[9px]">👍</span>}
+                        {item.wouldRepurchase === false && <span className="text-[9px]">👎</span>}
+                      </div>
+                    </div>
+                  </motion.button>
+                )
+              })}
+            </div>
+          )}
+        </section>
 
         {/* Add Manual Modal */}
         <AnimatePresence>
@@ -778,7 +831,13 @@ export default function BelongingsTab() {
                         <option value="rarely">Rarely</option>
                       </select>
                     </div>
-                    <input value={selectedItem.size || ''} onChange={e => updateSelected({ size: e.target.value })} placeholder="Size / Volume / Weight (e.g. 75ml, 250g)" className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <input value={selectedItem.size || ''} onChange={e => updateSelected({ size: e.target.value })} placeholder="Size (75ml, 250g)" className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
+                      <select value={selectedItem.business || ''} onChange={e => updateSelected({ business: e.target.value || undefined })} className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}>
+                        <option value="">Personal item</option>
+                        {BUSINESSES.map(b => <option key={b.id} value={b.id}>{b.icon} {b.name}</option>)}
+                      </select>
+                    </div>
                     <textarea value={selectedItem.description} onChange={e => updateSelected({ description: e.target.value })} placeholder="Description" rows={2} className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
 
                     {/* Tags */}
