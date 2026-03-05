@@ -294,7 +294,11 @@ export default function BelongingsTab() {
       const data = await res.json()
       if (data.imagePath) {
         // Product image becomes the header, user's original stays as gallery
-        updateSelected({ productImage: data.imagePath })
+        const updatedItem = { ...item, productImage: data.imagePath }
+        setSelectedItem(updatedItem)
+        // Auto-save immediately
+        const updatedItems = items.map(i => i.id === item.id ? updatedItem : i)
+        await saveItems(updatedItems)
       } else if (data.searchUrl) {
         window.open(data.searchUrl, '_blank')
       }
