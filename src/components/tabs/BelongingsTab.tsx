@@ -120,6 +120,11 @@ export default function BelongingsTab() {
   return (
     <div className="h-[calc(100vh-100px)] overflow-y-auto">
       <div className="p-4 md:p-6 max-w-[1400px] mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>Belongings</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>Your physical world, catalogued and searchable</p>
+        </div>
+
         <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
           <input
             value={search}

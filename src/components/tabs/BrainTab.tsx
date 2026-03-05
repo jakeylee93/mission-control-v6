@@ -499,6 +499,11 @@ export default function BrainTab() {
   return (
     <div className="h-[calc(100vh-100px)] overflow-y-auto">
       <div className="p-4 md:p-6 max-w-[1400px] mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>Brain</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>Your memory system — capture, search and organise thoughts</p>
+        </div>
+
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <div className="text-xs uppercase tracking-widest" style={{ color: 'var(--c-muted)' }}>Cognitive Layer</div>

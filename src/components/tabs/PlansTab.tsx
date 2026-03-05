@@ -718,9 +718,16 @@ export default function PlansTab() {
 
   return (
     <div className="h-[calc(100vh-116px)] flex flex-col">
+      <div className="px-4 md:px-6 pt-4">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>Plans</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>Track your companies, goals and next moves</p>
+        </div>
+      </div>
+
       {/* ── Category Pills ── */}
       <div
-        className="shrink-0 px-4 pt-4 pb-3"
+        className="shrink-0 px-4 pt-0 pb-3"
         style={{ borderBottom: '1px solid var(--c-border)' }}
       >
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5">

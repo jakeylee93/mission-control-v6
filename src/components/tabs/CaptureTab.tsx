@@ -203,6 +203,10 @@ export default function CaptureTab() {
   return (
     <div className="h-[calc(100vh-100px)] overflow-y-auto">
       <div className="p-4 md:p-6 max-w-[860px] mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>Capture</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>Quick capture — snap, upload and enhance</p>
+        </div>
 
         {/* Header */}
         <div className="mb-6">

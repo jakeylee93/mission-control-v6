@@ -134,6 +134,11 @@ export default function TeamsTab() {
   return (
     <div className="h-[calc(100vh-100px)] overflow-y-auto">
       <div className="p-4 md:p-6 max-w-[1400px] mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>Teams</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>Your AI agents working together in real-time</p>
+        </div>
+
         <div className="card rounded-2xl p-3 md:p-4 mb-4 md:mb-5">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 md:gap-3 text-sm">
             <div className="flex items-center gap-2" style={{ color: 'var(--c-text)' }}>

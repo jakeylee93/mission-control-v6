@@ -211,6 +211,13 @@ export default function SystemTab() {
   return (
     <div className="h-[calc(100vh-100px)] overflow-y-auto">
       <div className="px-4 md:px-6 pt-4 max-w-[1400px] mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold" style={{ color: "var(--c-text)" }}>System</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--c-muted)" }}>Under the hood — costs, services and configuration</p>
+        </div>
+      </div>
+
+      <div className="px-4 md:px-6 pt-4 max-w-[1400px] mx-auto">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {SYSTEM_SUB_TABS.map((tab) => {
             const active = activeSubTab === tab.id
