@@ -17,6 +17,7 @@ interface InventoryItem {
   photos?: string[]      // user's photos (gallery)
   uses?: string
   size?: string
+  colour?: string
   purchaseLocation?: string
   categoryConfidence?: number
   alternateCategories?: string[]
@@ -183,6 +184,7 @@ export default function BelongingsTab() {
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({ category: CATEGORIES[0], location: LOCATIONS[0], condition: 'Good' })
   const [priceLoading, setPriceLoading] = useState<string | null>(null)
   const [imageSearching, setImageSearching] = useState(false)
+  const [imageQuery, setImageQuery] = useState('')
   const [tagInput, setTagInput] = useState('')
 
   useEffect(() => {
@@ -279,6 +281,7 @@ export default function BelongingsTab() {
       imagePath: r.imagePath,
       productImage: r.productImage || undefined,
       size: (r as any).size || undefined,
+      colour: (r as any).colour || undefined,
       categoryConfidence: r.categoryConfidence,
       alternateCategories: r.alternateCategories,
       uses: '',
@@ -314,13 +317,14 @@ export default function BelongingsTab() {
     setPriceLoading(null)
   }
 
-  async function findProductImage(item: InventoryItem) {
+  async function findProductImage(item: InventoryItem, customQuery?: string) {
     setImageSearching(true)
     try {
+      const query = customQuery || item.priceSearchQuery || item.name
       const res = await fetch('/api/belongings/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: item.priceSearchQuery || item.name, itemId: item.id }),
+        body: JSON.stringify({ query, itemId: item.id }),
       })
       const data = await res.json()
       if (data.imagePath) {
@@ -692,8 +696,8 @@ export default function BelongingsTab() {
                     {/* Running low badge */}
                     {item.runningLow && <div className="absolute top-1.5 left-1.5 z-10 text-[9px] px-1 py-0.5 rounded font-semibold" style={{ background: '#EF444430', color: '#EF4444' }}>LOW</div>}
 
-                    <div className="rounded-lg mb-1.5 aspect-square w-full flex items-center justify-center overflow-hidden" style={{ background: '#FFFFFF' }}>
-                      {(item.productImage || item.imagePath) ? <img src={item.productImage || item.imagePath} alt={item.name} className="w-full h-full object-cover" /> : <span className="text-2xl">📷</span>}
+                    <div className="rounded-lg mb-1.5 aspect-square w-full flex items-center justify-center overflow-hidden p-2" style={{ background: '#FFFFFF' }}>
+                      {(item.productImage || item.imagePath) ? <img src={item.productImage || item.imagePath} alt={item.name} className="w-full h-full object-contain" /> : <span className="text-2xl opacity-30">📷</span>}
                     </div>
                     <div className="text-xs font-semibold mb-0.5 truncate pr-5" style={{ color: 'var(--c-text)' }}>{item.name}</div>
 
@@ -709,6 +713,7 @@ export default function BelongingsTab() {
 
                     <div className="flex items-center gap-1 flex-wrap mb-0.5">
                       <span className="text-[9px] px-1 py-px rounded" style={{ background: `${accent}20`, color: accent }}>{item.category.replace(/^[^\s]+\s/, '')}</span>
+                      {item.colour && <span className="text-[9px]" style={{ color: 'var(--c-muted)' }}>{item.colour}</span>}
                       {item.size && <span className="text-[9px] font-semibold" style={{ color: '#60A5FA' }}>{item.size}</span>}
                     </div>
 
@@ -768,13 +773,24 @@ export default function BelongingsTab() {
                 {/* Photo section — product image header + gallery */}
                 <div className="mb-4">
                   {/* Main product image */}
-                  <div className="rounded-xl aspect-square max-h-[300px] w-full flex items-center justify-center overflow-hidden relative" style={{ background: '#FFFFFF', border: '1px solid var(--c-border)' }}>
+                  <div className="rounded-xl aspect-square max-h-[300px] w-full flex items-center justify-center overflow-hidden relative p-4" style={{ background: '#FFFFFF', border: '1px solid var(--c-border)' }}>
                     {(selectedItem.productImage || selectedItem.imagePath) ? (
                       <>
-                        <img src={selectedItem.productImage || selectedItem.imagePath} alt={selectedItem.name} className="w-full h-full object-cover" />
-                        <button onClick={() => findProductImage(selectedItem)} disabled={imageSearching} className="absolute bottom-2 right-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'rgba(0,0,0,0.85)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)' }}>
-                          {imageSearching ? '🔍 Searching...' : '🔄 Better Image'}
-                        </button>
+                        <img src={selectedItem.productImage || selectedItem.imagePath} alt={selectedItem.name} className="w-full h-full object-contain" />
+                        <div className="absolute bottom-2 right-2 left-2 flex gap-1.5">
+                          <input
+                            value={imageQuery}
+                            onChange={e => setImageQuery(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && imageQuery.trim()) findProductImage(selectedItem, imageQuery.trim()) }}
+                            placeholder="Describe image..."
+                            className="flex-1 px-2 py-1.5 rounded-lg text-xs"
+                            style={{ background: 'rgba(0,0,0,0.85)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
+                            onClick={e => e.stopPropagation()}
+                          />
+                          <button onClick={() => findProductImage(selectedItem, imageQuery.trim() || undefined)} disabled={imageSearching} className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'rgba(0,0,0,0.85)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)' }}>
+                            {imageSearching ? '🔍...' : '🔄'}
+                          </button>
+                        </div>
                       </>
                     ) : (
                       <div className="text-center">
@@ -893,8 +909,9 @@ export default function BelongingsTab() {
                         <option value="rarely">Rarely</option>
                       </select>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <input value={selectedItem.size || ''} onChange={e => updateSelected({ size: e.target.value })} placeholder="Size (75ml, 250g)" className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
+                    <div className="grid grid-cols-3 gap-3">
+                      <input value={selectedItem.colour || ''} onChange={e => updateSelected({ colour: e.target.value })} placeholder="Colour" className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
+                      <input value={selectedItem.size || ''} onChange={e => updateSelected({ size: e.target.value })} placeholder="Size" className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
                       <select value={selectedItem.business || ''} onChange={e => updateSelected({ business: e.target.value || undefined })} className="rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }}>
                         <option value="">Personal item</option>
                         {BUSINESSES.map(b => <option key={b.id} value={b.id}>{b.icon} {b.name}</option>)}
