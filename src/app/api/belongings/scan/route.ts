@@ -1,168 +1,173 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'fs'
 import path from 'path'
 
-export const runtime = 'nodejs'
-
-type Category =
-  | 'Electronics'
-  | 'Climbing Gear'
-  | 'Tools'
-  | 'Kitchen'
-  | 'Business Equipment'
-  | 'Office Equipment'
-  | 'Other'
-
-interface DetectedItem {
-  name: string
-  category: Category
-  estimatedValue: string
-  description: string
-  suggestedLocation: string
-}
-
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'belongings')
-const VALID_CATEGORIES: Category[] = [
-  'Electronics',
-  'Climbing Gear',
-  'Tools',
-  'Kitchen',
-  'Business Equipment',
-  'Office Equipment',
-  'Other',
-]
-
-function ensureDir(dir: string) {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-}
-
-function extractContentText(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return ''
-
-  const textParts = content
-    .map((part) => {
-      if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
-        return part.text
-      }
-      return ''
-    })
-    .filter(Boolean)
-
-  return textParts.join('\n').trim()
-}
-
-function parseJsonArray(raw: string): unknown[] {
-  const trimmed = raw.trim()
-  if (!trimmed) return []
-
-  try {
-    const parsed = JSON.parse(trimmed)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    const match = trimmed.match(/\[[\s\S]*\]/)
-    if (!match) return []
-    try {
-      const parsed = JSON.parse(match[0])
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  }
-}
-
-function normalizeItem(input: unknown): DetectedItem | null {
-  if (!input || typeof input !== 'object') return null
-
-  const raw = input as Record<string, unknown>
-  const name = typeof raw.name === 'string' ? raw.name.trim() : ''
-  if (!name) return null
-
-  const category = typeof raw.category === 'string' && VALID_CATEGORIES.includes(raw.category as Category)
-    ? (raw.category as Category)
-    : 'Other'
-
-  return {
-    name,
-    category,
-    estimatedValue: typeof raw.estimatedValue === 'string' ? raw.estimatedValue.trim() : '',
-    description: typeof raw.description === 'string' ? raw.description.trim() : '',
-    suggestedLocation: typeof raw.suggestedLocation === 'string' ? raw.suggestedLocation.trim() : 'Home',
-  }
-}
+const BELONGINGS_DIR = path.join(process.cwd(), 'public', 'belongings')
+const QUEUE_FILE = '/Users/margaritabot/.openclaw/workspace/memory/belongings-queue.json'
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      return NextResponse.json({ ok: false, error: 'OPENAI_API_KEY is not configured' }, { status: 500 })
-    }
-
     const formData = await req.formData()
-    const image = (formData.get('image') ?? formData.get('file')) as File | null
+    const file = formData.get('file') as File | null
+    const action = formData.get('action') as string | null
 
-    if (!image || image.size === 0) {
-      return NextResponse.json({ ok: false, error: 'Image file is required' }, { status: 400 })
+    // If action is "sync", process the queue
+    if (action === 'sync') {
+      return await processQueue()
     }
 
-    ensureDir(UPLOAD_DIR)
+    if (!file) {
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    }
 
+    // Save image
+    mkdirSync(BELONGINGS_DIR, { recursive: true })
     const filename = `item-${Date.now()}.jpg`
-    const filePath = path.join(UPLOAD_DIR, filename)
-    const buffer = Buffer.from(await image.arrayBuffer())
-    fs.writeFileSync(filePath, buffer)
+    const filepath = path.join(BELONGINGS_DIR, filename)
+    const buffer = Buffer.from(await file.arrayBuffer())
+    writeFileSync(filepath, buffer)
 
-    const mimeType = image.type || 'image/jpeg'
-    const base64 = buffer.toString('base64')
-    const dataUri = `data:${mimeType};base64,${base64}`
-
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        temperature: 0.2,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You are an inventory assistant. Analyse this photo and identify ALL distinct physical items visible. For each item return a JSON array of objects with: name (string), category (one of: Electronics, Climbing Gear, Tools, Kitchen, Business Equipment, Office Equipment, Other), estimatedValue (string like "£50"), description (brief), suggestedLocation (string). Be specific with item names. Return ONLY valid JSON array, no markdown.',
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Identify all distinct items in this image.' },
-              { type: 'image_url', image_url: { url: dataUri } },
-            ],
-          },
-        ],
-      }),
-    })
-
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text()
-      console.error('OpenAI scan failed:', errText)
-      return NextResponse.json({ ok: false, error: 'Failed to analyse image' }, { status: 502 })
-    }
-
-    const aiJson = (await aiResponse.json()) as {
-      choices?: Array<{ message?: { content?: unknown } }>
-    }
-
-    const rawContent = extractContentText(aiJson.choices?.[0]?.message?.content)
-    const parsed = parseJsonArray(rawContent)
-    const items = parsed.map(normalizeItem).filter((item): item is DetectedItem => item !== null)
-
-    return NextResponse.json({
-      ok: true,
-      items,
+    // Add to queue
+    const queue = loadQueue()
+    queue.push({
+      id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       imagePath: `/belongings/${filename}`,
+      addedAt: new Date().toISOString(),
+      status: 'pending',
     })
-  } catch (error) {
-    console.error('Belongings scan error:', error)
-    return NextResponse.json({ ok: false, error: 'Unable to scan items right now' }, { status: 500 })
+    saveQueue(queue)
+
+    return NextResponse.json({ ok: true, queueLength: queue.length })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Scan failed' }, { status: 500 })
   }
+}
+
+// GET: return current queue
+export async function GET() {
+  return NextResponse.json({ queue: loadQueue() })
+}
+
+// DELETE: remove item from queue
+export async function DELETE(req: NextRequest) {
+  try {
+    const { id } = await req.json()
+    const queue = loadQueue().filter((q: any) => q.id !== id)
+    saveQueue(queue)
+    return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+function loadQueue(): any[] {
+  try {
+    if (existsSync(QUEUE_FILE)) {
+      return JSON.parse(readFileSync(QUEUE_FILE, 'utf8'))
+    }
+  } catch {}
+  return []
+}
+
+function saveQueue(queue: any[]) {
+  mkdirSync(path.dirname(QUEUE_FILE), { recursive: true })
+  writeFileSync(QUEUE_FILE, JSON.stringify(queue, null, 2))
+}
+
+async function processQueue() {
+  const queue = loadQueue()
+  const pending = queue.filter((q: any) => q.status === 'pending')
+
+  if (pending.length === 0) {
+    return NextResponse.json({ ok: true, results: [], message: 'Nothing to process' })
+  }
+
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) {
+    return NextResponse.json({ error: 'OPENAI_API_KEY not set' }, { status: 500 })
+  }
+
+  const allResults: any[] = []
+
+  for (const item of pending) {
+    try {
+      const imgPath = path.join(process.cwd(), 'public', item.imagePath)
+      if (!existsSync(imgPath)) continue
+
+      const imgBuffer = readFileSync(imgPath)
+      const base64 = imgBuffer.toString('base64')
+      const mimeType = 'image/jpeg'
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an inventory assistant. Analyse this photo and identify ALL distinct physical items visible.
+
+For each item return a JSON array of objects with:
+- name: specific product name if recognisable, otherwise descriptive name
+- category: one of [Electronics, Climbing Gear, Tools, Kitchen, Business Equipment, Office Equipment, Toiletries & Grooming, Clothing, Food & Drink, Sports & Fitness, Home, Other]
+- categoryConfidence: number 0-100 (how sure you are about the category)
+- alternateCategories: array of up to 2 other possible categories
+- estimatedValue: string like "£50" (your best estimate of current retail value)
+- priceSearchQuery: a good Google Shopping search query to find this exact item (e.g. "Nivea Men Moisturiser 75ml")
+- description: brief description
+- condition: one of [New, Good, Fair, Poor]
+- suggestedLocation: likely storage location
+
+Return ONLY a valid JSON array, no markdown, no explanation.`
+            },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Identify all items in this photo:' },
+                { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } }
+              ]
+            }
+          ],
+          max_tokens: 2000,
+          temperature: 0.3,
+        }),
+      })
+
+      const data = await response.json()
+      const content = data.choices?.[0]?.message?.content || '[]'
+
+      // Parse JSON from response
+      let items: any[] = []
+      try {
+        const jsonMatch = content.match(/\[[\s\S]*\]/)
+        if (jsonMatch) {
+          items = JSON.parse(jsonMatch[0])
+        }
+      } catch {}
+
+      // Attach image to each detected item
+      for (const detected of items) {
+        allResults.push({
+          id: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          ...detected,
+          imagePath: item.imagePath,
+          queueId: item.id,
+          scannedAt: new Date().toISOString(),
+        })
+      }
+
+      // Mark queue item as processed
+      item.status = 'processed'
+    } catch (err: any) {
+      item.status = 'error'
+      item.error = err.message
+    }
+  }
+
+  saveQueue(queue)
+  return NextResponse.json({ ok: true, results: allResults })
 }
