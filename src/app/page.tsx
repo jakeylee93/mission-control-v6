@@ -12,7 +12,8 @@ import DocsTab from '@/components/tabs/DocsTab'
 import BelongingsTab from '@/components/tabs/BelongingsTab'
 import PropertyTab from '@/components/tabs/PropertyTab'
 import LovelyTab from '@/components/tabs/LovelyTab'
-export type Tab = 'TEAMS' | 'PLANS' | 'BRAIN' | 'DOCS' | 'BELONGINGS' | 'LOVELY' | 'PROPERTY' | 'CAPTURE' | 'SYSTEM'
+import CalendarTab from '@/components/tabs/CalendarTab'
+export type Tab = 'TEAMS' | 'PLANS' | 'BRAIN' | 'DOCS' | 'BELONGINGS' | 'LOVELY' | 'PROPERTY' | 'CALENDAR' | 'CAPTURE' | 'SYSTEM'
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>('TEAMS')
@@ -67,6 +68,7 @@ export default function Home() {
             {activeTab === 'BELONGINGS' && <BelongingsTab />}
             {activeTab === 'LOVELY' && <LovelyTab />}
             {activeTab === 'PROPERTY' && <PropertyTab />}
+            {activeTab === 'CALENDAR' && <CalendarTab />}
             {activeTab === 'CAPTURE' && <CaptureTab />}
             {activeTab === 'SYSTEM' && <SystemTab />}
           </motion.div>
