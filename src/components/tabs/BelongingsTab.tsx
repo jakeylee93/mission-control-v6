@@ -169,6 +169,7 @@ export default function BelongingsTab() {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState('')
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [filterFavs, setFilterFavs] = useState(false)
@@ -223,20 +224,44 @@ export default function BelongingsTab() {
   async function handleSync() {
     if (syncing || queue.length === 0) return
     setSyncing(true)
+    setSyncStatus('🔍 Identifying items with AI...')
+
+    // Animate status messages
+    const statuses = [
+      '🔍 Identifying items with AI...',
+      '📸 Finding product images...',
+      '💰 Looking up current prices...',
+      '🏪 Checking UK retailers...',
+      '✨ Almost done...',
+    ]
+    let statusIdx = 0
+    const statusInterval = setInterval(() => {
+      statusIdx = Math.min(statusIdx + 1, statuses.length - 1)
+      setSyncStatus(statuses[statusIdx])
+    }, 4000)
+
     try {
       const fd = new FormData()
       fd.append('action', 'sync')
       const res = await fetch('/api/belongings/scan', { method: 'POST', body: fd })
       const data = await res.json()
-      if (data.ok && data.results) {
+      if (data.ok && data.results && data.results.length > 0) {
         setScanResults(data.results.map((r: ScanResult) => ({
           ...r,
           category: matchCategory(r.category),
           selected: true,
         })))
         setQueue([])
+        setSyncStatus('')
+      } else {
+        setSyncStatus('⚠️ No items detected — try a clearer photo')
+        setTimeout(() => setSyncStatus(''), 3000)
       }
-    } catch {}
+    } catch {
+      setSyncStatus('❌ Sync failed — try again')
+      setTimeout(() => setSyncStatus(''), 3000)
+    }
+    clearInterval(statusInterval)
     setSyncing(false)
   }
 
@@ -525,9 +550,24 @@ export default function BelongingsTab() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-sm font-semibold" style={{ color: '#F59E0B' }}>⏳ Scan Queue ({queue.length} photos)</div>
                   <button onClick={handleSync} disabled={syncing} className="px-4 py-1.5 rounded-lg text-xs font-semibold disabled:opacity-50" style={{ background: '#FFD700', color: '#000' }}>
-                    {syncing ? '🔄 Scanning...' : '🔍 Sync & Identify'}
+                    {syncing ? '🔄 Syncing...' : '🔍 Sync & Identify'}
                   </button>
                 </div>
+                {/* Sync progress */}
+                {syncing && syncStatus && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mb-3 rounded-xl p-3 text-center"
+                    style={{ background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.2)' }}
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#FFD700', borderTopColor: 'transparent' }} />
+                      <span className="text-sm font-semibold" style={{ color: '#FFD700' }}>{syncStatus}</span>
+                    </div>
+                    <div className="text-[10px] mt-1" style={{ color: 'var(--c-muted)' }}>This takes 10-20 seconds per item (AI + image + price lookup)</div>
+                  </motion.div>
+                )}
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {queue.map(q => (
                     <div key={q.id} className="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden" style={{ border: '1px solid var(--c-border)' }}>

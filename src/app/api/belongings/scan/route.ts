@@ -91,7 +91,14 @@ async function processQueue() {
 
   for (const item of pending) {
     try {
-      const imgPath = path.join(process.cwd(), 'public', item.imagePath)
+      // Extract filename from either /api/belongings/img?f=xxx.jpg or /belongings/xxx.jpg
+      let imgFilename = item.imagePath
+      if (imgFilename.includes('?f=')) {
+        imgFilename = imgFilename.split('?f=')[1]
+      } else if (imgFilename.startsWith('/belongings/')) {
+        imgFilename = imgFilename.replace('/belongings/', '')
+      }
+      const imgPath = path.join(BELONGINGS_DIR, imgFilename)
       if (!existsSync(imgPath)) continue
 
       const imgBuffer = readFileSync(imgPath)
