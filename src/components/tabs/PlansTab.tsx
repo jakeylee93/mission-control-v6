@@ -30,9 +30,9 @@ const VENTURES = [
 ]
 
 const TIERS = [
-  { id: 'Live',     label: '🟢 Live',     color: '#22C55E' },
-  { id: 'Pipeline', label: '🟡 Pipeline', color: '#F59E0B' },
-  { id: 'Archived', label: '📦 Archived', color: '#666666' },
+  { id: 'Live',     label: '🟢 LIVE',     color: '#22C55E' },
+  { id: 'Pipeline', label: '🟡 PIPELINE', color: '#F59E0B' },
+  { id: 'Archived', label: '📦 ARCHIVED', color: '#6B7280' },
 ] as const
 
 const STATUSES = ['not-started', 'in-progress', 'done', 'blocked'] as const
@@ -48,59 +48,22 @@ interface Subcategory {
   icon: string
 }
 
-function getSubcategories(categoryId: CategoryId, plans: Plan[]): Subcategory[] {
-  if (categoryId === 'companies') {
-    const result: Subcategory[] = []
-    for (const tier of TIERS) {
-      const tierVentures = VENTURES.filter((v) => v.tier === tier.id)
-      const tierPlans = plans.filter((p) => {
-        const v = VENTURES.find((v) => v.name === p.company)
-        const planTier = p.subcategory || v?.tier || 'Pipeline'
-        return planTier === tier.id
-      })
-      if (tierVentures.length === 0 && tierPlans.length === 0) continue
-      // Group by company within this tier
-      const companyGroups: Record<string, Plan[]> = {}
-      for (const plan of tierPlans) {
-        const key = plan.company || 'Other'
-        if (!companyGroups[key]) companyGroups[key] = []
-        companyGroups[key].push(plan)
-      }
-      // Add tier header as a subcategory
-      const tierOrder = tierVentures.map((v) => v.name)
-      const sortedCompanies = Object.entries(companyGroups).sort(([a], [b]) => {
-        const ia = tierOrder.indexOf(a)
-        const ib = tierOrder.indexOf(b)
-        if (ia === -1 && ib === -1) return a.localeCompare(b)
-        if (ia === -1) return 1
-        if (ib === -1) return -1
-        return ia - ib
-      })
-      for (const [name, compPlans] of sortedCompanies) {
-        const venture = VENTURES.find((v) => v.name === name)
-        result.push({
-          id: `${tier.id}-${name}`,
-          label: `${tier.label} › ${name}`,
-          plans: compPlans.filter((p) => !p.isExpansion),
-          color: venture?.color || '#666',
-          icon: venture?.icon || '🏢',
-        })
-        // Add expansions as separate sub-section
-        const expansions = compPlans.filter((p) => p.isExpansion)
-        if (expansions.length > 0) {
-          result.push({
-            id: `${tier.id}-${name}-expansions`,
-            label: `   ↳ ${name} Expansions`,
-            plans: expansions,
-            color: venture?.color || '#666',
-            icon: '🔄',
-          })
-        }
-      }
-    }
-    return result
-  }
+interface CompanyGroup {
+  id: string
+  label: string
+  plans: Plan[]
+  color: string
+  icon: string
+}
 
+interface TierGroup {
+  id: string
+  label: string
+  color: string
+  companies: CompanyGroup[]
+}
+
+function getSubcategories(_categoryId: CategoryId, plans: Plan[]): Subcategory[] {
   // Status-based subcategories for all other categories
   const sections: Subcategory[] = [
     { id: 'in-progress', label: 'In Progress', plans: plans.filter((p) => p.status === 'in-progress'), color: '#A855F7', icon: '⚡' },
@@ -109,6 +72,52 @@ function getSubcategories(categoryId: CategoryId, plans: Plan[]): Subcategory[] 
     { id: 'done',        label: 'Done',        plans: plans.filter((p) => p.status === 'done'),        color: '#22C55E', icon: '✅' },
   ]
   return sections.filter((s) => s.plans.length > 0)
+}
+
+function getCompanyTierGroups(plans: Plan[]): TierGroup[] {
+  return TIERS.map((tier) => {
+    const tierVentures = VENTURES.filter((v) => v.tier === tier.id)
+    const tierPlans = plans.filter((p) => {
+      const venture = VENTURES.find((v) => v.name === p.company)
+      const planTier = p.subcategory || venture?.tier || 'Pipeline'
+      return planTier === tier.id
+    })
+
+    const companyGroups: Record<string, Plan[]> = {}
+    for (const plan of tierPlans) {
+      const key = plan.company || 'Other'
+      if (!companyGroups[key]) companyGroups[key] = []
+      companyGroups[key].push(plan)
+    }
+
+    const tierOrder = tierVentures.map((v) => v.name)
+    const companies = Object.entries(companyGroups)
+      .sort(([a], [b]) => {
+        const ia = tierOrder.indexOf(a)
+        const ib = tierOrder.indexOf(b)
+        if (ia === -1 && ib === -1) return a.localeCompare(b)
+        if (ia === -1) return 1
+        if (ib === -1) return -1
+        return ia - ib
+      })
+      .map(([name, groupedPlans]): CompanyGroup => {
+        const venture = VENTURES.find((v) => v.name === name)
+        return {
+          id: `${tier.id}-${name}`,
+          label: name,
+          plans: groupedPlans,
+          color: venture?.color || '#666666',
+          icon: venture?.icon || '🏢',
+        }
+      })
+
+    return {
+      id: tier.id,
+      label: tier.label,
+      color: tier.color,
+      companies,
+    }
+  }).filter((tier) => tier.companies.length > 0)
 }
 
 // ─── Priority Badge ────────────────────────────────────────────────────────────
@@ -490,6 +499,82 @@ function SubcategorySection({ sub, category, defaultOpen, onUpdate, onDelete, on
   )
 }
 
+interface TierSectionProps {
+  tier: TierGroup
+  category: CategoryId
+  onUpdate: (id: string, data: Partial<Plan>) => void
+  onDelete: (id: string) => void
+  onMove: (id: string, direction: 'up' | 'down') => void
+}
+
+function TierSection({ tier, category, onUpdate, onDelete, onMove }: TierSectionProps) {
+  const [open, setOpen] = useState(true)
+  const totalPlans = tier.companies.reduce((acc, company) => acc + company.plans.length, 0)
+
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full rounded-xl px-4 py-3 mb-2 text-left transition-colors"
+        style={{
+          background: 'var(--c-surface)',
+          border: `1px solid ${tier.color}55`,
+        }}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="text-lg font-bold" style={{ color: tier.color }}>
+              {tier.label}
+            </div>
+            <div className="h-px w-10" style={{ background: tier.color }} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: `${tier.color}1f`, color: tier.color }}
+            >
+              {totalPlans}
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-4 h-4 transition-transform duration-200"
+              style={{ color: 'var(--c-muted)', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </div>
+        </div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden"
+          >
+            {tier.companies.map((company, idx) => (
+              <SubcategorySection
+                key={company.id}
+                sub={company}
+                category={category}
+                defaultOpen={idx === 0}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onMove={onMove}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 // ─── Quick Add Form ───────────────────────────────────────────────────────────
 
 interface AddPlanFormProps {
@@ -593,7 +678,8 @@ export default function PlansTab() {
   useEffect(() => { load() }, [load])
 
   const plans = allPlans[activeCategory] || []
-  const subcategories = getSubcategories(activeCategory, plans)
+  const companyTiers = activeCategory === 'companies' ? getCompanyTierGroups(plans) : []
+  const subcategories = activeCategory === 'companies' ? [] : getSubcategories(activeCategory, plans)
   const cat = CATEGORIES.find((c) => c.id === activeCategory)!
   const activeCount = plans.filter((p) => p.status === 'in-progress').length
 
@@ -724,7 +810,7 @@ export default function PlansTab() {
             <div className="text-center py-16 text-sm" style={{ color: 'var(--c-muted)' }}>
               Loading plans...
             </div>
-          ) : subcategories.length === 0 ? (
+          ) : activeCategory === 'companies' && companyTiers.length === 0 ? (
             <div className="text-center py-20">
               <div className="text-5xl mb-4">{cat.icon}</div>
               <div className="text-lg font-semibold mb-1" style={{ color: 'var(--c-text)', fontFamily: 'var(--font-heading)' }}>
@@ -740,6 +826,33 @@ export default function PlansTab() {
                 Add first plan
               </button>
             </div>
+          ) : activeCategory !== 'companies' && subcategories.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="text-5xl mb-4">{cat.icon}</div>
+              <div className="text-lg font-semibold mb-1" style={{ color: 'var(--c-text)', fontFamily: 'var(--font-heading)' }}>
+                No plans yet
+              </div>
+              <div className="text-sm mb-6" style={{ color: 'var(--c-muted)' }}>
+                Start building your {cat.label} roadmap
+              </div>
+              <button
+                onClick={() => setShowAdd(true)}
+                className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-[#FFD700] text-black"
+              >
+                Add first plan
+              </button>
+            </div>
+          ) : activeCategory === 'companies' ? (
+            companyTiers.map((tier) => (
+              <TierSection
+                key={tier.id}
+                tier={tier}
+                category={activeCategory}
+                onUpdate={handleUpdate}
+                onDelete={handleDelete}
+                onMove={handleMove}
+              />
+            ))
           ) : (
             subcategories.map((sub, idx) => (
               <SubcategorySection

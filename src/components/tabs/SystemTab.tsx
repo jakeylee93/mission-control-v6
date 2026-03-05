@@ -6,6 +6,7 @@ import { api, formatCost, formatTokens, type CostEntry, type CostHistory, type C
 
 type ViewPeriod = 'daily' | 'weekly' | 'monthly'
 type ProviderKey = 'kimi' | 'claude' | 'openai'
+type SystemSubTab = 'costs' | 'gateway' | 'cron' | 'channels' | 'models' | 'activity'
 
 interface ProviderTotals {
   calls: number
@@ -26,11 +27,21 @@ const PERIOD_BUTTONS: Array<{ key: ViewPeriod; label: string }> = [
   { key: 'monthly', label: 'Monthly' },
 ]
 
+const SYSTEM_SUB_TABS: Array<{ id: SystemSubTab; label: string; icon: string }> = [
+  { id: 'costs', label: 'Costs', icon: '💰' },
+  { id: 'gateway', label: 'Gateway', icon: '🟢' },
+  { id: 'cron', label: 'Cron', icon: '⏰' },
+  { id: 'channels', label: 'Channels', icon: '🔌' },
+  { id: 'models', label: 'Models', icon: '🤖' },
+  { id: 'activity', label: 'Activity', icon: '📋' },
+]
+
 export default function SystemTab() {
   const [costs, setCosts] = useState<CostSummary | null>(null)
   const [trends, setTrends] = useState<CostTrends | null>(null)
   const [history, setHistory] = useState<CostHistory | null>(null)
   const [period, setPeriod] = useState<ViewPeriod>('daily')
+  const [activeSubTab, setActiveSubTab] = useState<SystemSubTab>('costs')
   const [loading, setLoading] = useState(true)
   const [hoverSparkIdx, setHoverSparkIdx] = useState<number | null>(null)
 
@@ -195,9 +206,34 @@ export default function SystemTab() {
   }, [period, trends?.weekChange, trends?.monthChange, sparkData])
 
   const comparisonColor = periodComparison.includes('+') ? '#F59E0B' : periodComparison.includes('-') ? '#16A34A' : 'var(--c-dim)'
+  const activeSubTabMeta = SYSTEM_SUB_TABS.find((item) => item.id === activeSubTab)
 
   return (
     <div className="h-[calc(100vh-100px)] overflow-y-auto">
+      <div className="px-4 md:px-6 pt-4 max-w-[1400px] mx-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {SYSTEM_SUB_TABS.map((tab) => {
+            const active = activeSubTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveSubTab(tab.id)}
+                className="rounded-lg px-3 py-2 text-sm flex items-center justify-center gap-2 transition-colors"
+                style={{
+                  background: active ? 'rgba(255,215,0,0.12)' : 'var(--c-surface)',
+                  border: `1px solid ${active ? 'rgba(255,215,0,0.35)' : 'var(--c-border)'}`,
+                  color: active ? '#FFD700' : 'var(--c-muted)',
+                }}
+              >
+                <span>{tab.icon}</span>
+                <span className="font-semibold">{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {activeSubTab === 'costs' ? (
       <div className="p-4 md:p-6 max-w-[1400px] mx-auto">
         <div className="flex items-center justify-between mb-5">
           <div>
@@ -428,6 +464,18 @@ export default function SystemTab() {
           </section>
         </div>
       </div>
+      ) : (
+        <div className="p-4 md:p-6 max-w-[1400px] mx-auto">
+          <div className="card p-8 rounded-2xl text-center">
+            <div className="text-xl font-semibold mb-2" style={{ color: 'var(--c-text)' }}>
+              {activeSubTabMeta?.icon} {activeSubTabMeta?.label}
+            </div>
+            <div className="text-sm" style={{ color: 'var(--c-muted)' }}>
+              Coming soon
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         .cost-refresh-spin {
