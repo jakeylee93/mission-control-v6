@@ -150,12 +150,50 @@ Return ONLY a valid JSON array, no markdown, no explanation.`
         }
       } catch {}
 
-      // Attach image to each detected item
+      // For each detected item: find product image + current price
       for (const detected of items) {
+        const itemId = `scan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+        let productImage: string | null = null
+        let currentPrice: string | null = null
+        let priceUrl: string | null = null
+        let retailer: string | null = null
+
+        const searchQuery = detected.priceSearchQuery || detected.name
+
+        // Find product image
+        try {
+          const imgRes = await fetch(`http://localhost:3001/api/belongings/image`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: searchQuery, itemId }),
+          })
+          const imgData = await imgRes.json()
+          if (imgData.imagePath) productImage = imgData.imagePath
+        } catch {}
+
+        // Find current price from known retailers
+        try {
+          const priceRes = await fetch(`http://localhost:3001/api/belongings/price-check`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: searchQuery }),
+          })
+          const priceData = await priceRes.json()
+          if (priceData.ok) {
+            currentPrice = priceData.price
+            priceUrl = priceData.url
+            retailer = priceData.retailer
+          }
+        } catch {}
+
         allResults.push({
-          id: `scan-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          id: itemId,
           ...detected,
           imagePath: item.imagePath,
+          productImage,
+          currentPrice,
+          priceUrl,
+          retailer,
           queueId: item.id,
           scannedAt: new Date().toISOString(),
         })

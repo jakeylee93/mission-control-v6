@@ -54,6 +54,10 @@ interface ScanResult {
   condition?: string
   suggestedLocation?: string
   imagePath: string
+  productImage?: string
+  currentPrice?: string
+  priceUrl?: string
+  retailer?: string
   queueId: string
   selected?: boolean
 }
@@ -248,11 +252,13 @@ export default function BelongingsTab() {
       priceSearchQuery: r.priceSearchQuery,
       condition: r.condition,
       imagePath: r.imagePath,
+      productImage: r.productImage || undefined,
       size: (r as any).size || undefined,
       categoryConfidence: r.categoryConfidence,
       alternateCategories: r.alternateCategories,
       uses: '',
       purchaseLocation: '',
+      purchaseLink: r.priceUrl || undefined,
       rating: 0,
       notes: '',
       tags: [],
@@ -495,8 +501,19 @@ export default function BelongingsTab() {
                           {(result as any).size && <div className="text-[10px] mt-0.5 font-semibold" style={{ color: '#60A5FA' }}>{(result as any).size}</div>}
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-sm font-semibold" style={{ color: '#22C55E' }}>{result.estimatedValue}</div>
-                          {result.condition && <div className="text-[10px]" style={{ color: 'var(--c-muted)' }}>{result.condition}</div>}
+                          {result.currentPrice ? (
+                            <>
+                              <div className="text-sm font-semibold" style={{ color: '#22C55E' }}>{result.currentPrice}</div>
+                              {result.retailer && result.priceUrl ? (
+                                <a href={result.priceUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] underline" style={{ color: '#60A5FA' }}>{result.retailer} →</a>
+                              ) : result.retailer ? (
+                                <div className="text-[10px]" style={{ color: '#60A5FA' }}>{result.retailer}</div>
+                              ) : null}
+                            </>
+                          ) : (
+                            <div className="text-sm font-semibold" style={{ color: '#22C55E' }}>{result.estimatedValue}</div>
+                          )}
+                          {result.productImage && <div className="text-[10px] mt-0.5" style={{ color: '#FFD700' }}>📸 Image found</div>}
                         </div>
                       </motion.div>
                     )
@@ -656,8 +673,9 @@ export default function BelongingsTab() {
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-wrap">
                         {item.estimatedValue && <span className="text-[10px] font-semibold" style={{ color: '#22C55E' }}>{item.estimatedValue}</span>}
+                        {item.purchaseLocation && <span className="text-[8px]" style={{ color: '#60A5FA' }}>{item.purchaseLocation}</span>}
                         {item.wouldRepurchase === true && <span className="text-[9px]">👍</span>}
                         {item.wouldRepurchase === false && <span className="text-[9px]">👎</span>}
                       </div>
@@ -959,12 +977,41 @@ export default function BelongingsTab() {
 
                     {/* Price actions */}
                     <div className="flex flex-wrap gap-2">
-                      <button onClick={() => findCheapest(selectedItem)} disabled={priceLoading === selectedItem.id} className="px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-50" style={{ background: '#22C55E20', color: '#22C55E', border: '1px solid #22C55E40' }}>
-                        {priceLoading === selectedItem.id ? '🔍...' : '🔍 Find Cheapest'}
+                      <button
+                        onClick={async () => {
+                          setPriceLoading(selectedItem.id)
+                          try {
+                            const res = await fetch('/api/belongings/price-check', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ query: selectedItem.priceSearchQuery || selectedItem.name }),
+                            })
+                            const data = await res.json()
+                            if (data.ok) {
+                              const patch: Partial<InventoryItem> = {}
+                              if (data.price) patch.estimatedValue = data.price
+                              if (data.url) patch.purchaseLink = data.url
+                              if (data.retailer) patch.purchaseLocation = data.retailer
+                              const updatedItem = { ...selectedItem, ...patch }
+                              setSelectedItem(updatedItem)
+                              const updatedItems = items.map(i => i.id === selectedItem.id ? updatedItem : i)
+                              await saveItems(updatedItems)
+                            }
+                          } catch {}
+                          setPriceLoading(null)
+                        }}
+                        disabled={priceLoading === selectedItem.id}
+                        className="px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+                        style={{ background: '#22C55E20', color: '#22C55E', border: '1px solid #22C55E40' }}
+                      >
+                        {priceLoading === selectedItem.id ? '🔄 Syncing...' : '🔄 Sync Price'}
+                      </button>
+                      <button onClick={() => findCheapest(selectedItem)} className="px-3 py-2 rounded-lg text-sm font-semibold" style={{ background: '#FFD70020', color: '#FFD700', border: '1px solid #FFD70040' }}>
+                        🛒 Google Shopping
                       </button>
                       {selectedItem.purchaseLink && (
                         <a href={selectedItem.purchaseLink} target="_blank" rel="noopener noreferrer" className="px-3 py-2 rounded-lg text-sm font-semibold" style={{ background: '#60A5FA20', color: '#60A5FA', border: '1px solid #60A5FA40' }}>
-                          🔗 Rebuy Link
+                          🔗 {selectedItem.purchaseLocation || 'Buy'} →
                         </a>
                       )}
                     </div>
