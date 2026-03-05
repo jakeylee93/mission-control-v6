@@ -13,6 +13,8 @@ interface InventoryItem {
   priceSearchQuery?: string
   condition?: string
   imagePath?: string
+  productImage?: string  // professional product shot (header)
+  photos?: string[]      // user's photos (gallery)
   uses?: string
   size?: string
   purchaseLocation?: string
@@ -30,7 +32,6 @@ interface InventoryItem {
   favourite?: boolean
   warrantyExpiry?: string
   runningLow?: boolean
-  photos?: string[]
 }
 
 interface QueueItem {
@@ -282,7 +283,8 @@ export default function BelongingsTab() {
       })
       const data = await res.json()
       if (data.imagePath) {
-        updateSelected({ imagePath: data.imagePath })
+        // Product image becomes the header, user's original stays as gallery
+        updateSelected({ productImage: data.imagePath })
       } else if (data.searchUrl) {
         window.open(data.searchUrl, '_blank')
       }
@@ -561,8 +563,8 @@ export default function BelongingsTab() {
                       {/* Running low badge */}
                       {item.runningLow && <div className="absolute top-2 left-2 z-10 text-[10px] px-1.5 py-0.5 rounded-lg font-semibold" style={{ background: '#EF444430', color: '#EF4444' }}>LOW</div>}
 
-                      <div className="rounded-lg mb-2 h-28 flex items-center justify-center overflow-hidden" style={{ background: '#1E1E1E' }}>
-                        {item.imagePath ? <img src={item.imagePath} alt={item.name} className="w-full h-full object-cover" /> : <span className="text-3xl">📷</span>}
+                      <div className="rounded-lg mb-2 aspect-square w-full flex items-center justify-center overflow-hidden" style={{ background: '#1E1E1E' }}>
+                        {(item.productImage || item.imagePath) ? <img src={item.productImage || item.imagePath} alt={item.name} className="w-full h-full object-cover" /> : <span className="text-3xl">📷</span>}
                       </div>
                       <div className="text-sm font-semibold mb-1 truncate pr-6" style={{ color: 'var(--c-text)' }}>{item.name}</div>
 
@@ -586,6 +588,8 @@ export default function BelongingsTab() {
                         <div className="flex items-center gap-2">
                           {item.estimatedValue && <span className="text-xs font-semibold" style={{ color: '#22C55E' }}>{item.estimatedValue}</span>}
                           {cpu && <span className="text-[10px]" style={{ color: 'var(--c-muted)' }}>{cpu}</span>}
+                          {item.wouldRepurchase === true && <span className="text-[10px]">👍</span>}
+                          {item.wouldRepurchase === false && <span className="text-[10px]">👎</span>}
                         </div>
                         <span className="text-[10px]" style={{ color: 'var(--c-dim)' }}>{item.location}</span>
                       </div>
@@ -645,38 +649,68 @@ export default function BelongingsTab() {
           {selectedItem && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 px-4 py-4 md:py-8 overflow-y-auto" style={{ background: 'rgba(0,0,0,0.65)' }} onClick={() => setSelectedItem(null)}>
               <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} onClick={e => e.stopPropagation()} className="max-w-2xl mx-auto card rounded-2xl p-5">
-                {/* Photo section */}
-                <div className="rounded-xl h-52 mb-4 flex items-center justify-center overflow-hidden relative" style={{ background: '#1E1E1E', border: '1px solid var(--c-border)' }}>
-                  {selectedItem.imagePath ? (
-                    <>
-                      <img src={selectedItem.imagePath} alt={selectedItem.name} className="w-full h-full object-contain" />
-                      <button onClick={() => findProductImage(selectedItem)} disabled={imageSearching} className="absolute bottom-2 right-2 px-2 py-1 rounded-lg text-[10px] font-semibold" style={{ background: 'rgba(0,0,0,0.8)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)' }}>
-                        {imageSearching ? '🔍...' : '🔄 Better Image'}
-                      </button>
-                    </>
-                  ) : (
-                    <div className="text-center">
-                      <div className="text-4xl mb-2">📷</div>
-                      <div className="flex gap-2 justify-center">
-                        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                          const file = e.target.files?.[0]
-                          if (!file) return
-                          const fd = new FormData()
-                          fd.append('file', file)
-                          const res = await fetch('/api/belongings/scan', { method: 'POST', body: fd })
-                          const data = await res.json()
-                          if (data.ok) {
-                            const qRes = await fetch('/api/belongings/scan')
-                            const qData = await qRes.json()
-                            const latest = qData.queue?.[qData.queue.length - 1]
-                            if (latest) updateSelected({ imagePath: latest.imagePath })
-                          }
-                        }} />
-                        <button onClick={() => photoInputRef.current?.click()} className="text-xs px-3 py-1 rounded-lg" style={{ color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)' }}>📸 Upload</button>
-                        <button onClick={() => findProductImage(selectedItem)} disabled={imageSearching} className="text-xs px-3 py-1 rounded-lg" style={{ color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
-                          {imageSearching ? '🔍...' : '🔍 Find Online'}
+                {/* Photo section — product image header + gallery */}
+                <div className="mb-4">
+                  {/* Main product image */}
+                  <div className="rounded-xl aspect-square max-h-[300px] w-full flex items-center justify-center overflow-hidden relative" style={{ background: '#1E1E1E', border: '1px solid var(--c-border)' }}>
+                    {(selectedItem.productImage || selectedItem.imagePath) ? (
+                      <>
+                        <img src={selectedItem.productImage || selectedItem.imagePath} alt={selectedItem.name} className="w-full h-full object-cover" />
+                        <button onClick={() => findProductImage(selectedItem)} disabled={imageSearching} className="absolute bottom-2 right-2 px-2.5 py-1.5 rounded-lg text-xs font-semibold" style={{ background: 'rgba(0,0,0,0.85)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)' }}>
+                          {imageSearching ? '🔍 Searching...' : '🔄 Better Image'}
                         </button>
+                      </>
+                    ) : (
+                      <div className="text-center">
+                        <div className="text-4xl mb-3">📷</div>
+                        <div className="flex gap-2 justify-center">
+                          <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+                            const fd = new FormData()
+                            fd.append('file', file)
+                            const res = await fetch('/api/belongings/scan', { method: 'POST', body: fd })
+                            const data = await res.json()
+                            if (data.ok) {
+                              const qRes = await fetch('/api/belongings/scan')
+                              const qData = await qRes.json()
+                              const latest = qData.queue?.[qData.queue.length - 1]
+                              if (latest) {
+                                const photos = [...(selectedItem.photos || [])]
+                                if (!selectedItem.imagePath) {
+                                  updateSelected({ imagePath: latest.imagePath, photos })
+                                } else {
+                                  photos.push(latest.imagePath)
+                                  updateSelected({ photos })
+                                }
+                              }
+                            }
+                          }} />
+                          <button onClick={() => photoInputRef.current?.click()} className="text-xs px-3 py-1.5 rounded-lg" style={{ color: '#FFD700', border: '1px solid rgba(255,215,0,0.3)' }}>📸 Upload Photo</button>
+                          <button onClick={() => findProductImage(selectedItem)} disabled={imageSearching} className="text-xs px-3 py-1.5 rounded-lg" style={{ color: '#22C55E', border: '1px solid rgba(34,197,94,0.3)' }}>
+                            {imageSearching ? '🔍 Searching...' : '🔍 Find Product Image'}
+                          </button>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                  {/* Photo gallery — user's own photos */}
+                  {((selectedItem.photos && selectedItem.photos.length > 0) || selectedItem.imagePath) && (
+                    <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                      {/* Show original scan photo */}
+                      {selectedItem.imagePath && selectedItem.productImage && (
+                        <div className="shrink-0 w-16 h-16 rounded-lg overflow-hidden" style={{ border: '1px solid var(--c-border)' }}>
+                          <img src={selectedItem.imagePath} alt="Your photo" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      {/* Additional photos */}
+                      {(selectedItem.photos || []).map((photo, i) => (
+                        <div key={i} className="shrink-0 w-16 h-16 rounded-lg overflow-hidden" style={{ border: '1px solid var(--c-border)' }}>
+                          <img src={photo} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                      {/* Add photo button */}
+                      <button onClick={() => photoInputRef.current?.click()} className="shrink-0 w-16 h-16 rounded-lg flex items-center justify-center text-lg" style={{ border: '1px dashed var(--c-border)', color: 'var(--c-muted)' }}>+</button>
                     </div>
                   )}
                 </div>
@@ -746,17 +780,40 @@ export default function BelongingsTab() {
                       </div>
                     </div>
 
-                    {/* Toggle row */}
-                    <div className="flex flex-wrap gap-3">
-                      <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="checkbox" checked={selectedItem.runningLow || false} onChange={e => updateSelected({ runningLow: e.target.checked })} className="accent-red-500 w-4 h-4" />
-                        <span style={{ color: selectedItem.runningLow ? '#EF4444' : 'var(--c-muted)' }}>🔔 Running low</span>
-                      </label>
-                      <label className="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="checkbox" checked={selectedItem.wouldRepurchase === true} onChange={e => updateSelected({ wouldRepurchase: e.target.checked ? true : null })} className="accent-green-500 w-4 h-4" />
-                        <span style={{ color: selectedItem.wouldRepurchase ? '#22C55E' : 'var(--c-muted)' }}>🔄 Would rebuy</span>
-                      </label>
+                    {/* Rebuy verdict */}
+                    <div>
+                      <div className="text-xs mb-1.5" style={{ color: 'var(--c-muted)' }}>Would you buy again?</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => updateSelected({ wouldRepurchase: selectedItem.wouldRepurchase === true ? null : true })}
+                          className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                          style={{
+                            background: selectedItem.wouldRepurchase === true ? '#22C55E20' : 'var(--c-panel)',
+                            color: selectedItem.wouldRepurchase === true ? '#22C55E' : 'var(--c-muted)',
+                            border: `1px solid ${selectedItem.wouldRepurchase === true ? '#22C55E40' : 'var(--c-border)'}`,
+                          }}
+                        >
+                          👍 Would buy again
+                        </button>
+                        <button
+                          onClick={() => updateSelected({ wouldRepurchase: selectedItem.wouldRepurchase === false ? null : false })}
+                          className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold transition-all"
+                          style={{
+                            background: selectedItem.wouldRepurchase === false ? '#EF444420' : 'var(--c-panel)',
+                            color: selectedItem.wouldRepurchase === false ? '#EF4444' : 'var(--c-muted)',
+                            border: `1px solid ${selectedItem.wouldRepurchase === false ? '#EF444440' : 'var(--c-border)'}`,
+                          }}
+                        >
+                          👎 Wouldn't buy again
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Running low toggle */}
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={selectedItem.runningLow || false} onChange={e => updateSelected({ runningLow: e.target.checked })} className="accent-red-500 w-4 h-4" />
+                      <span style={{ color: selectedItem.runningLow ? '#EF4444' : 'var(--c-muted)' }}>🔔 Running low</span>
+                    </label>
                   </div>
                 )}
 

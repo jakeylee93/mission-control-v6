@@ -9,73 +9,108 @@ export async function POST(req: NextRequest) {
     const { query, itemId } = await req.json()
     if (!query) return NextResponse.json({ error: 'No query' }, { status: 400 })
 
-    // Use OpenAI to generate a good search query, then use Brave image search
+    mkdirSync(BELONGINGS_DIR, { recursive: true })
+
+    // Strategy 1: Brave Image Search
     const braveKey = process.env.BRAVE_SEARCH_API_KEY
-
-    let imageUrl: string | null = null
-    let searchResults: any[] = []
-
     if (braveKey) {
-      // Brave Image Search
-      const searchUrl = `https://api.search.brave.com/res/v1/images/search?q=${encodeURIComponent(query + ' product photo square white background')}&count=8&country=gb&safesearch=strict`
-      const res = await fetch(searchUrl, {
-        headers: { 'X-Subscription-Token': braveKey, Accept: 'application/json' },
-      })
-      const data = await res.json()
-      searchResults = (data.results || []).slice(0, 8).map((r: any) => ({
-        url: r.properties?.url || r.thumbnail?.src || r.url,
-        thumb: r.thumbnail?.src || r.properties?.url,
-        title: r.title || '',
-        source: r.source || '',
-        width: r.properties?.width,
-        height: r.properties?.height,
-      }))
-
-      // Pick the most square image
-      if (searchResults.length > 0) {
-        const best = searchResults.reduce((a: any, b: any) => {
-          const aRatio = a.width && a.height ? Math.abs(1 - a.width / a.height) : 1
-          const bRatio = b.width && b.height ? Math.abs(1 - b.width / b.height) : 1
-          return aRatio < bRatio ? a : b
-        })
-        imageUrl = best.url || best.thumb
-      }
-    }
-
-    // If we found an image, download and save it locally
-    if (imageUrl) {
       try {
-        const imgRes = await fetch(imageUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          signal: AbortSignal.timeout(10000),
+        const searchUrl = `https://api.search.brave.com/res/v1/images/search?q=${encodeURIComponent(query + ' product')}&count=8&country=gb&safesearch=strict`
+        const res = await fetch(searchUrl, {
+          headers: { 'X-Subscription-Token': braveKey, Accept: 'application/json' },
         })
+        const data = await res.json()
+        const results = (data.results || []).slice(0, 8)
 
-        if (imgRes.ok) {
-          const contentType = imgRes.headers.get('content-type') || 'image/jpeg'
-          const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
-          const filename = `product-${itemId || Date.now()}.${ext}`
-          mkdirSync(BELONGINGS_DIR, { recursive: true })
-          const buffer = Buffer.from(await imgRes.arrayBuffer())
-          writeFileSync(path.join(BELONGINGS_DIR, filename), buffer)
-
-          return NextResponse.json({
-            ok: true,
-            imagePath: `/belongings/${filename}`,
-            originalUrl: imageUrl,
-            alternatives: searchResults.slice(0, 6),
-          })
+        for (const r of results) {
+          const imgUrl = r.properties?.url || r.thumbnail?.src
+          if (!imgUrl) continue
+          const saved = await downloadImage(imgUrl, itemId)
+          if (saved) return NextResponse.json({ ok: true, imagePath: saved })
         }
       } catch {}
     }
 
-    // Fallback: return search results for manual selection
+    // Strategy 2: Use OpenAI to search and find an image URL
+    const openaiKey = process.env.OPENAI_API_KEY
+    if (openaiKey) {
+      try {
+        // Ask GPT to give us a direct image URL for this product
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [{
+              role: 'user',
+              content: `I need a direct image URL for this product: "${query}". Give me 3 direct URLs to product images (jpg/png) from major retailers (Amazon, Boots, Superdrug, Tesco, etc). Return ONLY a JSON array of URL strings, nothing else.`
+            }],
+            max_tokens: 500,
+            temperature: 0.3,
+          }),
+        })
+        const data = await res.json()
+        const content = data.choices?.[0]?.message?.content || ''
+        const urls = JSON.parse(content.match(/\[[\s\S]*\]/)?.[0] || '[]')
+
+        for (const url of urls) {
+          const saved = await downloadImage(url, itemId)
+          if (saved) return NextResponse.json({ ok: true, imagePath: saved })
+        }
+      } catch {}
+    }
+
+    // Strategy 3: Scrape Google Images
+    try {
+      const googleUrl = `https://www.google.co.uk/search?tbm=isch&q=${encodeURIComponent(query + ' product photo')}`
+      const res = await fetch(googleUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html',
+        },
+      })
+      const html = await res.text()
+      // Extract image URLs from Google's HTML
+      const imgMatches = html.match(/\["(https?:\/\/[^"]+\.(?:jpg|jpeg|png|webp)(?:\?[^"]*)?)",\d+,\d+\]/g) || []
+      for (const match of imgMatches.slice(0, 5)) {
+        const urlMatch = match.match(/"(https?:\/\/[^"]+)"/)
+        if (urlMatch) {
+          const saved = await downloadImage(urlMatch[1], itemId)
+          if (saved) return NextResponse.json({ ok: true, imagePath: saved })
+        }
+      }
+    } catch {}
+
+    // All strategies failed
     return NextResponse.json({
-      ok: true,
-      imagePath: null,
-      alternatives: searchResults.slice(0, 6),
+      ok: false,
+      error: 'Could not find product image',
       searchUrl: `https://www.google.co.uk/search?tbm=isch&q=${encodeURIComponent(query + ' product')}`,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+async function downloadImage(url: string, itemId: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+      signal: AbortSignal.timeout(8000),
+      redirect: 'follow',
+    })
+    if (!res.ok) return null
+    const ct = res.headers.get('content-type') || ''
+    if (!ct.includes('image')) return null
+
+    const buffer = Buffer.from(await res.arrayBuffer())
+    if (buffer.length < 1000) return null // Skip tiny images
+
+    const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg'
+    const filename = `product-${itemId || Date.now()}-${Date.now()}.${ext}`
+    writeFileSync(path.join(BELONGINGS_DIR, filename), buffer)
+    return `/belongings/${filename}`
+  } catch {
+    return null
   }
 }
