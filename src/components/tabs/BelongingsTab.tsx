@@ -165,6 +165,7 @@ export default function BelongingsTab() {
   const [detailTab, setDetailTab] = useState<'info' | 'notes' | 'value'>('info')
   const scanInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
   const [newItem, setNewItem] = useState<Partial<InventoryItem>>({ category: CATEGORIES[0], location: LOCATIONS[0], condition: 'Good' })
   const [priceLoading, setPriceLoading] = useState<string | null>(null)
   const [imageSearching, setImageSearching] = useState(false)
@@ -695,24 +696,41 @@ export default function BelongingsTab() {
                     )}
                   </div>
                   {/* Photo gallery — user's own photos */}
-                  {((selectedItem.photos && selectedItem.photos.length > 0) || selectedItem.imagePath) && (
-                    <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
-                      {/* Show original scan photo */}
-                      {selectedItem.imagePath && selectedItem.productImage && (
-                        <div className="shrink-0 w-16 h-16 rounded-lg overflow-hidden" style={{ border: '1px solid var(--c-border)' }}>
-                          <img src={selectedItem.imagePath} alt="Your photo" className="w-full h-full object-cover" />
-                        </div>
-                      )}
-                      {/* Additional photos */}
-                      {(selectedItem.photos || []).map((photo, i) => (
-                        <div key={i} className="shrink-0 w-16 h-16 rounded-lg overflow-hidden" style={{ border: '1px solid var(--c-border)' }}>
-                          <img src={photo} alt="" className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                      {/* Add photo button */}
-                      <button onClick={() => photoInputRef.current?.click()} className="shrink-0 w-16 h-16 rounded-lg flex items-center justify-center text-lg" style={{ border: '1px dashed var(--c-border)', color: 'var(--c-muted)' }}>+</button>
-                    </div>
-                  )}
+                  <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                    {/* Show original scan photo */}
+                    {selectedItem.imagePath && (
+                      <div className="shrink-0 w-16 h-16 rounded-lg overflow-hidden" style={{ border: '2px solid var(--c-border)' }}>
+                        <img src={selectedItem.imagePath} alt="Your photo" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                    {/* Additional gallery photos */}
+                    {(selectedItem.photos || []).map((photo, i) => (
+                      <div key={i} className="shrink-0 w-16 h-16 rounded-lg overflow-hidden" style={{ border: '1px solid var(--c-border)' }}>
+                        <img src={photo} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                    {/* Add gallery photo button */}
+                    <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const fd = new FormData()
+                      fd.append('file', file)
+                      const res = await fetch('/api/belongings/scan', { method: 'POST', body: fd })
+                      const data = await res.json()
+                      if (data.ok) {
+                        const qRes = await fetch('/api/belongings/scan')
+                        const qData = await qRes.json()
+                        const allQueue = qData.queue || []
+                        const latest = allQueue[allQueue.length - 1]
+                        if (latest) {
+                          const photos = [...(selectedItem.photos || []), latest.imagePath]
+                          updateSelected({ photos })
+                        }
+                      }
+                      if (galleryInputRef.current) galleryInputRef.current.value = ''
+                    }} />
+                    <button onClick={() => galleryInputRef.current?.click()} className="shrink-0 w-16 h-16 rounded-lg flex items-center justify-center text-xl" style={{ border: '2px dashed var(--c-border)', color: 'var(--c-muted)' }}>+</button>
+                  </div>
                 </div>
 
                 {/* Item name + favourite */}

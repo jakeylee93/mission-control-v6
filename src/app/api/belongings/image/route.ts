@@ -109,7 +109,7 @@ async function downloadImage(url: string, itemId: string): Promise<string | null
     const ext = ct.includes('png') ? 'png' : ct.includes('webp') ? 'webp' : 'jpg'
     const filename = `product-${itemId || Date.now()}-${Date.now()}.${ext}`
     writeFileSync(path.join(BELONGINGS_DIR, filename), buffer)
-    return `/belongings/${filename}`
+    return `/api/belongings/img?f=${filename}`
   } catch {
     return null
   }

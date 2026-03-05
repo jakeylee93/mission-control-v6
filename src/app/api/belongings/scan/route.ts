@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const queue = loadQueue()
     queue.push({
       id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      imagePath: `/belongings/${filename}`,
+      imagePath: `/api/belongings/img?f=${filename}`,
       addedAt: new Date().toISOString(),
       status: 'pending',
     })
