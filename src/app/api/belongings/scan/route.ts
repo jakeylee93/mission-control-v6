@@ -112,13 +112,14 @@ async function processQueue() {
               content: `You are an inventory assistant. Analyse this photo and identify ALL distinct physical items visible.
 
 For each item return a JSON array of objects with:
-- name: specific product name if recognisable, otherwise descriptive name
+- name: specific product name if recognisable, otherwise descriptive name. For cosmetics/toiletries/food, ALWAYS include the size/volume/weight (e.g. "Nivea Men Moisturiser 75ml", "Dove Shower Gel 250ml", "Pringles Original 200g")
+- size: product size/volume/weight if visible or known (e.g. "75ml", "250g", "500ml", "30cm"). Null if not applicable.
 - category: one of [Electronics, Climbing Gear, Tools, Kitchen, Business Equipment, Office Equipment, Toiletries & Grooming, Clothing, Food & Drink, Sports & Fitness, Home, Other]
 - categoryConfidence: number 0-100 (how sure you are about the category)
 - alternateCategories: array of up to 2 other possible categories
-- estimatedValue: string like "£50" (your best estimate of current retail value)
-- priceSearchQuery: a good Google Shopping search query to find this exact item (e.g. "Nivea Men Moisturiser 75ml")
-- description: brief description
+- estimatedValue: string like "£50" (your best estimate of current UK retail value)
+- priceSearchQuery: a good Google Shopping search query to find this exact item with size (e.g. "Nivea Men Moisturiser 75ml")
+- description: brief description including brand, variant, size where relevant
 - condition: one of [New, Good, Fair, Poor]
 - suggestedLocation: likely storage location
 

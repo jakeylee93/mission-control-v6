@@ -14,6 +14,7 @@ interface InventoryItem {
   condition?: string
   imagePath?: string
   uses?: string
+  size?: string
   purchaseLocation?: string
   categoryConfidence?: number
   alternateCategories?: string[]
@@ -236,6 +237,7 @@ export default function BelongingsTab() {
       priceSearchQuery: r.priceSearchQuery,
       condition: r.condition,
       imagePath: r.imagePath,
+      size: (r as any).size || undefined,
       categoryConfidence: r.categoryConfidence,
       alternateCategories: r.alternateCategories,
       uses: '',
@@ -470,6 +472,7 @@ export default function BelongingsTab() {
                             )}
                           </div>
                           <div className="text-xs mt-1" style={{ color: 'var(--c-muted)' }}>{result.description}</div>
+                          {(result as any).size && <div className="text-[10px] mt-0.5 font-semibold" style={{ color: '#60A5FA' }}>{(result as any).size}</div>}
                         </div>
                         <div className="text-right shrink-0">
                           <div className="text-sm font-semibold" style={{ color: '#22C55E' }}>{result.estimatedValue}</div>
@@ -575,6 +578,7 @@ export default function BelongingsTab() {
 
                       <div className="flex items-center gap-1.5 flex-wrap mb-1">
                         <span className="text-[10px] px-1.5 py-0.5 rounded-lg" style={{ background: `${accent}20`, color: accent }}>{item.category.replace(/^[^\s]+\s/, '')}</span>
+                        {item.size && <span className="text-[10px] font-semibold" style={{ color: '#60A5FA' }}>{item.size}</span>}
                         {item.condition && <span className="text-[10px]" style={{ color: 'var(--c-muted)' }}>{item.condition}</span>}
                       </div>
 
@@ -722,6 +726,7 @@ export default function BelongingsTab() {
                         <option value="rarely">Rarely</option>
                       </select>
                     </div>
+                    <input value={selectedItem.size || ''} onChange={e => updateSelected({ size: e.target.value })} placeholder="Size / Volume / Weight (e.g. 75ml, 250g)" className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
                     <textarea value={selectedItem.description} onChange={e => updateSelected({ description: e.target.value })} placeholder="Description" rows={2} className="w-full rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--c-panel)', border: '1px solid var(--c-border)', color: 'var(--c-text)' }} />
 
                     {/* Tags */}
