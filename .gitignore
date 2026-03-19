@@ -27,3 +27,4 @@ capture/
 
 # Google tokens (private)
 google-tokens.json
+.vercel
