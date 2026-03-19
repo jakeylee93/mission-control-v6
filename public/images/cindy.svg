@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <circle cx="50" cy="50" r="50" fill="#140d1e"/>
+  <circle cx="50" cy="38" r="18" fill="#C084FC" opacity="0.15"/>
+  <circle cx="50" cy="38" r="16" fill="#1e1530"/>
+  <!-- face -->
+  <circle cx="50" cy="38" r="14" fill="#e8c9a0"/>
+  <!-- long hair -->
+  <path d="M34 32 C34 20, 66 20, 66 32 C66 26, 60 22, 50 22 C40 22, 34 26, 34 32Z" fill="#4a2a1a"/>
+  <path d="M34 32 C32 44, 30 54, 34 52 C33 46, 34 38, 34 32Z" fill="#4a2a1a"/>
+  <path d="M66 32 C68 44, 70 54, 66 52 C67 46, 66 38, 66 32Z" fill="#4a2a1a"/>
+  <!-- eyes -->
+  <ellipse cx="43" cy="36" rx="2" ry="2" fill="#2a1a10"/>
+  <ellipse cx="57" cy="36" rx="2" ry="2" fill="#2a1a10"/>
+  <!-- eyelashes -->
+  <path d="M40 35 L39 33" stroke="#3a2010" stroke-width="0.8" stroke-linecap="round"/>
+  <path d="M60 35 L61 33" stroke="#3a2010" stroke-width="0.8" stroke-linecap="round"/>
+  <!-- warm smile -->
+  <path d="M44 43 Q50 48 56 43" stroke="#c47a50" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  <!-- sweater -->
+  <path d="M33 62 C33 52, 40 50, 50 50 C60 50, 67 52, 67 62 L70 82 L30 82 Z" fill="#2d8a6e"/>
+  <!-- v-neck -->
+  <path d="M44 50 L50 58 L56 50" stroke="#25705a" stroke-width="1.5" fill="none"/>
+  <!-- hand gesture -->
+  <circle cx="68" cy="58" r="4" fill="#e8c9a0" opacity="0.8"/>
+  <!-- sparkle accent -->
+  <path d="M72 30 L73 27 L74 30 L77 31 L74 32 L73 35 L72 32 L69 31 Z" fill="#C084FC" opacity="0.4"/>
+  <path d="M28 28 L29 26 L30 28 L32 29 L30 30 L29 32 L28 30 L26 29 Z" fill="#C084FC" opacity="0.3"/>
+  <!-- glow ring -->
+  <circle cx="50" cy="50" r="48" stroke="#C084FC" stroke-width="1.5" opacity="0.15"/>
+</svg>

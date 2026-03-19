@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <circle cx="50" cy="50" r="50" fill="#0d1520"/>
+  <circle cx="50" cy="38" r="18" fill="#60A5FA" opacity="0.15"/>
+  <circle cx="50" cy="38" r="16" fill="#152030"/>
+  <!-- face -->
+  <circle cx="50" cy="38" r="14" fill="#d4a574"/>
+  <!-- hair/grey -->
+  <path d="M34 34 C34 22, 66 22, 66 34 C66 28, 62 24, 50 24 C38 24, 34 28, 34 34Z" fill="#9ca3af"/>
+  <path d="M34 34 C33 38, 33 40, 35 38Z" fill="#9ca3af"/>
+  <path d="M66 34 C67 38, 67 40, 65 38Z" fill="#9ca3af"/>
+  <!-- glasses -->
+  <circle cx="43" cy="36" r="5" stroke="#60A5FA" stroke-width="1.3" fill="none" opacity="0.6"/>
+  <circle cx="57" cy="36" r="5" stroke="#60A5FA" stroke-width="1.3" fill="none" opacity="0.6"/>
+  <line x1="48" y1="36" x2="52" y2="36" stroke="#60A5FA" stroke-width="1" opacity="0.6"/>
+  <!-- eyes -->
+  <circle cx="43" cy="36" r="1.5" fill="#1a2a3a"/>
+  <circle cx="57" cy="36" r="1.5" fill="#1a2a3a"/>
+  <!-- kind smile -->
+  <path d="M44 43 Q50 47 56 43" stroke="#a06030" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+  <!-- white coat -->
+  <path d="M33 60 C33 52, 40 50, 50 50 C60 50, 67 52, 67 60 L70 82 L30 82 Z" fill="#e8e8f0"/>
+  <!-- coat collar -->
+  <path d="M42 50 L50 58 L46 60 Z" fill="#d0d0e0"/>
+  <path d="M58 50 L50 58 L54 60 Z" fill="#d0d0e0"/>
+  <!-- stethoscope -->
+  <path d="M46 54 C44 62, 42 66, 44 68 C46 70, 50 68, 50 64" stroke="#60A5FA" stroke-width="1.5" fill="none" opacity="0.7" stroke-linecap="round"/>
+  <circle cx="50" cy="63" r="2.5" fill="#60A5FA" opacity="0.5"/>
+  <!-- glow ring -->
+  <circle cx="50" cy="50" r="48" stroke="#60A5FA" stroke-width="1.5" opacity="0.15"/>
+</svg>

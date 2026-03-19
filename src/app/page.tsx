@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Image from 'next/image'
 
 export type Tab = 'TEAMS' | 'PLANS' | 'BRAIN' | 'DOCS' | 'BELONGINGS' | 'LOVELY' | 'PROPERTY' | 'CALENDAR' | 'CAPTURE' | 'SYSTEM'
 
@@ -16,14 +17,16 @@ interface ChatMsg {
 }
 
 interface Agent {
-  id: AgentId; name: string; role: string; accent: string; initial: string
+  id: AgentId; name: string; role: string; accent: string; avatar: string
 }
 
 const AGENTS: Record<AgentId, Agent> = {
-  marg: { id: 'marg', name: 'Margarita', role: 'Orchestrator', accent: '#FFD700', initial: 'M' },
-  doc: { id: 'doc', name: 'Doc', role: 'Builder', accent: '#60A5FA', initial: 'D' },
-  cindy: { id: 'cindy', name: 'Cindy', role: 'Assistant', accent: '#C084FC', initial: 'C' },
+  marg: { id: 'marg', name: 'Margarita', role: 'Orchestrator', accent: '#FFD700', avatar: '/images/marg.svg' },
+  doc: { id: 'doc', name: 'Doc', role: 'Builder', accent: '#60A5FA', avatar: '/images/doc.svg' },
+  cindy: { id: 'cindy', name: 'Cindy', role: 'Assistant', accent: '#C084FC', avatar: '/images/cindy.svg' },
 }
+
+const SR_SUPPORTED = typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
 
 /* ── real audio waveform via analyser ── */
 function useAudioAnalyser() {
@@ -32,16 +35,21 @@ function useAudioAnalyser() {
   const analyserRef = useRef<AnalyserNode | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef<number>(0)
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
 
   const start = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
+      // Create AudioContext on user gesture to satisfy browser autoplay policy
       const ctx = new AudioContext()
+      if (ctx.state === 'suspended') await ctx.resume()
       ctxRef.current = ctx
       const src = ctx.createMediaStreamSource(stream)
+      sourceRef.current = src
       const analyser = ctx.createAnalyser()
-      analyser.fftSize = 64
+      analyser.fftSize = 128
+      analyser.smoothingTimeConstant = 0.4
       src.connect(analyser)
       analyserRef.current = analyser
 
@@ -59,8 +67,15 @@ function useAudioAnalyser() {
 
   const stop = useCallback(() => {
     cancelAnimationFrame(rafRef.current)
+    sourceRef.current?.disconnect()
     streamRef.current?.getTracks().forEach(t => t.stop())
-    ctxRef.current?.close()
+    if (ctxRef.current && ctxRef.current.state !== 'closed') {
+      ctxRef.current.close()
+    }
+    ctxRef.current = null
+    analyserRef.current = null
+    sourceRef.current = null
+    streamRef.current = null
     setLevels(new Array(32).fill(0))
   }, [])
 
@@ -75,13 +90,23 @@ function useSpeechRecognition() {
 
   const start = useCallback(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) { alert('Speech recognition not supported'); return }
+    if (!SR) return
     const rec = new SR()
     rec.lang = 'en-GB'
-    rec.continuous = false
+    rec.continuous = true
     rec.interimResults = false
-    rec.onresult = (e: any) => { setTranscript(e.results[0][0].transcript); setListening(false) }
-    rec.onerror = () => setListening(false)
+    rec.maxAlternatives = 1
+    rec.onresult = (e: any) => {
+      let final = ''
+      for (let i = 0; i < e.results.length; i++) {
+        if (e.results[i].isFinal) final += e.results[i][0].transcript + ' '
+      }
+      if (final.trim()) setTranscript(final.trim())
+    }
+    rec.onerror = (e: any) => {
+      console.warn('SpeechRecognition error:', e.error)
+      if (e.error !== 'aborted') setListening(false)
+    }
     rec.onend = () => setListening(false)
     recRef.current = rec
     setTranscript('')
@@ -89,7 +114,10 @@ function useSpeechRecognition() {
     rec.start()
   }, [])
 
-  const stop = useCallback(() => { recRef.current?.stop(); setListening(false) }, [])
+  const stop = useCallback(() => {
+    recRef.current?.stop()
+    setListening(false)
+  }, [])
 
   return { listening, transcript, start, stop, setTranscript }
 }
@@ -133,6 +161,8 @@ function StaticWaveform({ color, bars = 18, h = 18 }: { color: string; bars?: nu
 function RecordTimer({ startTime }: { startTime: number }) {
   const [elapsed, setElapsed] = useState(0)
   useEffect(() => {
+    if (!startTime) return
+    setElapsed(0)
     const t = setInterval(() => setElapsed(Math.floor((Date.now() - startTime) / 1000)), 100)
     return () => clearInterval(t)
   }, [startTime])
@@ -145,6 +175,20 @@ function RecordTimer({ startTime }: { startTime: number }) {
   )
 }
 
+/* ── agent avatar ── */
+function AgentAvatar({ agent, size, borderRadius }: { agent: Agent; size: number; borderRadius: number }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius,
+      background: `linear-gradient(145deg, ${agent.accent}25, ${agent.accent}08)`,
+      border: `1.5px solid ${agent.accent}30`,
+      overflow: 'hidden', flexShrink: 0,
+    }}>
+      <Image src={agent.avatar} alt={agent.name} width={size} height={size} style={{ width: size, height: size, objectFit: 'cover' }} />
+    </div>
+  )
+}
+
 /* ── main ── */
 export default function Home() {
   const [active, setActive] = useState<AgentId>('marg')
@@ -153,6 +197,8 @@ export default function Home() {
   const [loading, setLoading] = useState(false)
   const [playingAudio, setPlayingAudio] = useState(false)
   const [recordStart, setRecordStart] = useState(0)
+  const [textInput, setTextInput] = useState('')
+  const [isRecording, setIsRecording] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -164,16 +210,29 @@ export default function Home() {
     return () => clearInterval(t)
   }, [])
 
+  // When speech recognition returns a transcript after stopping
   useEffect(() => {
-    if (transcript && !loading) {
+    if (transcript && !loading && !isRecording) {
       sendMessage(transcript)
       setTranscript('')
     }
-  }, [transcript])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcript, isRecording])
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Sync listening state
+  useEffect(() => {
+    if (!listening && isRecording) {
+      // Speech recognition ended on its own (timeout, etc.) - stop everything
+      stopAnalyser()
+      setIsRecording(false)
+      setRecordStart(0)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listening])
 
   const agent = AGENTS[active]
   const others = (['marg', 'doc', 'cindy'] as AgentId[]).filter(id => id !== active)
@@ -182,15 +241,26 @@ export default function Home() {
   const timeFmt = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
   function startRecording() {
-    startSR()
+    const ts = Date.now()
+    setRecordStart(ts)
+    setIsRecording(true)
     startAnalyser()
-    setRecordStart(Date.now())
+    if (SR_SUPPORTED) startSR()
   }
 
   function stopRecording() {
-    stopSR()
+    setIsRecording(false)
     stopAnalyser()
+    if (SR_SUPPORTED) stopSR()
     setRecordStart(0)
+  }
+
+  function handleTextSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const text = textInput.trim()
+    if (!text || loading) return
+    setTextInput('')
+    sendMessage(text)
   }
 
   async function sendMessage(text: string) {
@@ -261,13 +331,7 @@ export default function Home() {
           {/* Agent header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, position: 'relative', zIndex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{
-                width: 48, height: 48, borderRadius: 14,
-                background: `linear-gradient(145deg, ${agent.accent}25, ${agent.accent}08)`,
-                border: `1.5px solid ${agent.accent}30`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 22, fontWeight: 700, color: agent.accent, fontFamily: "'Space Grotesk', sans-serif",
-              }}>{agent.initial}</div>
+              <AgentAvatar agent={agent} size={48} borderRadius={14} />
               <div>
                 <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0, fontFamily: "'Space Grotesk', sans-serif" }}>{agent.name}</h2>
                 <div style={{ color: '#555', fontSize: 11 }}>{agent.role}</div>
@@ -281,10 +345,12 @@ export default function Home() {
                     width: 38, height: 38, borderRadius: '50%',
                     background: `linear-gradient(135deg, ${AGENTS[id].accent}18, ${AGENTS[id].accent}06)`,
                     border: `1.5px solid ${AGENTS[id].accent}30`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: 'pointer', fontSize: 14, fontWeight: 700, color: AGENTS[id].accent,
+                    overflow: 'hidden', padding: 0,
+                    cursor: 'pointer',
                   }}
-                >{AGENTS[id].initial}</motion.button>
+                >
+                  <Image src={AGENTS[id].avatar} alt={AGENTS[id].name} width={38} height={38} style={{ width: 38, height: 38, objectFit: 'cover' }} />
+                </motion.button>
               ))}
             </div>
           </div>
@@ -295,7 +361,7 @@ export default function Home() {
               <motion.div key={idx} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 style={{ display: 'flex', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row', gap: 8, marginBottom: 10, alignItems: 'flex-end' }}>
                 {msg.role === 'assistant' && (
-                  <div style={{ width: 26, height: 26, borderRadius: 8, flexShrink: 0, background: `${agent.accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: agent.accent }}>{agent.initial}</div>
+                  <AgentAvatar agent={agent} size={26} borderRadius={8} />
                 )}
                 <div style={{
                   maxWidth: '80%', padding: '10px 14px',
@@ -311,7 +377,7 @@ export default function Home() {
                     </div>
                   )}
                   <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: msg.role === 'user' ? '#C8C8E8' : '#B8B8B8' }}>{msg.content}</p>
-                  <div style={{ fontSize: 9, color: '#3A3A3A', marginTop: 4, textAlign: msg.role === 'user' ? 'right' : 'left' as any }}>
+                  <div style={{ fontSize: 9, color: '#3A3A3A', marginTop: 4, textAlign: msg.role === 'user' ? 'right' : 'left' }}>
                     {msg.ts.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
@@ -319,7 +385,7 @@ export default function Home() {
             ))}
             {loading && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0' }}>
-                <div style={{ width: 26, height: 26, borderRadius: 8, background: `${agent.accent}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: agent.accent }}>{agent.initial}</div>
+                <AgentAvatar agent={agent} size={26} borderRadius={8} />
                 <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity }} style={{ color: '#555', fontSize: 12 }}>thinking...</motion.div>
               </motion.div>
             )}
@@ -329,10 +395,10 @@ export default function Home() {
           {/* ─── Recording area ─── */}
           <div style={{ position: 'relative', zIndex: 1 }}>
             <AnimatePresence mode="wait">
-              {listening ? (
+              {isRecording ? (
                 <motion.div key="recording" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '8px 0' }}>
-                  
+
                   {/* Recording indicator + timer */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <motion.div
@@ -365,14 +431,13 @@ export default function Home() {
                       animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0.1, 0.5] }}
                       transition={{ duration: 1.2, repeat: Infinity }}
                     />
-                    {/* Stop square icon */}
                     <div style={{ width: 20, height: 20, borderRadius: 4, background: '#EF4444' }} />
                   </motion.button>
                 </motion.div>
               ) : (
                 <motion.div key="idle" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '8px 0' }}>
-                  
+
                   {playingAudio && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -386,12 +451,14 @@ export default function Home() {
                     whileHover={{ scale: 1.06 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={startRecording}
+                    disabled={loading}
                     style={{
                       width: 64, height: 64, borderRadius: '50%',
                       background: `radial-gradient(circle at 35% 35%, ${agent.accent}40, ${agent.accent}12)`,
                       border: `2px solid ${agent.accent}35`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', position: 'relative',
+                      cursor: loading ? 'not-allowed' : 'pointer', position: 'relative',
+                      opacity: loading ? 0.5 : 1,
                     }}
                   >
                     <motion.div
@@ -406,10 +473,55 @@ export default function Home() {
                       <line x1="8" y1="23" x2="16" y2="23" />
                     </svg>
                   </motion.button>
+
+                  {!SR_SUPPORTED && (
+                    <div style={{ color: '#666', fontSize: 10, marginTop: 2 }}>Voice not supported — use text input below</div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
+
+          {/* ─── Text input ─── */}
+          <form onSubmit={handleTextSubmit} style={{ display: 'flex', gap: 8, marginTop: 12, position: 'relative', zIndex: 1 }}>
+            <input
+              type="text"
+              value={textInput}
+              onChange={e => setTextInput(e.target.value)}
+              placeholder={`Message ${agent.name}...`}
+              disabled={loading || isRecording}
+              style={{
+                flex: 1, padding: '10px 14px', borderRadius: 16,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#E0E0E0', fontSize: 13,
+                fontFamily: "'Inter', system-ui, sans-serif",
+                outline: 'none',
+              }}
+              onFocus={e => { e.currentTarget.style.borderColor = `${agent.accent}40` }}
+              onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+            />
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.92 }}
+              disabled={!textInput.trim() || loading || isRecording}
+              style={{
+                width: 40, height: 40, borderRadius: '50%',
+                background: textInput.trim() ? `${agent.accent}25` : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${textInput.trim() ? `${agent.accent}35` : 'rgba(255,255,255,0.06)'}`,
+                cursor: textInput.trim() && !loading ? 'pointer' : 'default',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: textInput.trim() ? agent.accent : '#444',
+                fontSize: 16, flexShrink: 0,
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </motion.button>
+          </form>
         </motion.div>
 
       </div>
