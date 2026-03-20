@@ -129,6 +129,11 @@ export default function Home() {
   const [recordStart, setRecordStart] = useState(0)
   const [textInput, setTextInput] = useState('')
 
+  const activeRef = useRef<AgentId>(active)
+  activeRef.current = active
+  const messagesRef = useRef<ChatMsg[]>(messages)
+  messagesRef.current = messages
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -206,8 +211,77 @@ export default function Home() {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
+      recorder.onstop = async () => {
+        // Stop mic and analyser
+        stopMicStream()
+
+        const recMime = recorder.mimeType
+        const ext = recMime.includes('mp4') ? '.mp4' : '.webm'
+        const blob = new Blob(chunksRef.current, { type: recMime })
+        chunksRef.current = []
+
+        if (blob.size < 100) {
+          setVoiceState('idle')
+          return
+        }
+
+        try {
+          setVoiceState('transcribing')
+          const formData = new FormData()
+          formData.append('file', blob, `recording${ext}`)
+          const transcribeRes = await fetch('/api/memory/transcribe', {
+            method: 'POST',
+            body: formData,
+          })
+          const transcribeData = await transcribeRes.json()
+          if (!transcribeRes.ok || !transcribeData.text) {
+            console.error('Transcribe error:', transcribeData.error)
+            setVoiceState('idle')
+            return
+          }
+
+          const text = transcribeData.text.trim()
+          if (!text) {
+            setVoiceState('idle')
+            return
+          }
+
+          // Send to chat
+          const userMsg: ChatMsg = { role: 'user', content: text, ts: new Date() }
+          setMessages(prev => [...prev, userMsg])
+          setVoiceState('thinking')
+
+          const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: text, agent: activeRef.current,
+              history: messagesRef.current.slice(-10).map(m => ({ role: m.role, content: m.content })),
+            }),
+          })
+          const data = await res.json()
+          if (data.error) throw new Error(data.error)
+          const assistantMsg: ChatMsg = { role: 'assistant', content: data.text, audioBase64: data.audioBase64, ts: new Date() }
+          setMessages(prev => [...prev, assistantMsg])
+          if (data.audioBase64) {
+            setVoiceState('speaking')
+            if (audioRef.current) audioRef.current.pause()
+            const audio = new Audio(`data:audio/mpeg;base64,${data.audioBase64}`)
+            audioRef.current = audio
+            await new Promise<void>((resolve) => {
+              audio.onended = () => resolve()
+              audio.onerror = () => resolve()
+              audio.play().catch(() => resolve())
+            })
+          }
+        } catch (err) {
+          console.error('Voice pipeline error:', err)
+          setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.', ts: new Date() }])
+        }
+        setVoiceState('idle')
+      }
       recorderRef.current = recorder
-      recorder.start()
+      recorder.start(250) // collect data every 250ms for reliability
 
       setVoiceState('recording')
       setRecordStart(Date.now())
@@ -220,87 +294,9 @@ export default function Home() {
   const stopRecording = useCallback(() => {
     const recorder = recorderRef.current
     if (!recorder || recorder.state === 'inactive') return
-
-    setVoiceState('transcribing')
     setRecordStart(0)
-
-    recorder.onstop = async () => {
-      // Stop mic and analyser
-      stopMicStream()
-
-      const mimeType = recorder.mimeType
-      const ext = mimeType.includes('mp4') ? '.mp4' : '.webm'
-      const blob = new Blob(chunksRef.current, { type: mimeType })
-      chunksRef.current = []
-
-      if (blob.size < 1000) {
-        // Too short / empty recording
-        setVoiceState('idle')
-        return
-      }
-
-      try {
-        // Transcribe via Whisper
-        const formData = new FormData()
-        formData.append('file', blob, `recording${ext}`)
-        const transcribeRes = await fetch('/api/memory/transcribe', {
-          method: 'POST',
-          body: formData,
-        })
-        const transcribeData = await transcribeRes.json()
-        if (!transcribeRes.ok || !transcribeData.text) {
-          console.error('Transcribe error:', transcribeData.error)
-          setVoiceState('idle')
-          return
-        }
-
-        const text = transcribeData.text.trim()
-        if (!text) {
-          setVoiceState('idle')
-          return
-        }
-
-        // Send to chat
-        await sendMessageFromVoice(text)
-      } catch (err) {
-        console.error('Voice pipeline error:', err)
-        setVoiceState('idle')
-      }
-    }
-
-    recorder.stop()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopMicStream])
-
-  /* ── send message (from voice flow, manages voiceState) ── */
-  async function sendMessageFromVoice(text: string) {
-    const userMsg: ChatMsg = { role: 'user', content: text, ts: new Date() }
-    setMessages(prev => [...prev, userMsg])
-    setVoiceState('thinking')
-
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text, agent: active,
-          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
-        }),
-      })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
-      const assistantMsg: ChatMsg = { role: 'assistant', content: data.text, audioBase64: data.audioBase64, ts: new Date() }
-      setMessages(prev => [...prev, assistantMsg])
-      if (data.audioBase64) {
-        setVoiceState('speaking')
-        await playAudioAsync(data.audioBase64)
-      }
-    } catch (err) {
-      console.error(err)
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.', ts: new Date() }])
-    }
-    setVoiceState('idle')
-  }
+    recorder.stop() // triggers the onstop handler set during startRecording
+  }, [])
 
   /* ── send message (from text input) ── */
   async function sendMessageFromText(text: string) {
@@ -313,8 +309,8 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: text, agent: active,
-          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+          message: text, agent: activeRef.current,
+          history: messagesRef.current.slice(-10).map(m => ({ role: m.role, content: m.content })),
         }),
       })
       const data = await res.json()
