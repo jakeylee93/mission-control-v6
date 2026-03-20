@@ -1,8 +1,26 @@
 import path from 'path'
 import fs from 'fs'
 
-export const HISTORY_FILE = path.join(process.cwd(), '..', 'memory', 'costs', 'history.json')
-const DAILY_FILE = path.join(process.cwd(), '..', 'memory', 'costs', 'daily.json')
+function resolveCostsDir(): string {
+  const candidates = [
+    path.join(process.cwd(), '..', 'memory', 'costs'),
+    path.join(process.cwd(), '.mc-data', 'costs'),
+  ]
+
+  for (const dir of candidates) {
+    try {
+      fs.mkdirSync(dir, { recursive: true })
+      fs.accessSync(dir, fs.constants.W_OK)
+      return dir
+    } catch {}
+  }
+
+  return candidates[1]
+}
+
+const COSTS_DIR = resolveCostsDir()
+export const HISTORY_FILE = path.join(COSTS_DIR, 'history.json')
+export const DAILY_FILE = path.join(COSTS_DIR, 'daily.json')
 const MAX_DAYS = 90
 
 export interface HistoryDay {

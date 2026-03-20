@@ -1,7 +1,8 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import type { Tab } from '@/app/page'
+
+type Tab = 'TEAMS' | 'PLANS' | 'BRAIN' | 'DOCS' | 'BELONGINGS' | 'LOVELY' | 'PROPERTY' | 'CALENDAR' | 'CAPTURE' | 'SYSTEM'
 
 interface TabDef {
   id: Tab

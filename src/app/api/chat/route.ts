@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerSupabaseAdmin } from '@/lib/supabase'
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY!
 const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY!
@@ -15,6 +16,25 @@ const SYSTEM_PROMPTS: Record<string, string> = {
   cindy: `You are Cindy, Jake's executive assistant agent. You handle calendar, emails, and organisation. You're precise, reliable, and one step ahead. Keep voice replies SHORT — 1-3 sentences max.`,
 }
 
+async function persistMessage(params: {
+  agent: string
+  role: 'user' | 'assistant'
+  content: string
+  hasAudio?: boolean
+}) {
+  try {
+    const supabase = createServerSupabaseAdmin()
+    await supabase.from('chat_messages').insert({
+      agent: params.agent,
+      role: params.role,
+      content: params.content,
+      has_audio: Boolean(params.hasAudio),
+    })
+  } catch (error) {
+    console.error('Failed to persist chat message:', error)
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { message, agent = 'marg', history = [] } = await req.json()
@@ -22,6 +42,14 @@ export async function POST(req: NextRequest) {
     if (!message?.trim()) {
       return NextResponse.json({ error: 'No message' }, { status: 400 })
     }
+
+    const normalizedAgent = String(agent || 'marg').toLowerCase()
+    await persistMessage({
+      agent: normalizedAgent,
+      role: 'user',
+      content: String(message).trim(),
+      hasAudio: false,
+    })
 
     // Build messages array
     const messages = [
@@ -43,7 +71,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: agent === 'marg' ? 'claude-sonnet-4-20250514' : agent === 'doc' ? 'claude-sonnet-4-20250514' : 'claude-sonnet-4-20250514',
         max_tokens: 300,
-        system: SYSTEM_PROMPTS[agent] || SYSTEM_PROMPTS.marg,
+        system: SYSTEM_PROMPTS[normalizedAgent] || SYSTEM_PROMPTS.marg,
         messages,
       }),
     })
@@ -81,12 +109,25 @@ export async function POST(req: NextRequest) {
       // Return text only if TTS fails
       const ttsErr = await ttsRes.text()
       console.error('TTS error:', ttsErr)
+      await persistMessage({
+        agent: normalizedAgent,
+        role: 'assistant',
+        content: text,
+        hasAudio: false,
+      })
       return NextResponse.json({ text, audioUrl: null })
     }
 
     // Convert audio to base64
     const audioBuffer = await ttsRes.arrayBuffer()
     const base64Audio = Buffer.from(audioBuffer).toString('base64')
+
+    await persistMessage({
+      agent: normalizedAgent,
+      role: 'assistant',
+      content: text,
+      hasAudio: true,
+    })
 
     return NextResponse.json({
       text,

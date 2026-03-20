@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { archiveToday, readHistory, saveHistory, type HistoryDay } from '@/lib/costs-history'
+import { archiveToday, DAILY_FILE, readHistory, saveHistory, type HistoryDay } from '@/lib/costs-history'
 
 export type Provider = 'kimi' | 'claude' | 'openai'
 
@@ -55,7 +55,6 @@ export interface DayTrend {
   openai: number
 }
 
-const DAILY_FILE = path.join(process.cwd(), '..', 'memory', 'costs', 'daily.json')
 const ACTIVITY_FILE = path.join(process.cwd(), '..', 'mission-control-v2', 'activity.json')
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://nrdlpdsoeksdybrshvst.supabase.co'
