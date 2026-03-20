@@ -8,6 +8,7 @@ export type Tab = 'TEAMS' | 'PLANS' | 'BRAIN' | 'DOCS' | 'BELONGINGS' | 'LOVELY'
 
 type AgentId = 'marg' | 'doc' | 'cindy'
 type MsgRole = 'user' | 'assistant'
+type VoiceState = 'idle' | 'recording' | 'transcribing' | 'thinking' | 'speaking'
 
 interface ChatMsg {
   role: MsgRole
@@ -21,105 +22,9 @@ interface Agent {
 }
 
 const AGENTS: Record<AgentId, Agent> = {
-  marg: { id: 'marg', name: 'Margarita', role: 'Orchestrator', accent: '#FFD700', avatar: '/images/marg.svg' },
-  doc: { id: 'doc', name: 'Doc', role: 'Builder', accent: '#60A5FA', avatar: '/images/doc.svg' },
-  cindy: { id: 'cindy', name: 'Cindy', role: 'Assistant', accent: '#C084FC', avatar: '/images/cindy.svg' },
-}
-
-const SR_SUPPORTED = typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
-
-/* ── real audio waveform via analyser ── */
-function useAudioAnalyser() {
-  const [levels, setLevels] = useState<number[]>(new Array(32).fill(0))
-  const ctxRef = useRef<AudioContext | null>(null)
-  const analyserRef = useRef<AnalyserNode | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const rafRef = useRef<number>(0)
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
-
-  const start = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      streamRef.current = stream
-      // Create AudioContext on user gesture to satisfy browser autoplay policy
-      const ctx = new AudioContext()
-      if (ctx.state === 'suspended') await ctx.resume()
-      ctxRef.current = ctx
-      const src = ctx.createMediaStreamSource(stream)
-      sourceRef.current = src
-      const analyser = ctx.createAnalyser()
-      analyser.fftSize = 128
-      analyser.smoothingTimeConstant = 0.4
-      src.connect(analyser)
-      analyserRef.current = analyser
-
-      const data = new Uint8Array(analyser.frequencyBinCount)
-      const tick = () => {
-        analyser.getByteFrequencyData(data)
-        setLevels(Array.from(data))
-        rafRef.current = requestAnimationFrame(tick)
-      }
-      tick()
-    } catch (e) {
-      console.error('Mic access error:', e)
-    }
-  }, [])
-
-  const stop = useCallback(() => {
-    cancelAnimationFrame(rafRef.current)
-    sourceRef.current?.disconnect()
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    if (ctxRef.current && ctxRef.current.state !== 'closed') {
-      ctxRef.current.close()
-    }
-    ctxRef.current = null
-    analyserRef.current = null
-    sourceRef.current = null
-    streamRef.current = null
-    setLevels(new Array(32).fill(0))
-  }, [])
-
-  return { levels, start, stop }
-}
-
-/* ── speech recognition ── */
-function useSpeechRecognition() {
-  const [listening, setListening] = useState(false)
-  const [transcript, setTranscript] = useState('')
-  const recRef = useRef<any>(null)
-
-  const start = useCallback(() => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) return
-    const rec = new SR()
-    rec.lang = 'en-GB'
-    rec.continuous = true
-    rec.interimResults = false
-    rec.maxAlternatives = 1
-    rec.onresult = (e: any) => {
-      let final = ''
-      for (let i = 0; i < e.results.length; i++) {
-        if (e.results[i].isFinal) final += e.results[i][0].transcript + ' '
-      }
-      if (final.trim()) setTranscript(final.trim())
-    }
-    rec.onerror = (e: any) => {
-      console.warn('SpeechRecognition error:', e.error)
-      if (e.error !== 'aborted') setListening(false)
-    }
-    rec.onend = () => setListening(false)
-    recRef.current = rec
-    setTranscript('')
-    setListening(true)
-    rec.start()
-  }, [])
-
-  const stop = useCallback(() => {
-    recRef.current?.stop()
-    setListening(false)
-  }, [])
-
-  return { listening, transcript, start, stop, setTranscript }
+  marg: { id: 'marg', name: 'Margarita', role: 'Orchestrator', accent: '#FFD700', avatar: '/images/marg.png' },
+  doc: { id: 'doc', name: 'Doc', role: 'Builder', accent: '#60A5FA', avatar: '/images/doc.png' },
+  cindy: { id: 'cindy', name: 'Cindy', role: 'Assistant', accent: '#C084FC', avatar: '/images/cindy.png' },
 }
 
 /* ── live waveform bars ── */
@@ -194,45 +99,31 @@ export default function Home() {
   const [active, setActive] = useState<AgentId>('marg')
   const [now, setNow] = useState(new Date())
   const [messages, setMessages] = useState<ChatMsg[]>([])
-  const [loading, setLoading] = useState(false)
-  const [playingAudio, setPlayingAudio] = useState(false)
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle')
   const [recordStart, setRecordStart] = useState(0)
   const [textInput, setTextInput] = useState('')
-  const [isRecording, setIsRecording] = useState(false)
+  const [levels, setLevels] = useState<number[]>(new Array(32).fill(0))
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const ctxRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const rafRef = useRef<number>(0)
 
-  const { listening, transcript, start: startSR, stop: stopSR, setTranscript } = useSpeechRecognition()
-  const { levels, start: startAnalyser, stop: stopAnalyser } = useAudioAnalyser()
+  const isBusy = voiceState !== 'idle'
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(t)
   }, [])
 
-  // When speech recognition returns a transcript after stopping
-  useEffect(() => {
-    if (transcript && !loading && !isRecording) {
-      sendMessage(transcript)
-      setTranscript('')
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transcript, isRecording])
-
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
-  // Sync listening state
-  useEffect(() => {
-    if (!listening && isRecording) {
-      // Speech recognition ended on its own (timeout, etc.) - stop everything
-      stopAnalyser()
-      setIsRecording(false)
-      setRecordStart(0)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listening])
 
   const agent = AGENTS[active]
   const others = (['marg', 'doc', 'cindy'] as AgentId[]).filter(id => id !== active)
@@ -240,33 +131,130 @@ export default function Home() {
   const dateFmt = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   const timeFmt = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
-  function startRecording() {
-    const ts = Date.now()
-    setRecordStart(ts)
-    setIsRecording(true)
-    startAnalyser()
-    if (SR_SUPPORTED) startSR()
-  }
+  /* ── cleanup helpers ── */
+  const stopMicStream = useCallback(() => {
+    cancelAnimationFrame(rafRef.current)
+    sourceRef.current?.disconnect()
+    streamRef.current?.getTracks().forEach(t => t.stop())
+    if (ctxRef.current && ctxRef.current.state !== 'closed') {
+      ctxRef.current.close()
+    }
+    ctxRef.current = null
+    analyserRef.current = null
+    sourceRef.current = null
+    streamRef.current = null
+    setLevels(new Array(32).fill(0))
+  }, [])
 
-  function stopRecording() {
-    setIsRecording(false)
-    stopAnalyser()
-    if (SR_SUPPORTED) stopSR()
+  /* ── start recording: mic → MediaRecorder + AudioContext analyser ── */
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+
+      // AudioContext for waveform (created on user tap)
+      const ctx = new AudioContext()
+      if (ctx.state === 'suspended') await ctx.resume()
+      ctxRef.current = ctx
+      const src = ctx.createMediaStreamSource(stream)
+      sourceRef.current = src
+      const analyser = ctx.createAnalyser()
+      analyser.fftSize = 128
+      analyser.smoothingTimeConstant = 0.4
+      src.connect(analyser)
+      analyserRef.current = analyser
+
+      const data = new Uint8Array(analyser.frequencyBinCount)
+      const tick = () => {
+        analyser.getByteFrequencyData(data)
+        setLevels(Array.from(data))
+        rafRef.current = requestAnimationFrame(tick)
+      }
+      tick()
+
+      // MediaRecorder for actual audio capture
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : 'audio/webm'
+      const recorder = new MediaRecorder(stream, { mimeType })
+      chunksRef.current = []
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      recorderRef.current = recorder
+      recorder.start()
+
+      setVoiceState('recording')
+      setRecordStart(Date.now())
+    } catch (e) {
+      console.error('Mic access error:', e)
+    }
+  }, [])
+
+  /* ── stop recording → transcribe → chat ── */
+  const stopRecording = useCallback(() => {
+    const recorder = recorderRef.current
+    if (!recorder || recorder.state === 'inactive') return
+
+    setVoiceState('transcribing')
     setRecordStart(0)
-  }
 
-  function handleTextSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const text = textInput.trim()
-    if (!text || loading) return
-    setTextInput('')
-    sendMessage(text)
-  }
+    recorder.onstop = async () => {
+      // Stop mic and analyser
+      stopMicStream()
 
-  async function sendMessage(text: string) {
+      const mimeType = recorder.mimeType
+      const ext = mimeType.includes('mp4') ? '.mp4' : '.webm'
+      const blob = new Blob(chunksRef.current, { type: mimeType })
+      chunksRef.current = []
+
+      if (blob.size < 1000) {
+        // Too short / empty recording
+        setVoiceState('idle')
+        return
+      }
+
+      try {
+        // Transcribe via Whisper
+        const formData = new FormData()
+        formData.append('file', blob, `recording${ext}`)
+        const transcribeRes = await fetch('/api/memory/transcribe', {
+          method: 'POST',
+          body: formData,
+        })
+        const transcribeData = await transcribeRes.json()
+        if (!transcribeRes.ok || !transcribeData.text) {
+          console.error('Transcribe error:', transcribeData.error)
+          setVoiceState('idle')
+          return
+        }
+
+        const text = transcribeData.text.trim()
+        if (!text) {
+          setVoiceState('idle')
+          return
+        }
+
+        // Send to chat
+        await sendMessageFromVoice(text)
+      } catch (err) {
+        console.error('Voice pipeline error:', err)
+        setVoiceState('idle')
+      }
+    }
+
+    recorder.stop()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopMicStream])
+
+  /* ── send message (from voice flow, manages voiceState) ── */
+  async function sendMessageFromVoice(text: string) {
     const userMsg: ChatMsg = { role: 'user', content: text, ts: new Date() }
     setMessages(prev => [...prev, userMsg])
-    setLoading(true)
+    setVoiceState('thinking')
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -280,21 +268,81 @@ export default function Home() {
       if (data.error) throw new Error(data.error)
       const assistantMsg: ChatMsg = { role: 'assistant', content: data.text, audioBase64: data.audioBase64, ts: new Date() }
       setMessages(prev => [...prev, assistantMsg])
-      if (data.audioBase64) playAudio(data.audioBase64)
+      if (data.audioBase64) {
+        setVoiceState('speaking')
+        await playAudioAsync(data.audioBase64)
+      }
     } catch (err) {
       console.error(err)
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.', ts: new Date() }])
-    } finally { setLoading(false) }
+    }
+    setVoiceState('idle')
   }
 
-  function playAudio(base64: string) {
+  /* ── send message (from text input) ── */
+  async function sendMessageFromText(text: string) {
+    const userMsg: ChatMsg = { role: 'user', content: text, ts: new Date() }
+    setMessages(prev => [...prev, userMsg])
+    setVoiceState('thinking')
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text, agent: active,
+          history: messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+        }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      const assistantMsg: ChatMsg = { role: 'assistant', content: data.text, audioBase64: data.audioBase64, ts: new Date() }
+      setMessages(prev => [...prev, assistantMsg])
+      if (data.audioBase64) {
+        setVoiceState('speaking')
+        await playAudioAsync(data.audioBase64)
+      }
+    } catch (err) {
+      console.error(err)
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, something went wrong.', ts: new Date() }])
+    }
+    setVoiceState('idle')
+  }
+
+  function handleTextSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const text = textInput.trim()
+    if (!text || isBusy) return
+    setTextInput('')
+    sendMessageFromText(text)
+  }
+
+  function playAudioAsync(base64: string): Promise<void> {
+    return new Promise((resolve) => {
+      if (audioRef.current) audioRef.current.pause()
+      const audio = new Audio(`data:audio/mpeg;base64,${base64}`)
+      audioRef.current = audio
+      audio.onended = () => resolve()
+      audio.onerror = () => resolve()
+      audio.play().catch(() => resolve())
+    })
+  }
+
+  function playAudioManual(base64: string) {
     if (audioRef.current) audioRef.current.pause()
     const audio = new Audio(`data:audio/mpeg;base64,${base64}`)
     audioRef.current = audio
-    setPlayingAudio(true)
-    audio.play()
-    audio.onended = () => setPlayingAudio(false)
+    setVoiceState('speaking')
+    audio.onended = () => setVoiceState('idle')
+    audio.onerror = () => setVoiceState('idle')
+    audio.play().catch(() => setVoiceState('idle'))
   }
+
+  /* ── status label ── */
+  const statusLabel = voiceState === 'transcribing' ? 'Transcribing...'
+    : voiceState === 'thinking' ? 'Thinking...'
+    : voiceState === 'speaking' ? 'Speaking...'
+    : null
 
   return (
     <div style={{
@@ -371,7 +419,7 @@ export default function Home() {
                 }}>
                   {msg.audioBase64 && msg.role === 'assistant' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <motion.button whileTap={{ scale: 0.9 }} onClick={() => playAudio(msg.audioBase64!)}
+                      <motion.button whileTap={{ scale: 0.9 }} onClick={() => playAudioManual(msg.audioBase64!)}
                         style={{ width: 26, height: 26, borderRadius: '50%', background: `${agent.accent}20`, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: agent.accent, fontSize: 11 }}>▶</motion.button>
                       <StaticWaveform color={agent.accent} bars={16} h={16} />
                     </div>
@@ -383,7 +431,7 @@ export default function Home() {
                 </div>
               </motion.div>
             ))}
-            {loading && (
+            {voiceState === 'thinking' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0' }}>
                 <AgentAvatar agent={agent} size={26} borderRadius={8} />
                 <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity }} style={{ color: '#555', fontSize: 12 }}>thinking...</motion.div>
@@ -395,7 +443,7 @@ export default function Home() {
           {/* ─── Recording area ─── */}
           <div style={{ position: 'relative', zIndex: 1 }}>
             <AnimatePresence mode="wait">
-              {isRecording ? (
+              {voiceState === 'recording' ? (
                 <motion.div key="recording" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '8px 0' }}>
 
@@ -438,12 +486,12 @@ export default function Home() {
                 <motion.div key="idle" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                   style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '8px 0' }}>
 
-                  {playingAudio && (
+                  {statusLabel && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                       style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       <motion.div style={{ width: 6, height: 6, borderRadius: '50%', background: agent.accent }}
                         animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 0.8, repeat: Infinity }} />
-                      <span style={{ color: agent.accent, fontSize: 11 }}>Speaking...</span>
+                      <span style={{ color: agent.accent, fontSize: 11 }}>{statusLabel}</span>
                     </motion.div>
                   )}
 
@@ -451,14 +499,14 @@ export default function Home() {
                     whileHover={{ scale: 1.06 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={startRecording}
-                    disabled={loading}
+                    disabled={isBusy}
                     style={{
                       width: 64, height: 64, borderRadius: '50%',
                       background: `radial-gradient(circle at 35% 35%, ${agent.accent}40, ${agent.accent}12)`,
                       border: `2px solid ${agent.accent}35`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: loading ? 'not-allowed' : 'pointer', position: 'relative',
-                      opacity: loading ? 0.5 : 1,
+                      cursor: isBusy ? 'not-allowed' : 'pointer', position: 'relative',
+                      opacity: isBusy ? 0.5 : 1,
                     }}
                   >
                     <motion.div
@@ -473,10 +521,6 @@ export default function Home() {
                       <line x1="8" y1="23" x2="16" y2="23" />
                     </svg>
                   </motion.button>
-
-                  {!SR_SUPPORTED && (
-                    <div style={{ color: '#666', fontSize: 10, marginTop: 2 }}>Voice not supported — use text input below</div>
-                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -489,7 +533,7 @@ export default function Home() {
               value={textInput}
               onChange={e => setTextInput(e.target.value)}
               placeholder={`Message ${agent.name}...`}
-              disabled={loading || isRecording}
+              disabled={isBusy}
               style={{
                 flex: 1, padding: '10px 14px', borderRadius: 16,
                 background: 'rgba(255,255,255,0.04)',
@@ -505,12 +549,12 @@ export default function Home() {
               type="submit"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.92 }}
-              disabled={!textInput.trim() || loading || isRecording}
+              disabled={!textInput.trim() || isBusy}
               style={{
                 width: 40, height: 40, borderRadius: '50%',
                 background: textInput.trim() ? `${agent.accent}25` : 'rgba(255,255,255,0.04)',
                 border: `1px solid ${textInput.trim() ? `${agent.accent}35` : 'rgba(255,255,255,0.06)'}`,
-                cursor: textInput.trim() && !loading ? 'pointer' : 'default',
+                cursor: textInput.trim() && !isBusy ? 'pointer' : 'default',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: textInput.trim() ? agent.accent : '#444',
                 fontSize: 16, flexShrink: 0,
