@@ -27,27 +27,53 @@ const AGENTS: Record<AgentId, Agent> = {
   cindy: { id: 'cindy', name: 'Cindy', role: 'Assistant', accent: '#C084FC', avatar: '/images/cindy.png' },
 }
 
-/* ── live waveform bars ── */
-function LiveWaveform({ levels, color, barCount = 28 }: { levels: number[]; color: string; barCount?: number }) {
-  const step = Math.max(1, Math.floor(levels.length / barCount))
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, height: 40 }}>
-      {Array.from({ length: barCount }).map((_, i) => {
-        const val = levels[i * step] || 0
-        const h = Math.max(3, (val / 255) * 40)
-        return (
-          <div
-            key={i}
-            style={{
-              width: 3, borderRadius: 2, background: color,
-              height: h, transition: 'height 0.06s ease-out',
-              opacity: 0.8,
-            }}
-          />
-        )
-      })}
-    </div>
-  )
+/* ── canvas-based live waveform ── */
+function LiveWaveformCanvas({ analyser, color, width = 280, height = 40 }: { analyser: AnalyserNode | null; color: string; width?: number; height?: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const rafRef = useRef<number>(0)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas || !analyser) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const barCount = 32
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    const step = Math.max(1, Math.floor(data.length / barCount))
+    const barW = 3
+    const gap = (width - barCount * barW) / (barCount - 1)
+
+    const tick = () => {
+      analyser.getByteFrequencyData(data)
+      ctx.clearRect(0, 0, width, height)
+      for (let i = 0; i < barCount; i++) {
+        const val = data[i * step] || 0
+        const h = Math.max(3, (val / 255) * height)
+        const x = i * (barW + gap)
+        const y = (height - h) / 2
+        ctx.fillStyle = color
+        ctx.globalAlpha = 0.8
+        ctx.beginPath()
+        ctx.roundRect(x, y, barW, h, 2)
+        ctx.fill()
+      }
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    tick()
+
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [analyser, color, width, height])
+
+  // Clear canvas when analyser goes away
+  useEffect(() => {
+    if (!analyser && canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d')
+      ctx?.clearRect(0, 0, width, height)
+    }
+  }, [analyser, width, height])
+
+  return <canvas ref={canvasRef} width={width} height={height} style={{ width, height }} />
 }
 
 /* ── static waveform (for played messages) ── */
@@ -102,7 +128,6 @@ export default function Home() {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle')
   const [recordStart, setRecordStart] = useState(0)
   const [textInput, setTextInput] = useState('')
-  const [levels, setLevels] = useState<number[]>(new Array(32).fill(0))
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
@@ -112,7 +137,7 @@ export default function Home() {
   const ctxRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
-  const rafRef = useRef<number>(0)
+  const [activeAnalyser, setActiveAnalyser] = useState<AnalyserNode | null>(null)
 
   const isBusy = voiceState !== 'idle'
 
@@ -133,7 +158,6 @@ export default function Home() {
 
   /* ── cleanup helpers ── */
   const stopMicStream = useCallback(() => {
-    cancelAnimationFrame(rafRef.current)
     sourceRef.current?.disconnect()
     streamRef.current?.getTracks().forEach(t => t.stop())
     if (ctxRef.current && ctxRef.current.state !== 'closed') {
@@ -143,8 +167,17 @@ export default function Home() {
     analyserRef.current = null
     sourceRef.current = null
     streamRef.current = null
-    setLevels(new Array(32).fill(0))
+    setActiveAnalyser(null)
   }, [])
+
+  /* ── pick best mime type for MediaRecorder (iOS-first) ── */
+  function pickMimeType(): { mimeType?: string; ext: string } {
+    if (typeof MediaRecorder === 'undefined') return { ext: '.webm' }
+    if (MediaRecorder.isTypeSupported('audio/mp4')) return { mimeType: 'audio/mp4', ext: '.mp4' }
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return { mimeType: 'audio/webm;codecs=opus', ext: '.webm' }
+    if (MediaRecorder.isTypeSupported('audio/webm')) return { mimeType: 'audio/webm', ext: '.webm' }
+    return { ext: '.webm' } // let browser decide
+  }
 
   /* ── start recording: mic → MediaRecorder + AudioContext analyser ── */
   const startRecording = useCallback(async () => {
@@ -163,22 +196,12 @@ export default function Home() {
       analyser.smoothingTimeConstant = 0.4
       src.connect(analyser)
       analyserRef.current = analyser
-
-      const data = new Uint8Array(analyser.frequencyBinCount)
-      const tick = () => {
-        analyser.getByteFrequencyData(data)
-        setLevels(Array.from(data))
-        rafRef.current = requestAnimationFrame(tick)
-      }
-      tick()
+      setActiveAnalyser(analyser)
 
       // MediaRecorder for actual audio capture
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/mp4')
-          ? 'audio/mp4'
-          : 'audio/webm'
-      const recorder = new MediaRecorder(stream, { mimeType })
+      const { mimeType } = pickMimeType()
+      const opts: MediaRecorderOptions = mimeType ? { mimeType } : {}
+      const recorder = new MediaRecorder(stream, opts)
       chunksRef.current = []
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data)
@@ -346,38 +369,41 @@ export default function Home() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      height: '100vh',
       background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
       color: '#F0EEE8', fontFamily: "'Inter', system-ui, sans-serif",
       position: 'relative', overflow: 'hidden',
+      display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)', width: 600, height: 600, borderRadius: '50%', background: 'radial-gradient(circle, rgba(120,80,200,0.07), transparent 70%)', pointerEvents: 'none' }} />
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 480, margin: '0 auto', padding: '0 20px', display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: 480, width: '100%', margin: '0 auto', padding: '0 20px', display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
 
-        {/* Header */}
-        <motion.header initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ paddingTop: 48, marginBottom: 28, textAlign: 'center', flexShrink: 0 }}>
+        {/* Header — compact */}
+        <header style={{ paddingTop: 24, marginBottom: 12, textAlign: 'center', flexShrink: 0 }}>
           <div style={{ color: '#555', fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 }}>
             {dayName} · {dateFmt}
           </div>
-          <h1 style={{ fontSize: 44, fontWeight: 700, margin: 0, letterSpacing: -1, fontFamily: "'Space Grotesk', 'Inter', sans-serif" }}>Jake</h1>
+          <h1 style={{ fontSize: 36, fontWeight: 700, margin: 0, letterSpacing: -1, fontFamily: "'Space Grotesk', 'Inter', sans-serif" }}>Jake</h1>
           <div style={{ color: '#666', fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', marginTop: 2 }}>Mission Control</div>
-          <div style={{ fontSize: 32, fontWeight: 200, fontFamily: 'monospace', letterSpacing: 3, marginTop: 10, opacity: 0.75 }}>{timeFmt}</div>
-        </motion.header>
+          <div style={{ fontSize: 28, fontWeight: 200, fontFamily: 'monospace', letterSpacing: 3, marginTop: 6, opacity: 0.75 }}>{timeFmt}</div>
+        </header>
 
-        {/* Agent Card */}
+        {/* Agent Card — takes remaining top space */}
         <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
           style={{
             background: 'rgba(255,255,255,0.035)', backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-            border: '1px solid rgba(255,255,255,0.07)', borderRadius: 28, padding: '22px',
+            border: '1px solid rgba(255,255,255,0.07)', borderRadius: 28, padding: '18px 22px',
             position: 'relative', overflow: 'hidden', flexShrink: 0,
+            display: 'flex', flexDirection: 'column',
+            flex: 1, minHeight: 0,
           }}
         >
           <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: `radial-gradient(circle, ${agent.accent}10, transparent 70%)`, pointerEvents: 'none' }} />
 
           {/* Agent header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, position: 'relative', zIndex: 1, flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <AgentAvatar agent={agent} size={48} borderRadius={14} />
               <div>
@@ -403,10 +429,10 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Chat messages */}
-          <div style={{ maxHeight: messages.length > 0 ? 280 : 0, overflowY: 'auto', transition: 'max-height 0.3s', marginBottom: messages.length > 0 ? 16 : 0 }}>
+          {/* Chat messages — scrollable, fills remaining card space */}
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, marginBottom: 8 }}>
             {messages.map((msg, idx) => (
-              <motion.div key={idx} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+              <div key={idx}
                 style={{ display: 'flex', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row', gap: 8, marginBottom: 10, alignItems: 'flex-end' }}>
                 {msg.role === 'assistant' && (
                   <AgentAvatar agent={agent} size={26} borderRadius={8} />
@@ -419,8 +445,8 @@ export default function Home() {
                 }}>
                   {msg.audioBase64 && msg.role === 'assistant' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <motion.button whileTap={{ scale: 0.9 }} onClick={() => playAudioManual(msg.audioBase64!)}
-                        style={{ width: 26, height: 26, borderRadius: '50%', background: `${agent.accent}20`, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: agent.accent, fontSize: 11 }}>▶</motion.button>
+                      <button onClick={() => playAudioManual(msg.audioBase64!)}
+                        style={{ width: 26, height: 26, borderRadius: '50%', background: `${agent.accent}20`, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: agent.accent, fontSize: 11 }}>▶</button>
                       <StaticWaveform color={agent.accent} bars={16} h={16} />
                     </div>
                   )}
@@ -429,23 +455,26 @@ export default function Home() {
                     {msg.ts.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
             {voiceState === 'thinking' && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0' }}>
                 <AgentAvatar agent={agent} size={26} borderRadius={8} />
                 <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ duration: 1.2, repeat: Infinity }} style={{ color: '#555', fontSize: 12 }}>thinking...</motion.div>
-              </motion.div>
+              </div>
             )}
             <div ref={chatEndRef} />
           </div>
+        </motion.div>
 
-          {/* ─── Recording area ─── */}
+        {/* ─── Bottom controls: mic + text input — pinned at bottom ─── */}
+        <div style={{ flexShrink: 0, paddingTop: 12, paddingBottom: 20 }}>
+          {/* Recording area */}
           <div style={{ position: 'relative', zIndex: 1 }}>
             <AnimatePresence mode="wait">
               {voiceState === 'recording' ? (
                 <motion.div key="recording" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, padding: '8px 0' }}>
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '4px 0' }}>
 
                   {/* Recording indicator + timer */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -458,8 +487,8 @@ export default function Home() {
                     <RecordTimer startTime={recordStart} />
                   </div>
 
-                  {/* Live waveform */}
-                  <LiveWaveform levels={levels} color={agent.accent} barCount={32} />
+                  {/* Live waveform — canvas */}
+                  <LiveWaveformCanvas analyser={activeAnalyser} color={agent.accent} />
 
                   {/* Stop button */}
                   <motion.button
@@ -467,7 +496,7 @@ export default function Home() {
                     whileTap={{ scale: 0.9 }}
                     onClick={stopRecording}
                     style={{
-                      width: 64, height: 64, borderRadius: '50%',
+                      width: 56, height: 56, borderRadius: '50%',
                       background: 'radial-gradient(circle at 35% 35%, rgba(239,68,68,0.5), rgba(239,68,68,0.2))',
                       border: '2px solid rgba(239,68,68,0.5)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -479,20 +508,19 @@ export default function Home() {
                       animate={{ scale: [1, 1.25, 1], opacity: [0.5, 0.1, 0.5] }}
                       transition={{ duration: 1.2, repeat: Infinity }}
                     />
-                    <div style={{ width: 20, height: 20, borderRadius: 4, background: '#EF4444' }} />
+                    <div style={{ width: 18, height: 18, borderRadius: 4, background: '#EF4444' }} />
                   </motion.button>
                 </motion.div>
               ) : (
                 <motion.div key="idle" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '8px 0' }}>
+                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '4px 0' }}>
 
                   {statusLabel && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                       <motion.div style={{ width: 6, height: 6, borderRadius: '50%', background: agent.accent }}
                         animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 0.8, repeat: Infinity }} />
                       <span style={{ color: agent.accent, fontSize: 11 }}>{statusLabel}</span>
-                    </motion.div>
+                    </div>
                   )}
 
                   <motion.button
@@ -501,7 +529,7 @@ export default function Home() {
                     onClick={startRecording}
                     disabled={isBusy}
                     style={{
-                      width: 64, height: 64, borderRadius: '50%',
+                      width: 56, height: 56, borderRadius: '50%',
                       background: `radial-gradient(circle at 35% 35%, ${agent.accent}40, ${agent.accent}12)`,
                       border: `2px solid ${agent.accent}35`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -514,7 +542,7 @@ export default function Home() {
                       animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.1, 0.4] }}
                       transition={{ duration: 2.5, repeat: Infinity }}
                     />
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={agent.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={agent.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="9" y="1" width="6" height="11" rx="3" />
                       <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
                       <line x1="12" y1="19" x2="12" y2="23" />
@@ -526,8 +554,8 @@ export default function Home() {
             </AnimatePresence>
           </div>
 
-          {/* ─── Text input ─── */}
-          <form onSubmit={handleTextSubmit} style={{ display: 'flex', gap: 8, marginTop: 12, position: 'relative', zIndex: 1 }}>
+          {/* Text input */}
+          <form onSubmit={handleTextSubmit} style={{ display: 'flex', gap: 8, marginTop: 8, position: 'relative', zIndex: 1 }}>
             <input
               type="text"
               value={textInput}
@@ -545,10 +573,8 @@ export default function Home() {
               onFocus={e => { e.currentTarget.style.borderColor = `${agent.accent}40` }}
               onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
             />
-            <motion.button
+            <button
               type="submit"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.92 }}
               disabled={!textInput.trim() || isBusy}
               style={{
                 width: 40, height: 40, borderRadius: '50%',
@@ -564,9 +590,9 @@ export default function Home() {
                 <line x1="22" y1="2" x2="11" y2="13" />
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />
               </svg>
-            </motion.button>
+            </button>
           </form>
-        </motion.div>
+        </div>
 
       </div>
     </div>
