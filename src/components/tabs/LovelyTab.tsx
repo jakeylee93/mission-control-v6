@@ -328,21 +328,39 @@ export default function LovelyTab() {
           <div className="grid grid-cols-7 gap-1">
             {calendarCells.map((cell) => {
               const clickable = !cell.isFuture
+              const isSelected = showCheckin && selectedDate === cell.date
+              const background = isSelected
+                ? 'rgba(255,215,0,0.3)'
+                : cell.hasCheckin
+                  ? 'rgba(34,197,94,0.25)'
+                  : PANEL_COLOR
+              const border = isSelected
+                ? '1px solid #FFD700'
+                : cell.isToday
+                  ? '1px solid #FFD700'
+                  : `1px solid ${BORDER_COLOR}`
               return (
                 <button
                   key={cell.key}
                   onClick={() => clickable && openCheckinForDate(cell.date)}
                   disabled={!clickable}
-                  className="h-10 rounded-lg text-xs relative disabled:opacity-35"
+                  className="h-11 rounded-lg text-xs relative disabled:opacity-35"
                   style={{
                     color: cell.inCurrentMonth ? TEXT_COLOR : '#666',
-                    background: cell.hasCheckin ? 'rgba(34,197,94,0.16)' : PANEL_COLOR,
-                    border: cell.isToday ? '1px solid #FFD700' : `1px solid ${BORDER_COLOR}`,
+                    background,
+                    border,
                     cursor: clickable ? 'pointer' : 'default',
                   }}
                 >
                   <span>{cell.day}</span>
-                  {cell.hasCheckin && <span className="absolute bottom-0.5 right-1 text-[10px]">✓</span>}
+                  {cell.hasCheckin && (
+                    <span
+                      className="absolute bottom-0.5 right-1 text-xs font-bold"
+                      style={{ color: '#22C55E' }}
+                    >
+                      ✓
+                    </span>
+                  )}
                 </button>
               )
             })}
