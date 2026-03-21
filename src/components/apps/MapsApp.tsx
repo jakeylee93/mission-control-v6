@@ -8,7 +8,6 @@ interface Place {
   name: string
   address: string
   phone: string
-  icon: string
   note?: string
   type?: string
 }
@@ -31,9 +30,9 @@ const CATEGORIES: Category[] = [
     title: 'FAVOURITES',
     accent: '#FFD700',
     places: [
-      { name: 'Home', address: '60 Dukes Avenue, Theydon Bois, Essex CM16 7HF', phone: '01921 812793', icon: '/places/home.svg', note: 'Home' },
-      { name: 'TM Event Hire', address: 'Unit 16, Griffin Farm, Great Canfield, Essex CM6 1JZ', phone: '07595 979451', icon: '/places/tm-event.png', note: 'Event equipment suppliers' },
-      { name: 'N2 Group', address: 'Unit C, Foxholes Business Park, John Tate Road, Hertford SG13 7DT', phone: '01992 440333', icon: '/places/n2-group.png', note: 'Print & visual communications' },
+      { name: 'Home', address: '60 Dukes Avenue, Theydon Bois, Essex CM16 7HF', phone: '01921 812793', note: 'Home' },
+      { name: 'TM Event Hire', address: 'Unit 16, Griffin Farm, Great Canfield, Essex CM6 1JZ', phone: '07595 979451', note: 'Event equipment suppliers' },
+      { name: 'N2 Group', address: 'Unit C, Foxholes Business Park, John Tate Road, Hertford SG13 7DT', phone: '01992 440333', note: 'Print & visual communications' },
     ],
   },
   {
@@ -41,11 +40,11 @@ const CATEGORIES: Category[] = [
     title: 'RESTAURANTS',
     accent: '#ef4444',
     places: [
-      { name: 'Il Bacio', address: '19B Forest Drive, Theydon Bois, Epping CM16 7EX', phone: '01992 812826', type: 'Italian', icon: '/places/il-bacio.png', note: 'Modern Italian with Sardinian influence' },
-      { name: 'Churchills Fish & Chips', address: '15 Forest Drive, Theydon Bois, Epping CM16 7EX', phone: '01992 812193', type: 'Fish & Chips', icon: '/places/churchills.png' },
-      { name: 'Indian Ocean', address: '1 Coppice Row, Theydon Bois CM16 7ES', phone: '01992 812658', type: 'Indian', icon: '/places/indian-ocean.png' },
-      { name: 'Filika', address: '13 Forest Drive, Theydon Bois, Epping CM16 7EX', phone: '01992 812000', type: 'Turkish/Mediterranean', icon: '/places/filika.png' },
-      { name: 'Theydon Bois Balti House', address: 'Station Approach, Coppice Row, Theydon Bois CM16 7HR', phone: '01992 813850', type: 'Indian/Balti', icon: '/places/balti-house.png' },
+      { name: 'Il Bacio', address: '19B Forest Drive, Theydon Bois, Epping CM16 7EX', phone: '01992 812826', type: 'Italian', note: 'Modern Italian with Sardinian influence' },
+      { name: 'Churchills Fish & Chips', address: '15 Forest Drive, Theydon Bois, Epping CM16 7EX', phone: '01992 812193', type: 'Fish & Chips' },
+      { name: 'Indian Ocean', address: '1 Coppice Row, Theydon Bois CM16 7ES', phone: '01992 812658', type: 'Indian' },
+      { name: 'Filika', address: '13 Forest Drive, Theydon Bois, Epping CM16 7EX', phone: '01992 812000', type: 'Turkish/Mediterranean' },
+      { name: 'Theydon Bois Balti House', address: 'Station Approach, Coppice Row, Theydon Bois CM16 7HR', phone: '01992 813850', type: 'Indian/Balti' },
     ],
   },
   {
@@ -53,10 +52,10 @@ const CATEGORIES: Category[] = [
     title: 'EXHIBITION CENTRES',
     accent: '#6366f1',
     places: [
-      { name: 'ExCeL London', address: 'Royal Victoria Dock, 1 Western Gateway, London E16 1XL', phone: '020 7069 5000', icon: '/places/excel.png' },
-      { name: 'Olympia London', address: 'Hammersmith Road, Kensington, London W14 8UX', phone: '020 7385 1200', icon: '/places/olympia.png' },
-      { name: 'NEC Birmingham', address: 'North Avenue, Marston Green, Birmingham B40 1NT', phone: '0121 780 4141', icon: '/places/nec.png' },
-      { name: 'Alexandra Palace', address: 'Alexandra Palace Way, Muswell Hill, London N22 7AY', phone: '020 8365 2121', icon: '/places/ally-pally.png' },
+      { name: 'ExCeL London', address: 'Royal Victoria Dock, 1 Western Gateway, London E16 1XL', phone: '020 7069 5000' },
+      { name: 'Olympia London', address: 'Hammersmith Road, Kensington, London W14 8UX', phone: '020 7385 1200' },
+      { name: 'NEC Birmingham', address: 'North Avenue, Marston Green, Birmingham B40 1NT', phone: '0121 780 4141' },
+      { name: 'Alexandra Palace', address: 'Alexandra Palace Way, Muswell Hill, London N22 7AY', phone: '020 8365 2121' },
     ],
   },
 ]
@@ -74,6 +73,18 @@ function normalizePhone(phone: string) {
 function getPlaceSearchUrl(name: string, address: string) {
   const query = encodeURIComponent(`${name} ${address}`).replace(/%20/g, '+')
   return `https://www.google.com/maps/search/?api=1&query=${query}`
+}
+
+function getAccentBackground(accent: string) {
+  if (!accent.startsWith('#') || accent.length !== 7) return 'rgba(255,255,255,0.2)'
+  const red = Number.parseInt(accent.slice(1, 3), 16)
+  const green = Number.parseInt(accent.slice(3, 5), 16)
+  const blue = Number.parseInt(accent.slice(5, 7), 16)
+  return `rgba(${red}, ${green}, ${blue}, 0.2)`
+}
+
+function getInitial(name: string) {
+  return name.trim().charAt(0).toUpperCase()
 }
 
 export default function MapsApp({ onBack }: { onBack: () => void }) {
@@ -146,40 +157,25 @@ export default function MapsApp({ onBack }: { onBack: () => void }) {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    {place.name === 'Home' ? (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: 36,
-                          height: 36,
-                          borderRadius: 10,
-                          background: '#D4AF37',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M3 10.5 12 3l9 7.5" />
-                          <path d="M5 9.5V21h14V9.5" />
-                          <path d="M10 21v-6h4v6" />
-                        </svg>
-                      </span>
-                    ) : (
-                      <img
-                        src={place.icon}
-                        alt={`${place.name} icon`}
-                        width={36}
-                        height={36}
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 10,
-                          objectFit: 'cover',
-                          flexShrink: 0,
-                        }}
-                      />
-                    )}
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        background: getAccentBackground(category.accent),
+                        color: category.accent,
+                        fontSize: 18,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {getInitial(place.name)}
+                    </span>
                     <div style={{ fontSize: 15, fontWeight: 700 }}>{place.name}</div>
                   </div>
                   <div style={{ fontSize: 12, color: MUTED_COLOR, lineHeight: 1.45 }}>{place.address}</div>
