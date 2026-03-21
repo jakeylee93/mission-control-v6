@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
+import LovelyTab from '@/components/tabs/LovelyTab'
 
 type TabId = 'business' | 'personal' | 'laboratory'
 type ActiveApp = string | null
@@ -49,6 +50,7 @@ const I = {
   automations: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
   database: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
   deploy: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
+  lovely: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
   back: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
   briefcase: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
   user: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
@@ -81,6 +83,7 @@ const PERSONAL: AppDef[] = [
   { icon: I.home, label: 'Home', color: '#64748b', id: 'home' },
   { icon: I.reading, label: 'Reading', color: '#a855f7', id: 'reading' },
   { icon: I.downtime, label: 'Downtime', color: '#6366f1', id: 'downtime' },
+  { icon: I.lovely, label: 'Lovely', color: '#FFD700', id: 'lovely' },
 ]
 
 const LAB: AppDef[] = [
@@ -248,6 +251,7 @@ export default function HomePage() {
   const handleAppClick = useCallback((app: AppDef) => {
     if (app.href) { window.open(app.href, '_blank'); return }
     if (app.id === 'calendar') { setActiveApp('calendar'); return }
+    if (app.id === 'lovely') { setActiveApp('lovely'); return }
     // Future: other apps
   }, [])
 
@@ -304,6 +308,15 @@ export default function HomePage() {
         }}>
           {activeApp === 'calendar' ? (
             <CalendarView onBack={() => setActiveApp(null)} />
+          ) : activeApp === 'lovely' ? (
+            <div>
+              <button onClick={() => setActiveApp(null)} style={{
+                background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
+                color: '#aaa', padding: '8px 14px', fontSize: 13, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
+              }}>{I.back} Back</button>
+              <LovelyTab />
+            </div>
           ) : (
             <div style={{
               display: 'grid',
