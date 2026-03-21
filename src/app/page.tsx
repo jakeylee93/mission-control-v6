@@ -7,6 +7,7 @@ import MapsApp from '@/components/apps/MapsApp'
 
 type TabId = 'business' | 'personal' | 'laboratory'
 type ActiveApp = string | null
+type QuickChatMessage = { role: 'user' | 'assistant'; content: string }
 
 interface Agent {
   id: string; name: string; role: string; model: string; provider: string
@@ -242,6 +243,11 @@ export default function HomePage() {
   const [tab, setTab] = useState<TabId>('business')
   const [activeApp, setActiveApp] = useState<ActiveApp>(null)
   const [now, setNow] = useState(new Date())
+  const [quickInput, setQuickInput] = useState('')
+  const [quickHistory, setQuickHistory] = useState<QuickChatMessage[]>([])
+  const [quickReply, setQuickReply] = useState('')
+  const [quickLoading, setQuickLoading] = useState(false)
+  const [quickExpanded, setQuickExpanded] = useState(false)
 
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
 
@@ -256,6 +262,41 @@ export default function HomePage() {
     if (app.id === 'lovely') { setActiveApp('lovely'); return }
     // Future: other apps
   }, [])
+
+  const handleQuickChatSend = useCallback(async () => {
+    const message = quickInput.trim()
+    if (!message || quickLoading) return
+
+    setQuickLoading(true)
+    setQuickExpanded(false)
+    setQuickReply('')
+    setQuickInput('')
+    setQuickHistory((prev) => [...prev, { role: 'user' as const, content: message }].slice(-10))
+
+    try {
+      const response = await fetch('/api/chat-quick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          history: quickHistory.slice(-10),
+        }),
+      })
+
+      if (!response.ok) throw new Error('chat-quick request failed')
+      const data = await response.json()
+      const text = String(data?.text || '').trim() || 'Sorry, I could not generate a response.'
+
+      setQuickReply(text)
+      setQuickHistory((prev) => [...prev, { role: 'assistant' as const, content: text }].slice(-10))
+    } catch {
+      const fallback = 'Sorry, something went wrong. Please try again.'
+      setQuickReply(fallback)
+      setQuickHistory((prev) => [...prev, { role: 'assistant' as const, content: fallback }].slice(-10))
+    } finally {
+      setQuickLoading(false)
+    }
+  }, [quickHistory, quickInput, quickLoading])
 
   return (
     <div style={{
@@ -300,6 +341,86 @@ export default function HomePage() {
             <div style={{ textAlign: 'center', fontSize: 11, color: '#555', marginTop: 2 }}>
               Total: <span style={{ color: '#6366f1', fontWeight: 700 }}>£1,003.50</span>
             </div>
+          </div>
+        )}
+
+        {!activeApp && (
+          <div style={{
+            marginBottom: 14,
+            background: 'rgba(255,255,255,0.035)',
+            border: '1px solid rgba(255,255,255,0.07)',
+            borderRadius: 14,
+            padding: '8px 10px',
+            backdropFilter: 'blur(12px)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                value={quickInput}
+                onChange={(e) => setQuickInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleQuickChatSend()
+                  }
+                }}
+                placeholder="Ask anything..."
+                style={{
+                  flex: 1,
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 10,
+                  height: 34,
+                  color: '#EDE9FE',
+                  fontSize: 13,
+                  padding: '0 10px',
+                  outline: 'none',
+                }}
+              />
+              <button
+                onClick={handleQuickChatSend}
+                disabled={quickLoading || !quickInput.trim()}
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 10,
+                  border: '1px solid rgba(99,102,241,0.35)',
+                  background: quickLoading ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.28)',
+                  color: '#E9E6FF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: quickLoading ? 'default' : 'pointer',
+                  opacity: quickInput.trim() ? 1 : 0.55,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </button>
+            </div>
+
+            {(quickLoading || quickReply) && (
+              <div
+                onClick={() => setQuickExpanded((v) => !v)}
+                style={{
+                  marginTop: 8,
+                  padding: '8px 10px',
+                  borderRadius: 10,
+                  background: 'rgba(15,12,26,0.72)',
+                  border: `1px solid ${quickExpanded ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                  color: '#BDB6DF',
+                  fontSize: 12,
+                  lineHeight: 1.4,
+                  maxHeight: quickExpanded ? 220 : 72,
+                  overflowY: 'auto',
+                  cursor: 'pointer',
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {quickLoading ? 'thinking...' : quickReply}
+              </div>
+            )}
           </div>
         )}
 
