@@ -7,7 +7,8 @@ type CategoryKey = 'favourites' | 'restaurants' | 'exhibition'
 interface Place {
   name: string
   address: string
-  phone?: string
+  phone: string
+  icon: string
   note?: string
   type?: string
 }
@@ -30,9 +31,9 @@ const CATEGORIES: Category[] = [
     title: 'FAVOURITES',
     accent: '#FFD700',
     places: [
-      { name: 'Home', address: '60 Dukes Avenue, Theydon Bois, Epping, Essex CM16 6HF' },
-      { name: 'TM Event Hire', address: 'Unit 16, Griffin Farm, Great Canfield, Essex CM6 1JZ', phone: '07595 979451', note: 'Event equipment suppliers' },
-      { name: 'N2 Group', address: 'Unit C, Foxholes Business Park, John Tate Road, Hertford SG13 7DT', note: 'Print & visual communications' },
+      { name: 'Home', address: '60 Dukes Avenue, Theydon Bois, Essex CM16 7HF', phone: '020 0000 0000', icon: '/places/home.svg', note: 'Home' },
+      { name: 'TM Event Hire', address: 'Unit 16, Griffin Farm, Great Canfield, Essex CM6 1JZ', phone: '07595 979451', icon: '/places/tm-event.svg', note: 'Event equipment suppliers' },
+      { name: 'N2 Group', address: 'Unit C, Foxholes Business Park, John Tate Road, Hertford SG13 7DT', phone: '01992 440333', icon: '/places/n2-group.svg', note: 'Print & visual communications' },
     ],
   },
   {
@@ -40,10 +41,11 @@ const CATEGORIES: Category[] = [
     title: 'RESTAURANTS',
     accent: '#ef4444',
     places: [
-      { name: 'Il Bacio', address: '19B Forest Drive, Theydon Bois CM16 7EX', phone: '01992 812826', type: 'Italian', note: 'Modern Italian with Sardinian influence' },
-      { name: "Churchill's Fish & Chips", address: '15 Forest Drive, Theydon Bois CM16 7EX', phone: '01992 812193', type: 'Fish & Chips' },
-      { name: 'Indian Ocean', address: '1 Coppice Row, Theydon Bois CM16 7ES', phone: '01992 812658', type: 'Indian' },
-      { name: 'Filika', address: '13 Forest Drive, Theydon Bois CM16 7EX', phone: '01992 812000', type: 'Turkish/Mediterranean' },
+      { name: 'Il Bacio', address: '19B Forest Drive, Theydon Bois, Epping CM16 7EX', phone: '01992 812826', type: 'Italian', icon: '/places/il-bacio.svg', note: 'Modern Italian with Sardinian influence' },
+      { name: 'Churchills Fish & Chips', address: '15 Forest Drive, Theydon Bois, Epping CM16 7EX', phone: '01992 812193', type: 'Fish & Chips', icon: '/places/churchills.svg' },
+      { name: 'Indian Ocean', address: '1 Coppice Row, Theydon Bois CM16 7ES', phone: '01992 812658', type: 'Indian', icon: '/places/indian-ocean.svg' },
+      { name: 'Filika', address: '13 Forest Drive, Theydon Bois, Epping CM16 7EX', phone: '01992 812000', type: 'Turkish/Mediterranean', icon: '/places/filika.svg' },
+      { name: 'Theydon Bois Balti House', address: 'Station Approach, Coppice Row, Theydon Bois CM16 7HR', phone: '01992 813850', type: 'Indian/Balti', icon: '/places/balti-house.svg' },
     ],
   },
   {
@@ -51,10 +53,10 @@ const CATEGORIES: Category[] = [
     title: 'EXHIBITION CENTRES',
     accent: '#6366f1',
     places: [
-      { name: 'ExCeL London', address: 'Royal Victoria Dock, 1 Western Gateway, London E16 1XL', phone: '020 7069 5000' },
-      { name: 'Olympia London', address: 'Hammersmith Road, London W14 8UX', phone: '020 7385 1200' },
-      { name: 'NEC Birmingham', address: 'North Avenue, Marston Green, Birmingham B40 1NT', phone: '0121 780 4141' },
-      { name: 'Alexandra Palace', address: 'Alexandra Palace Way, London N22 7AY', phone: '020 8365 2121' },
+      { name: 'ExCeL London', address: 'Royal Victoria Dock, 1 Western Gateway, London E16 1XL', phone: '020 7069 5000', icon: '/places/excel.svg' },
+      { name: 'Olympia London', address: 'Hammersmith Road, Kensington, London W14 8UX', phone: '020 7385 1200', icon: '/places/olympia.svg' },
+      { name: 'NEC Birmingham', address: 'North Avenue, Marston Green, Birmingham B40 1NT', phone: '0121 780 4141', icon: '/places/nec.svg' },
+      { name: 'Alexandra Palace', address: 'Alexandra Palace Way, Muswell Hill, London N22 7AY', phone: '020 8365 2121', icon: '/places/ally-pally.svg' },
     ],
   },
 ]
@@ -70,11 +72,8 @@ function normalizePhone(phone: string) {
 }
 
 function getPlaceSearchUrl(name: string, address: string) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${address}`)}`
-}
-
-function getPlaceInitial(name: string) {
-  return name.trim().charAt(0).toUpperCase()
+  const query = encodeURIComponent(`${name} ${address}`).replace(/%20/g, '+')
+  return `https://www.google.com/maps/search/?api=1&query=${query}`
 }
 
 export default function MapsApp({ onBack }: { onBack: () => void }) {
@@ -147,23 +146,40 @@ export default function MapsApp({ onBack }: { onBack: () => void }) {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 36,
-                        height: 36,
-                        borderRadius: 999,
-                        color: category.accent,
-                        background: `${category.accent}33`,
-                        fontSize: 14,
-                        fontWeight: 700,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {getPlaceInitial(place.name)}
-                    </span>
+                    {place.name === 'Home' ? (
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          background: '#D4AF37',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M3 10.5 12 3l9 7.5" />
+                          <path d="M5 9.5V21h14V9.5" />
+                          <path d="M10 21v-6h4v6" />
+                        </svg>
+                      </span>
+                    ) : (
+                      <img
+                        src={place.icon}
+                        alt={`${place.name} icon`}
+                        width={36}
+                        height={36}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          objectFit: 'cover',
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
                     <div style={{ fontSize: 15, fontWeight: 700 }}>{place.name}</div>
                   </div>
                   <div style={{ fontSize: 12, color: MUTED_COLOR, lineHeight: 1.45 }}>{place.address}</div>
