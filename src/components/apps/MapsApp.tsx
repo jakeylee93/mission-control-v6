@@ -1,7 +1,8 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 type CategoryKey = 'favourites' | 'restaurants' | 'exhibition'
-type PlaceIcon = 'home' | 'work'
 
 interface Place {
   name: string
@@ -9,7 +10,6 @@ interface Place {
   phone?: string
   note?: string
   type?: string
-  icon?: PlaceIcon
 }
 
 interface Category {
@@ -30,9 +30,9 @@ const CATEGORIES: Category[] = [
     title: 'FAVOURITES',
     accent: '#FFD700',
     places: [
-      { name: 'Home', address: '60 Duke Avenue, Theydon Bois, Essex CM16 6HF', icon: 'home' },
-      { name: 'TM Event Hire', address: 'Unit 16, Griffin Farm, Great Canfield, Essex CM6 1JZ', phone: '07595 979451', icon: 'work', note: 'Event equipment suppliers' },
-      { name: 'N2 Group', address: 'Unit C, Foxholes Business Park, John Tate Road, Hertford SG13 7DT', icon: 'work', note: 'Print & visual communications' },
+      { name: 'Home', address: '60 Dukes Avenue, Theydon Bois, Epping, Essex CM16 6HF' },
+      { name: 'TM Event Hire', address: 'Unit 16, Griffin Farm, Great Canfield, Essex CM6 1JZ', phone: '07595 979451', note: 'Event equipment suppliers' },
+      { name: 'N2 Group', address: 'Unit C, Foxholes Business Park, John Tate Road, Hertford SG13 7DT', note: 'Print & visual communications' },
     ],
   },
   {
@@ -65,29 +65,32 @@ const BackIcon = (
   </svg>
 )
 
-const HomeIcon = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    <polyline points="9 22 9 12 15 12 15 22" />
-  </svg>
-)
-
-const WorkIcon = (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="7" width="20" height="14" rx="2" />
-    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-  </svg>
-)
-
 function normalizePhone(phone: string) {
   return phone.replace(/\s+/g, '')
 }
 
-function getDirectionsUrl(address: string) {
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`
+function getPlaceSearchUrl(name: string, address: string) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${address}`)}`
+}
+
+function getPlaceInitial(name: string) {
+  return name.trim().charAt(0).toUpperCase()
 }
 
 export default function MapsApp({ onBack }: { onBack: () => void }) {
+  const [selected, setSelected] = useState<{ place: Place; accent: string } | null>(null)
+
+  useEffect(() => {
+    if (!selected) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [selected])
+
+  const closeModal = () => setSelected(null)
+
   return (
     <div style={{ padding: '0 4px', color: TEXT_COLOR }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
@@ -111,7 +114,7 @@ export default function MapsApp({ onBack }: { onBack: () => void }) {
       </div>
 
       <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>Maps</h2>
-      <p style={{ fontSize: 12, color: '#666', marginBottom: 14 }}>Tap any place for directions from your current location.</p>
+      <p style={{ fontSize: 12, color: MUTED_COLOR, marginBottom: 14 }}>Tap any place to view details and navigate.</p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {CATEGORIES.map((category) => (
@@ -131,7 +134,7 @@ export default function MapsApp({ onBack }: { onBack: () => void }) {
               {category.places.map((place) => (
                 <button
                   key={`${category.key}-${place.name}`}
-                  onClick={() => window.open(getDirectionsUrl(place.address), '_blank', 'noopener,noreferrer')}
+                  onClick={() => setSelected({ place, accent: category.accent })}
                   style={{
                     width: '100%',
                     textAlign: 'left',
@@ -144,23 +147,23 @@ export default function MapsApp({ onBack }: { onBack: () => void }) {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    {place.icon && (
-                      <span
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: 24,
-                          height: 24,
-                          borderRadius: 999,
-                          border: `1px solid ${category.accent}55`,
-                          color: category.accent,
-                          background: `${category.accent}22`,
-                        }}
-                      >
-                        {place.icon === 'home' ? HomeIcon : WorkIcon}
-                      </span>
-                    )}
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 36,
+                        height: 36,
+                        borderRadius: 999,
+                        color: category.accent,
+                        background: `${category.accent}33`,
+                        fontSize: 14,
+                        fontWeight: 700,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {getPlaceInitial(place.name)}
+                    </span>
                     <div style={{ fontSize: 15, fontWeight: 700 }}>{place.name}</div>
                   </div>
                   <div style={{ fontSize: 12, color: MUTED_COLOR, lineHeight: 1.45 }}>{place.address}</div>
@@ -183,6 +186,118 @@ export default function MapsApp({ onBack }: { onBack: () => void }) {
           </section>
         ))}
       </div>
+
+      {selected && (
+        <div
+          onClick={closeModal}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.6)',
+            zIndex: 100,
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              position: 'fixed',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: '#0f0f10',
+              borderRadius: '22px 22px 0 0',
+              borderTop: `1px solid ${BORDER_COLOR}`,
+              padding: '20px 18px 18px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+            }}
+          >
+            <button
+              onClick={closeModal}
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                border: 'none',
+                background: 'rgba(255,255,255,0.08)',
+                color: TEXT_COLOR,
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                fontSize: 18,
+                lineHeight: 1,
+                cursor: 'pointer',
+              }}
+              aria-label="Close place details"
+            >
+              ×
+            </button>
+
+            <h3 style={{ margin: '0 0 8px', fontSize: 28, fontWeight: 700, color: TEXT_COLOR }}>
+              {selected.place.name}
+            </h3>
+
+            <div style={{ fontSize: 13, color: MUTED_COLOR, lineHeight: 1.5, marginBottom: 10 }}>{selected.place.address}</div>
+
+            {selected.place.phone && (
+              <div style={{ marginBottom: 10 }}>
+                <a
+                  href={`tel:${normalizePhone(selected.place.phone)}`}
+                  style={{ fontSize: 13, color: '#9ecbff', textDecoration: 'none' }}
+                >
+                  {selected.place.phone}
+                </a>
+              </div>
+            )}
+
+            {selected.place.type && (
+              <div style={{ fontSize: 12, color: selected.accent, fontWeight: 700, letterSpacing: 0.3, marginBottom: 8 }}>
+                {selected.place.type}
+              </div>
+            )}
+
+            {selected.place.note && <div style={{ fontSize: 13, color: '#bbb', lineHeight: 1.5, marginBottom: 16 }}>{selected.place.note}</div>}
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+              <button
+                onClick={() => window.open(getPlaceSearchUrl(selected.place.name, selected.place.address), '_blank', 'noopener,noreferrer')}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  borderRadius: 12,
+                  padding: '12px 14px',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: '#fff',
+                  background: selected.accent,
+                  cursor: 'pointer',
+                }}
+              >
+                Navigate
+              </button>
+
+              {selected.place.phone && (
+                <a
+                  href={`tel:${normalizePhone(selected.place.phone)}`}
+                  style={{
+                    flex: 1,
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: selected.accent,
+                    border: `1px solid ${selected.accent}`,
+                    textDecoration: 'none',
+                    textAlign: 'center',
+                  }}
+                >
+                  Call
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
