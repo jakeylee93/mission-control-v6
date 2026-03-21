@@ -247,7 +247,7 @@ export default function HomePage() {
 
   const dayName = now.toLocaleDateString('en-GB', { weekday: 'long' })
   const dateFmt = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-  const timeFmt = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  const timeFmt = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
   const handleAppClick = useCallback((app: AppDef) => {
     if (app.href) { window.open(app.href, '_blank'); return }
@@ -272,6 +272,7 @@ export default function HomePage() {
           <div style={{ color: '#555', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' }}>{dayName} · {dateFmt}</div>
           <h1 style={{ fontSize: 34, fontWeight: 700, margin: '2px 0', letterSpacing: -1, fontFamily: "'Space Grotesk', sans-serif" }}>Jake</h1>
           <div style={{ color: '#555', fontSize: 10, letterSpacing: 3, textTransform: 'uppercase' }}>Mission Control</div>
+          <div style={{ fontSize: 10, color: '#444', marginTop: 2 }}>v6.1</div>
           <div style={{ fontSize: 26, fontWeight: 200, fontFamily: 'monospace', letterSpacing: 3, marginTop: 6, opacity: 0.7 }}>{timeFmt}</div>
         </header>
 
