@@ -306,18 +306,7 @@ export default function HomePage() {
           borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.05)',
           borderBottom: 'none', padding: '20px 12px 110px',
         }}>
-          {activeApp === 'calendar' ? (
-            <CalendarView onBack={() => setActiveApp(null)} />
-          ) : activeApp === 'lovely' ? (
-            <div>
-              <button onClick={() => setActiveApp(null)} style={{
-                background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
-                color: '#aaa', padding: '8px 14px', fontSize: 13, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-              }}>{I.back} Back</button>
-              <LovelyTab />
-            </div>
-          ) : (
+          {(activeApp === 'calendar' || activeApp === 'lovely') ? null : (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(5, 1fr)',
@@ -343,6 +332,40 @@ export default function HomePage() {
           )}
         </div>
       </div>
+
+      {/* Full-screen app views */}
+      {activeApp === 'calendar' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const,
+          paddingBottom: 80,
+        }}>
+          <div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px', paddingTop: 52 }}>
+            <CalendarView onBack={() => setActiveApp(null)} />
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'lovely' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const,
+          paddingBottom: 80,
+        }}>
+          <div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px' }}>
+            <div style={{ paddingTop: 52, marginBottom: 8 }}>
+              <button onClick={() => setActiveApp(null)} style={{
+                background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
+                color: '#aaa', padding: '10px 16px', fontSize: 14, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>{I.back} Back</button>
+            </div>
+            <LovelyTab />
+          </div>
+        </div>
+      )}
 
       {/* Tab Bar */}
       <div style={{
