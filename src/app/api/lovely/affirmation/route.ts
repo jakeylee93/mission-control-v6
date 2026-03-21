@@ -1,54 +1,74 @@
 import { NextResponse } from 'next/server'
 
-// Personal affirmations for Jake — not generic, based on who he is
+const BIRTHDAY_MESSAGE = 'Happy birthday Jake! Take today to celebrate — you deserve it.'
+
 const AFFIRMATIONS = [
-  // Climbing / strength
-  "You climb walls for fun. Life's problems are just another route to figure out. 🧗",
-  "Every climb started with one hold. Every business started with one idea. You've done both.",
-  "The guy who built a mobile bar empire from scratch can handle whatever today throws at him.",
-  "Remember how scared you were on your first climb? Look how far you've come since then.",
-  "Strong hands, strong mind. You've got both.",
-
-  // Business / achievement
-  "You're building multiple businesses while most people struggle with one. That takes something special.",
-  "The Bar People didn't build itself. YOU built it. Don't forget that.",
-  "AnyVendor is going to change how events work. You're not dreaming — you're building.",
-  "You work silly hours because you care. But you also deserve rest. Both are true.",
-  "Every successful person felt like a fraud at some point. It's a sign you're pushing boundaries.",
-
-  // Self-worth
-  "You're not behind. You're building something most people wouldn't even attempt.",
-  "Low days don't define you. They're just part of being human. Tomorrow's a new route.",
-  "The fact that you're building an AI system to help yourself shows incredible self-awareness.",
-  "You don't need to earn rest. You deserve it just by existing.",
-  "Being lonely doesn't mean you're alone. It means you're ready for deeper connections.",
-
-  // Motivation
-  "Small steps, mate. You don't need to send the whole wall today. Just one move.",
-  "The hard days are what make the good days feel incredible. Keep going.",
-  "You've survived 100% of your worst days so far. That's a perfect track record.",
-  "Future you is going to look back at this period and be proud of how hard you worked.",
-  "It's OK to not be OK. But it's also OK to ask for help. That's strength, not weakness.",
-
-  // Practical
-  "Drink some water. Step outside for 5 minutes. Text someone you care about. Small wins.",
-  "When did you last climb? Book a session. Your body and mind will thank you.",
-  "You're allowed to have a slow day. Not every day needs to be a 10.",
-  "One thing at a time. You don't need to solve everything today.",
-  "Take a breath. You're doing better than you think. Seriously.",
+  'You are building a life with intention, and that matters.',
+  'Small progress still counts as progress.',
+  'You can do hard things one step at a time.',
+  'Your effort today is enough.',
+  'Rest is productive when it protects your energy.',
+  'You have overcome difficult days before; you can do it again.',
+  'Your calm decisions create better outcomes.',
+  'You do not need perfect conditions to begin.',
+  'Your consistency is becoming your superpower.',
+  'You are allowed to grow at your own pace.',
+  'One focused hour can change the whole day.',
+  'Your work has value, even when results are delayed.',
+  'You are learning, adapting, and getting sharper.',
+  'Your future gets built by today\'s choices.',
+  'You can choose clarity over pressure.',
+  'Your body and mind both deserve care.',
+  'You are not behind; you are in motion.',
+  'Good boundaries create better momentum.',
+  'You can reset at any point in the day.',
+  'The next right action is enough for now.',
+  'You can be ambitious and kind to yourself.',
+  'Your presence matters to the people around you.',
+  'You are building trust with yourself every time you show up.',
+  'Strong foundations beat quick fixes.',
+  'You can ask for support and still be strong.',
+  'Your discipline is paying off, even if quietly.',
+  'You have permission to simplify.',
+  'You can celebrate small wins without waiting for perfect.',
+  'You are more resilient than this moment feels.',
+  'You can protect your peace and pursue your goals.',
+  'Your attention is your most valuable resource.',
+  'You are allowed to take up space and speak clearly.',
+  'Progress is not linear, but it is still progress.',
+  'You can finish today proud of one meaningful thing.',
+  'Your story is still being written, and this chapter matters.',
 ]
+
+function getDayOfYear(date: Date): number {
+  const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 0))
+  const now = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+  return Math.floor((now.getTime() - start.getTime()) / 86400000)
+}
+
+function getRandomAffirmation(exclude?: string): string {
+  const pool = exclude ? AFFIRMATIONS.filter((item) => item !== exclude) : AFFIRMATIONS
+  return pool[Math.floor(Math.random() * pool.length)]
+}
 
 export async function GET() {
   const today = new Date()
-  const dayOfYear = Math.floor((today.getTime() - new Date(today.getFullYear(), 0, 0).getTime()) / 86400000)
-  const index = dayOfYear % AFFIRMATIONS.length
+  const isBirthday = today.getUTCMonth() === 2 && today.getUTCDate() === 22
 
-  // Also pick a random one for variety
-  const random = AFFIRMATIONS[Math.floor(Math.random() * AFFIRMATIONS.length)]
+  if (isBirthday) {
+    return NextResponse.json({
+      daily: BIRTHDAY_MESSAGE,
+      random: getRandomAffirmation(BIRTHDAY_MESSAGE),
+      total: AFFIRMATIONS.length + 1,
+    })
+  }
+
+  const dayOfYear = getDayOfYear(today)
+  const daily = AFFIRMATIONS[(dayOfYear - 1) % AFFIRMATIONS.length]
 
   return NextResponse.json({
-    daily: AFFIRMATIONS[index],
-    random,
+    daily,
+    random: getRandomAffirmation(daily),
     total: AFFIRMATIONS.length,
   })
 }

@@ -1,79 +1,186 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
-import path from 'path'
+import { createServerSupabaseAdmin } from '@/lib/supabase'
 
-const DATA_DIR = '/Users/margaritabot/.openclaw/workspace/memory/lovely'
-const CHECKINS_FILE = path.join(DATA_DIR, 'checkins.json')
-
-function loadCheckins(): any[] {
-  try {
-    if (existsSync(CHECKINS_FILE)) return JSON.parse(readFileSync(CHECKINS_FILE, 'utf8'))
-  } catch {}
-  return []
+type DbCheckin = {
+  id: string
+  date: string
+  mood: number
+  energy: number
+  sleep: number
+  gratitude: string | null
+  wins: string | null
+  note: string | null
+  self_care: string[] | null
+  created_at: string
+  updated_at: string
 }
 
-function saveCheckins(checkins: any[]) {
-  mkdirSync(DATA_DIR, { recursive: true })
-  writeFileSync(CHECKINS_FILE, JSON.stringify(checkins, null, 2))
+type ApiCheckin = {
+  id?: string
+  date: string
+  mood: number
+  energy: number
+  sleep: number
+  gratitude: string
+  wins: string
+  note: string
+  selfCareToday: string[]
+  createdAt?: string
+  updatedAt?: string
 }
 
-export async function GET() {
-  const checkins = loadCheckins()
-  const today = new Date().toISOString().split('T')[0]
-  const todayCheckin = checkins.find((c: any) => c.date === today)
-  const last7 = checkins.slice(-7)
-  const streak = calculateStreak(checkins)
+function dateString(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
 
-  return NextResponse.json({
-    checkins: last7,
+function toApiCheckin(row: DbCheckin): ApiCheckin {
+  return {
+    id: row.id,
+    date: row.date,
+    mood: row.mood,
+    energy: row.energy,
+    sleep: Number(row.sleep),
+    gratitude: row.gratitude ?? '',
+    wins: row.wins ?? '',
+    note: row.note ?? '',
+    selfCareToday: row.self_care ?? [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }
+}
+
+function calculateStreak(dates: string[]): number {
+  if (!dates.length) return 0
+  const set = new Set(dates)
+  let streak = 0
+  const today = new Date()
+
+  for (let i = 0; i < 3650; i++) {
+    const current = new Date(today)
+    current.setUTCDate(current.getUTCDate() - i)
+    const key = dateString(current)
+
+    if (set.has(key)) {
+      streak += 1
+      continue
+    }
+
+    if (i === 0) {
+      return 0
+    }
+
+    break
+  }
+
+  return streak
+}
+
+export async function GET(req: NextRequest) {
+  const supabase = createServerSupabaseAdmin()
+  const selectedDate = req.nextUrl.searchParams.get('date')
+  const today = dateString(new Date())
+
+  const [{ data: latestRows, error: latestError }, { data: dateRows, error: dateError }, { data: selectedRow, error: selectedError }] =
+    await Promise.all([
+      supabase
+        .from('lovely_checkins')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(30),
+      supabase
+        .from('lovely_checkins')
+        .select('date,mood')
+        .order('date', { ascending: false }),
+      selectedDate
+        ? supabase
+            .from('lovely_checkins')
+            .select('*')
+            .eq('date', selectedDate)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ])
+
+  if (latestError || dateError || selectedError) {
+    return NextResponse.json(
+      { error: latestError?.message || dateError?.message || selectedError?.message || 'Failed to load check-ins' },
+      { status: 500 },
+    )
+  }
+
+  const checkins = (latestRows as DbCheckin[]).map(toApiCheckin)
+  const allDates = (dateRows ?? []).map((row) => String(row.date))
+  const streak = calculateStreak(allDates)
+  const todayCheckin = checkins.find((c) => c.date === today) ?? null
+
+  const sevenDayMoodRows = (dateRows ?? []).slice(0, 7)
+  const averageMood = sevenDayMoodRows.length
+    ? (sevenDayMoodRows.reduce((sum, row) => sum + Number(row.mood || 0), 0) / sevenDayMoodRows.length).toFixed(1)
+    : null
+
+  const body: {
+    checkins: ApiCheckin[]
+    todayCheckin: ApiCheckin | null
+    streak: number
+    totalCheckins: number
+    averageMood: string | null
+    checkin?: ApiCheckin | null
+  } = {
+    checkins,
     todayCheckin,
     streak,
-    totalCheckins: checkins.length,
-    averageMood: last7.length > 0 ? (last7.reduce((s: number, c: any) => s + (c.mood || 0), 0) / last7.length).toFixed(1) : null,
-  })
+    totalCheckins: allDates.length,
+    averageMood,
+  }
+
+  if (selectedDate) {
+    body.checkin = selectedRow ? toApiCheckin(selectedRow as DbCheckin) : null
+  }
+
+  return NextResponse.json(body)
 }
 
 export async function POST(req: NextRequest) {
+  const supabase = createServerSupabaseAdmin()
   const data = await req.json()
-  const checkins = loadCheckins()
-  const today = new Date().toISOString().split('T')[0]
 
-  const checkin = {
-    date: today,
-    time: new Date().toISOString(),
-    mood: data.mood, // 1-5
-    energy: data.energy, // 1-5
-    sleep: data.sleep, // hours
+  const date = typeof data.date === 'string' && data.date ? data.date : dateString(new Date())
+
+  const payload = {
+    date,
+    mood: Number(data.mood) || 3,
+    energy: Number(data.energy) || 3,
+    sleep: Number(data.sleep) || 7,
     gratitude: data.gratitude || '',
     note: data.note || '',
     wins: data.wins || '',
-    selfCareToday: data.selfCareToday || [],
+    self_care: Array.isArray(data.selfCareToday) ? data.selfCareToday : [],
+    updated_at: new Date().toISOString(),
   }
 
-  const idx = checkins.findIndex((c: any) => c.date === today)
-  if (idx >= 0) {
-    checkins[idx] = checkin
-  } else {
-    checkins.push(checkin)
+  const { data: upserted, error: upsertError } = await supabase
+    .from('lovely_checkins')
+    .upsert(payload, { onConflict: 'date' })
+    .select('*')
+    .single()
+
+  if (upsertError) {
+    return NextResponse.json({ error: upsertError.message || 'Failed to save check-in' }, { status: 500 })
   }
 
-  saveCheckins(checkins)
-  return NextResponse.json({ ok: true, checkin, streak: calculateStreak(checkins) })
-}
+  const { data: streakRows, error: streakError } = await supabase
+    .from('lovely_checkins')
+    .select('date')
+    .order('date', { ascending: false })
 
-function calculateStreak(checkins: any[]): number {
-  if (checkins.length === 0) return 0
-  let streak = 0
-  const today = new Date()
-  for (let i = 0; i <= 365; i++) {
-    const d = new Date(today)
-    d.setDate(d.getDate() - i)
-    const dateStr = d.toISOString().split('T')[0]
-    if (checkins.some((c: any) => c.date === dateStr)) {
-      streak++
-    } else if (i > 0) {
-      break
-    }
+  if (streakError) {
+    return NextResponse.json({ error: streakError.message || 'Failed to calculate streak' }, { status: 500 })
   }
-  return streak
+
+  const streak = calculateStreak((streakRows ?? []).map((row) => String(row.date)))
+
+  return NextResponse.json({
+    ok: true,
+    checkin: toApiCheckin(upserted as DbCheckin),
+    streak,
+  })
 }
