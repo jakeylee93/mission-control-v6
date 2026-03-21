@@ -249,6 +249,15 @@ export default function HomePage() {
   const [quickLoading, setQuickLoading] = useState(false)
   const [quickExpanded, setQuickExpanded] = useState(false)
 
+  useEffect(() => {
+    void fetch('/api/setup', {
+      method: 'POST',
+      cache: 'no-store',
+    }).catch((error) => {
+      console.error('Auto setup failed:', error)
+    })
+  }, [])
+
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
 
   const dayName = now.toLocaleDateString('en-GB', { weekday: 'long' })

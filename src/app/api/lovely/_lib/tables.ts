@@ -94,7 +94,14 @@ END
 $$;
 `
 
-const SQL_STATEMENTS = [CHECKINS_TABLE_SQL, CHECKINS_POLICY_SQL, WATER_TABLE_SQL, WATER_POLICY_SQL, LAGER_TABLE_SQL, LAGER_POLICY_SQL]
+export const LOVELY_SQL_STATEMENTS = [
+  CHECKINS_TABLE_SQL,
+  CHECKINS_POLICY_SQL,
+  WATER_TABLE_SQL,
+  WATER_POLICY_SQL,
+  LAGER_TABLE_SQL,
+  LAGER_POLICY_SQL,
+]
 
 const RPC_FUNCTIONS = ['exec_sql', 'execute_sql', 'run_sql', 'query_sql']
 
@@ -143,7 +150,7 @@ async function executeSqlViaRpc(supabase: SupabaseClient, sql: string): Promise<
 }
 
 export async function ensureLovelyTables(supabase: SupabaseClient): Promise<{ ok: true } | { ok: false; error: string }> {
-  for (const sql of SQL_STATEMENTS) {
+  for (const sql of LOVELY_SQL_STATEMENTS) {
     try {
       await executeSqlViaRpc(supabase, sql)
     } catch (error) {
