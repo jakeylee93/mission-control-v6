@@ -17,6 +17,12 @@ interface CheckIn {
   updatedAt?: string
 }
 
+interface WaterState {
+  glasses: number
+  goal: number
+  log: string[]
+}
+
 const MOOD_EMOJIS = ['😞', '😔', '😐', '🙂', '😊']
 const MOOD_LABELS = ['Rough', 'Low', 'Okay', 'Good', 'Great']
 const MOOD_COLORS = ['#EF4444', '#F59E0B', '#6B7280', '#22C55E', '#10B981']
@@ -64,6 +70,16 @@ function toDateStringLocal(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
+function formatWaterTime(isoTime: string): string {
+  const dt = new Date(isoTime)
+  if (Number.isNaN(dt.getTime())) return ''
+
+  return dt.toLocaleTimeString('en-GB', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export default function LovelyTab() {
   const [affirmation, setAffirmation] = useState('')
   const [checkins, setCheckins] = useState<CheckIn[]>([])
@@ -75,6 +91,8 @@ export default function LovelyTab() {
   const [saving, setSaving] = useState(false)
   const [showCheckin, setShowCheckin] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [water, setWater] = useState<WaterState>({ glasses: 0, goal: 8, log: [] })
+  const [waterSaving, setWaterSaving] = useState(false)
   const [selectedDate, setSelectedDate] = useState(todayDate())
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date()
@@ -103,6 +121,16 @@ export default function LovelyTab() {
     setStreak(data.streak || 0)
     setTotalCheckins(data.totalCheckins || 0)
     setAverageMood(data.averageMood ?? null)
+  }
+
+  async function loadWater() {
+    const response = await fetch('/api/lovely/water')
+    const data = await response.json()
+    setWater({
+      glasses: Number(data.glasses) || 0,
+      goal: Number(data.goal) || 8,
+      log: Array.isArray(data.log) ? data.log.filter((item: unknown): item is string => typeof item === 'string') : [],
+    })
   }
 
   async function loadAffirmation() {
@@ -161,7 +189,7 @@ export default function LovelyTab() {
   }
 
   useEffect(() => {
-    Promise.all([loadAffirmation(), loadDashboard()])
+    Promise.all([loadAffirmation(), loadDashboard(), loadWater()])
       .catch(() => {
         // Keep tab usable even if requests fail.
       })
@@ -199,6 +227,36 @@ export default function LovelyTab() {
     setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + offset, 1))
   }
 
+  async function updateWater(action: 'drink' | 'reset') {
+    setWaterSaving(true)
+    try {
+      const res = await fetch('/api/lovely/water', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      const data = await res.json()
+      setWater({
+        glasses: Number(data.glasses) || 0,
+        goal: Number(data.goal) || 8,
+        log: Array.isArray(data.log) ? data.log.filter((item: unknown): item is string => typeof item === 'string') : [],
+      })
+    } catch {
+      // no-op
+    }
+    setWaterSaving(false)
+  }
+
+  function drinkWater() {
+    if (waterSaving) return
+    updateWater('drink')
+  }
+
+  function resetWater() {
+    if (waterSaving) return
+    updateWater('reset')
+  }
+
   const calendarCells = useMemo(() => {
     const year = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
@@ -226,6 +284,7 @@ export default function LovelyTab() {
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const waterProgress = Math.min((water.glasses / Math.max(1, water.goal)) * 100, 100)
 
   if (loading) {
     return (
@@ -323,6 +382,73 @@ export default function LovelyTab() {
               {averageMood ? `${averageMood}` : '—'}
             </div>
             <div className="text-[10px] uppercase tracking-widest" style={{ color: MUTED_COLOR }}>Avg Mood (7d)</div>
+          </div>
+        </div>
+
+        {/* Water Intake */}
+        <div className="card rounded-2xl p-4 mb-4" style={{ border: `1px solid ${BORDER_COLOR}` }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest" style={{ color: MUTED_COLOR }}>Water Intake</div>
+              <div className="text-sm" style={{ color: TEXT_COLOR }}>
+                <motion.span
+                  key={water.glasses}
+                  initial={{ y: -8, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                  className="inline-block font-semibold"
+                  style={{ color: '#06B6D4' }}
+                >
+                  {water.glasses}
+                </motion.span>
+                /{water.goal} glasses
+              </div>
+            </div>
+            <button
+              onClick={resetWater}
+              disabled={waterSaving || water.glasses === 0}
+              className="px-2.5 py-1 rounded-lg text-[11px] disabled:opacity-50"
+              style={{ color: MUTED_COLOR, border: `1px solid ${BORDER_COLOR}` }}
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="w-full rounded-full h-2.5 mb-3" style={{ background: PANEL_COLOR }}>
+            <motion.div
+              className="rounded-full h-2.5"
+              style={{ background: 'linear-gradient(90deg, #06B6D4, #22C55E)' }}
+              animate={{ width: `${waterProgress}%` }}
+              transition={{ type: 'spring', stiffness: 170, damping: 22 }}
+            />
+          </div>
+
+          <button
+            onClick={drinkWater}
+            disabled={waterSaving}
+            className="w-full rounded-xl py-3 text-sm font-semibold mb-3 disabled:opacity-60"
+            style={{ color: '#001018', background: '#06B6D4' }}
+          >
+            + Water
+          </button>
+
+          <div className="flex flex-wrap gap-1.5">
+            {(water.log || []).slice(-10).map((entry, idx) => {
+              const formatted = formatWaterTime(entry)
+              if (!formatted) return null
+              return (
+                <span
+                  key={`${entry}-${idx}`}
+                  className="px-2 py-1 rounded-md text-[10px]"
+                  style={{ color: TEXT_COLOR, background: PANEL_COLOR, border: `1px solid ${BORDER_COLOR}` }}
+                >
+                  {formatted}
+                </span>
+              )
+            })}
+            {water.log.length === 0 && (
+              <span className="text-xs" style={{ color: MUTED_COLOR }}>No glasses logged yet today.</span>
+            )}
           </div>
         </div>
 

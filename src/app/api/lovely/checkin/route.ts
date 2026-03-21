@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdmin } from '@/lib/supabase'
+import { ensureLovelyTables, isMissingTableError } from '../_lib/tables'
 
 type DbCheckin = {
   id: string
@@ -75,6 +76,17 @@ function calculateStreak(dates: string[]): number {
   return streak
 }
 
+function emptyDashboard(selectedDate?: string | null) {
+  return {
+    checkins: [],
+    todayCheckin: null,
+    streak: 0,
+    totalCheckins: 0,
+    averageMood: null,
+    ...(selectedDate ? { checkin: null } : {}),
+  }
+}
+
 export async function GET(req: NextRequest) {
   const supabase = createServerSupabaseAdmin()
   const selectedDate = req.nextUrl.searchParams.get('date')
@@ -101,6 +113,10 @@ export async function GET(req: NextRequest) {
     ])
 
   if (latestError || dateError || selectedError) {
+    if (isMissingTableError(latestError) || isMissingTableError(dateError) || isMissingTableError(selectedError)) {
+      return NextResponse.json(emptyDashboard(selectedDate))
+    }
+
     return NextResponse.json(
       { error: latestError?.message || dateError?.message || selectedError?.message || 'Failed to load check-ins' },
       { status: 500 },
@@ -141,7 +157,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const supabase = createServerSupabaseAdmin()
-  const data = await req.json()
+  const data = await req.json().catch(() => ({}))
 
   const date = typeof data.date === 'string' && data.date ? data.date : dateString(new Date())
 
@@ -157,11 +173,29 @@ export async function POST(req: NextRequest) {
     updated_at: new Date().toISOString(),
   }
 
-  const { data: upserted, error: upsertError } = await supabase
+  let { data: upserted, error: upsertError } = await supabase
     .from('lovely_checkins')
     .upsert(payload, { onConflict: 'date' })
     .select('*')
     .single()
+
+  if (upsertError && isMissingTableError(upsertError)) {
+    const setup = await ensureLovelyTables(supabase)
+    if (setup.ok) {
+      const retry = await supabase
+        .from('lovely_checkins')
+        .upsert(payload, { onConflict: 'date' })
+        .select('*')
+        .single()
+      upserted = retry.data
+      upsertError = retry.error
+    } else {
+      return NextResponse.json(
+        { ok: false, error: `Check-in table is missing and setup failed: ${setup.error}` },
+        { status: 200 },
+      )
+    }
+  }
 
   if (upsertError) {
     return NextResponse.json({ error: upsertError.message || 'Failed to save check-in' }, { status: 500 })
@@ -173,6 +207,14 @@ export async function POST(req: NextRequest) {
     .order('date', { ascending: false })
 
   if (streakError) {
+    if (isMissingTableError(streakError)) {
+      return NextResponse.json({
+        ok: true,
+        checkin: toApiCheckin(upserted as DbCheckin),
+        streak: 1,
+      })
+    }
+
     return NextResponse.json({ error: streakError.message || 'Failed to calculate streak' }, { status: 500 })
   }
 
