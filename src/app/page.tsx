@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import LovelyTab from '@/components/tabs/LovelyTab'
+import MapsApp from '@/components/apps/MapsApp'
 
 type TabId = 'business' | 'personal' | 'laboratory'
 type ActiveApp = string | null
@@ -251,6 +252,7 @@ export default function HomePage() {
   const handleAppClick = useCallback((app: AppDef) => {
     if (app.href) { window.open(app.href, '_blank'); return }
     if (app.id === 'calendar') { setActiveApp('calendar'); return }
+    if (app.id === 'maps') { setActiveApp('maps'); return }
     if (app.id === 'lovely') { setActiveApp('lovely'); return }
     // Future: other apps
   }, [])
@@ -306,7 +308,7 @@ export default function HomePage() {
           borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.05)',
           borderBottom: 'none', padding: '20px 12px 110px',
         }}>
-          {(activeApp === 'calendar' || activeApp === 'lovely') ? null : (
+          {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps') ? null : (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(5, 1fr)',
@@ -363,6 +365,19 @@ export default function HomePage() {
               }}>{I.back} Back</button>
             </div>
             <LovelyTab />
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'maps' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const,
+          paddingBottom: 80,
+        }}>
+          <div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px', paddingTop: 52 }}>
+            <MapsApp onBack={() => setActiveApp(null)} />
           </div>
         </div>
       )}
