@@ -99,21 +99,45 @@ const LAB: AppDef[] = [
 const TABS: Record<TabId, AppDef[]> = { business: BUSINESS, personal: PERSONAL, laboratory: LAB }
 
 interface CalEvent { summary?: string; title?: string; start: string; end: string; location?: string; color?: string; calendar?: string; isAllDay?: boolean }
+interface CalendarInfo { id: string; name: string; color: string; primary: boolean }
+
+// Global cache for calendar data
+let calCache: { events: CalEvent[]; calendars: CalendarInfo[]; fetchedAt: number } | null = null
+const CACHE_TTL = 60 * 60 * 1000 // 1 hour
 
 /* ── Calendar App View ── */
 function CalendarView({ onBack }: { onBack: () => void }) {
-  const [events, setEvents] = useState<CalEvent[]>([])
-  const [loading, setLoading] = useState(true)
+  const [events, setEvents] = useState<CalEvent[]>(calCache?.events || [])
+  const [calendars, setCalendars] = useState<CalendarInfo[]>(calCache?.calendars || [])
+  const [loading, setLoading] = useState(!calCache || (Date.now() - calCache.fetchedAt > CACHE_TTL))
+  const [activeCalendar, setActiveCalendar] = useState<string>('all')
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    fetch('/api/calendar/events')
-      .then(r => r.json())
-      .then(data => { setEvents(data.events || []); setLoading(false) })
-      .catch(() => setLoading(false))
+  const fetchEvents = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
+    try {
+      const res = await fetch('/api/calendar/events')
+      const data = await res.json()
+      const evts = data.events || []
+      const cals = data.calendars || []
+      setEvents(evts)
+      setCalendars(cals)
+      calCache = { events: evts, calendars: cals, fetchedAt: Date.now() }
+    } catch {}
+    finally { setLoading(false); setRefreshing(false) }
   }, [])
 
+  useEffect(() => {
+    // Only fetch if cache is stale or empty
+    if (!calCache || (Date.now() - calCache.fetchedAt > CACHE_TTL)) {
+      fetchEvents()
+    }
+  }, [fetchEvents])
+
   const today = new Date()
-  const upcoming = events.filter(e => new Date(e.start) >= today).slice(0, 20)
+  const filtered = activeCalendar === 'all' ? events : events.filter(e => e.calendar === activeCalendar)
+  const upcoming = filtered.filter(e => new Date(e.start) >= today).slice(0, 30)
   const grouped: Record<string, CalEvent[]> = {}
   upcoming.forEach(e => {
     const d = new Date(e.start).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -121,17 +145,60 @@ function CalendarView({ onBack }: { onBack: () => void }) {
     grouped[d].push(e)
   })
 
+  // Get unique calendar names for filter
+  const calNames = Array.from(new Set(events.map(e => e.calendar).filter(Boolean))) as string[]
+
   return (
     <div style={{ padding: '0 4px' }}>
-      <button onClick={onBack} style={{
-        background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
-        color: '#aaa', padding: '8px 14px', fontSize: 13, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16,
-      }}>{I.back} Back</button>
-      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>Calendar</h2>
-      <p style={{ fontSize: 12, color: '#666', marginBottom: 20 }}>Upcoming events from Google Calendar</p>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <button onClick={onBack} style={{
+          background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
+          color: '#aaa', padding: '8px 14px', fontSize: 13, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>{I.back} Back</button>
+        <button onClick={() => fetchEvents(true)} style={{
+          background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
+          color: refreshing ? '#6366f1' : '#aaa', padding: '8px 14px', fontSize: 13, cursor: 'pointer',
+        }}>{refreshing ? 'Refreshing...' : 'Refresh'}</button>
+      </div>
 
-      {loading && <div style={{ color: '#666', fontSize: 13 }}>Loading events...</div>}
+      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>Calendar</h2>
+      <p style={{ fontSize: 12, color: '#666', marginBottom: 14 }}>
+        {events.length} events · jake@anyvendor.co.uk
+      </p>
+
+      {/* Calendar filter pills */}
+      {calNames.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12, WebkitOverflowScrolling: 'touch' as const }}>
+          <button
+            onClick={() => setActiveCalendar('all')}
+            style={{
+              padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+              whiteSpace: 'nowrap', cursor: 'pointer', border: 'none',
+              background: activeCalendar === 'all' ? '#6366f1' : 'rgba(255,255,255,0.06)',
+              color: activeCalendar === 'all' ? '#fff' : '#888',
+            }}
+          >All</button>
+          {calNames.map(name => {
+            const cal = calendars.find(c => c.name === name)
+            return (
+              <button
+                key={name}
+                onClick={() => setActiveCalendar(name)}
+                style={{
+                  padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                  whiteSpace: 'nowrap', cursor: 'pointer', border: 'none',
+                  background: activeCalendar === name ? (cal?.color || '#6366f1') : 'rgba(255,255,255,0.06)',
+                  color: activeCalendar === name ? '#fff' : '#888',
+                }}
+              >{name}</button>
+            )
+          })}
+        </div>
+      )}
+
+      {loading && <div style={{ color: '#666', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Loading calendar...</div>}
 
       {!loading && Object.entries(grouped).map(([date, dayEvents]) => (
         <div key={date} style={{ marginBottom: 20 }}>
@@ -159,7 +226,7 @@ function CalendarView({ onBack }: { onBack: () => void }) {
 
       {!loading && upcoming.length === 0 && (
         <div style={{ textAlign: 'center', color: '#666', padding: '40px 0', fontSize: 14 }}>
-          No upcoming events
+          No upcoming events{activeCalendar !== 'all' ? ` in ${activeCalendar}` : ''}
         </div>
       )}
     </div>
