@@ -98,7 +98,7 @@ const LAB: AppDef[] = [
 
 const TABS: Record<TabId, AppDef[]> = { business: BUSINESS, personal: PERSONAL, laboratory: LAB }
 
-interface CalEvent { summary: string; start: string; end: string; location?: string; color?: string }
+interface CalEvent { summary?: string; title?: string; start: string; end: string; location?: string; color?: string; calendar?: string; isAllDay?: boolean }
 
 /* ── Calendar App View ── */
 function CalendarView({ onBack }: { onBack: () => void }) {
@@ -147,9 +147,10 @@ function CalendarView({ onBack }: { onBack: () => void }) {
                 padding: '14px 16px', marginBottom: 8,
                 borderLeft: `3px solid ${ev.color || '#6366f1'}`,
               }}>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{ev.summary}</div>
-                <div style={{ fontSize: 12, color: '#888' }}>{time} – {endTime}</div>
-                {ev.location && <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>{ev.location}</div>}
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{ev.title || ev.summary}</div>
+                <div style={{ fontSize: 12, color: '#888' }}>{ev.isAllDay ? 'All day' : `${time} – ${endTime}`}</div>
+                {ev.calendar && <div style={{ fontSize: 11, color: '#777', marginTop: 2 }}>{ev.calendar}</div>}
+                {ev.location && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>📍 {ev.location}</div>}
               </div>
             )
           })}
