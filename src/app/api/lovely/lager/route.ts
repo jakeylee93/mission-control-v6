@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdmin } from '@/lib/supabase'
-import { dateStringUTC, ensureLovelyTables, isMissingTableError } from '../_lib/tables'
+import { dateStringUTC, isMissingTableError } from '../_lib/tables'
 
-type WaterRow = {
+type LagerRow = {
   id: string
   date: string
   glasses: number
@@ -12,15 +12,15 @@ type WaterRow = {
   updated_at: string
 }
 
-type WaterResponse = {
+type LagerResponse = {
   glasses: number
   goal: number
   log: string[]
 }
 
-const DEFAULT_WATER: WaterResponse = {
+const DEFAULT_LAGER: LagerResponse = {
   glasses: 0,
-  goal: 8,
+  goal: 0,
   log: [],
 }
 
@@ -28,12 +28,12 @@ function isValidDateString(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
-function toWaterResponse(row: WaterRow | null): WaterResponse {
-  if (!row) return DEFAULT_WATER
+function toLagerResponse(row: LagerRow | null): LagerResponse {
+  if (!row) return DEFAULT_LAGER
 
   return {
     glasses: Number(row.glasses) || 0,
-    goal: Number(row.goal) || 8,
+    goal: Number(row.goal) || 0,
     log: Array.isArray(row.log) ? row.log : [],
   }
 }
@@ -49,20 +49,20 @@ export async function GET(req: NextRequest) {
   const date = isValidDateString(requestedDate) ? requestedDate : dateStringUTC(new Date())
 
   const { data, error } = await supabase
-    .from('lovely_water')
+    .from('lovely_lager')
     .select('*')
     .eq('date', date)
     .maybeSingle()
 
   if (error) {
     if (isMissingTableError(error)) {
-      return NextResponse.json(DEFAULT_WATER)
+      return NextResponse.json(DEFAULT_LAGER)
     }
 
-    return NextResponse.json({ error: error.message || 'Failed to load water intake' }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Failed to load lager intake' }, { status: 500 })
   }
 
-  return NextResponse.json(toWaterResponse(data as WaterRow | null))
+  return NextResponse.json(toLagerResponse(data as LagerRow | null))
 }
 
 export async function POST(req: NextRequest) {
@@ -76,29 +76,20 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: currentRow, error: currentError } = await supabase
-    .from('lovely_water')
+    .from('lovely_lager')
     .select('*')
     .eq('date', date)
     .maybeSingle()
 
-  if (currentError && !isMissingTableError(currentError)) {
-    return NextResponse.json({ error: currentError.message || 'Failed to load current water record' }, { status: 500 })
-  }
-
-  if (currentError && isMissingTableError(currentError)) {
-    const setup = await ensureLovelyTables(supabase)
-    if (!setup.ok) {
-      return NextResponse.json(
-        {
-          error: `Water table is missing and setup failed: ${setup.error}`,
-          ...DEFAULT_WATER,
-        },
-        { status: 200 },
-      )
+  if (currentError) {
+    if (isMissingTableError(currentError)) {
+      return NextResponse.json({ ok: false, ...DEFAULT_LAGER, error: 'Lager table is missing' })
     }
+
+    return NextResponse.json({ error: currentError.message || 'Failed to load current lager record' }, { status: 500 })
   }
 
-  const existing = (currentRow as WaterRow | null) ?? null
+  const existing = (currentRow as LagerRow | null) ?? null
   const existingLog = safeLogInput(existing?.log)
   const now = new Date().toISOString()
 
@@ -106,17 +97,17 @@ export async function POST(req: NextRequest) {
     action === 'drink'
       ? {
           glasses: (Number(existing?.glasses) || 0) + 1,
-          goal: Number(existing?.goal) || 8,
+          goal: Number(existing?.goal) || 0,
           log: [...existingLog, now],
         }
       : {
           glasses: 0,
-          goal: Number(existing?.goal) || 8,
+          goal: Number(existing?.goal) || 0,
           log: [],
         }
 
   const { data: upserted, error: upsertError } = await supabase
-    .from('lovely_water')
+    .from('lovely_lager')
     .upsert(
       {
         date,
@@ -132,14 +123,11 @@ export async function POST(req: NextRequest) {
 
   if (upsertError) {
     if (isMissingTableError(upsertError)) {
-      return NextResponse.json({
-        ...DEFAULT_WATER,
-        error: 'Water table is not ready yet. Run POST /api/lovely/setup.',
-      })
+      return NextResponse.json({ ok: false, ...DEFAULT_LAGER, error: 'Lager table is not ready yet' })
     }
 
-    return NextResponse.json({ error: upsertError.message || 'Failed to save water intake' }, { status: 500 })
+    return NextResponse.json({ error: upsertError.message || 'Failed to save lager intake' }, { status: 500 })
   }
 
-  return NextResponse.json({ ok: true, ...toWaterResponse(upserted as WaterRow) })
+  return NextResponse.json({ ok: true, ...toLagerResponse(upserted as LagerRow) })
 }

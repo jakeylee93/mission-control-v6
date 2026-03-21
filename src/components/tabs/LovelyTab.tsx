@@ -23,6 +23,12 @@ interface WaterState {
   log: string[]
 }
 
+interface LagerState {
+  glasses: number
+  goal: number
+  log: string[]
+}
+
 const MOOD_EMOJIS = ['😞', '😔', '😐', '🙂', '😊']
 const MOOD_LABELS = ['Rough', 'Low', 'Okay', 'Good', 'Great']
 const MOOD_COLORS = ['#EF4444', '#F59E0B', '#6B7280', '#22C55E', '#10B981']
@@ -80,6 +86,28 @@ function formatWaterTime(isoTime: string): string {
   })
 }
 
+function formatSelectedDateLabel(date: string, today: string): string {
+  if (date === today) return 'Today'
+  return new Date(`${date}T12:00:00`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
+function normalizeTrackerState(input: unknown, fallbackGoal: number): WaterState {
+  if (!input || typeof input !== 'object') {
+    return { glasses: 0, goal: fallbackGoal, log: [] }
+  }
+
+  const value = input as { glasses?: unknown; goal?: unknown; log?: unknown }
+  return {
+    glasses: Number(value.glasses) || 0,
+    goal: Number(value.goal) || fallbackGoal,
+    log: Array.isArray(value.log) ? value.log.filter((item): item is string => typeof item === 'string') : [],
+  }
+}
+
 export default function LovelyTab() {
   const [affirmation, setAffirmation] = useState('')
   const [checkins, setCheckins] = useState<CheckIn[]>([])
@@ -93,6 +121,8 @@ export default function LovelyTab() {
   const [saved, setSaved] = useState(false)
   const [water, setWater] = useState<WaterState>({ glasses: 0, goal: 8, log: [] })
   const [waterSaving, setWaterSaving] = useState(false)
+  const [lager, setLager] = useState<LagerState>({ glasses: 0, goal: 0, log: [] })
+  const [lagerSaving, setLagerSaving] = useState(false)
   const [selectedDate, setSelectedDate] = useState(todayDate())
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date()
@@ -123,14 +153,16 @@ export default function LovelyTab() {
     setAverageMood(data.averageMood ?? null)
   }
 
-  async function loadWater() {
-    const response = await fetch('/api/lovely/water')
+  async function loadWater(date: string) {
+    const response = await fetch(`/api/lovely/water?date=${date}`)
     const data = await response.json()
-    setWater({
-      glasses: Number(data.glasses) || 0,
-      goal: Number(data.goal) || 8,
-      log: Array.isArray(data.log) ? data.log.filter((item: unknown): item is string => typeof item === 'string') : [],
-    })
+    setWater(normalizeTrackerState(data, 8))
+  }
+
+  async function loadLager(date: string) {
+    const response = await fetch(`/api/lovely/lager?date=${date}`)
+    const data = await response.json()
+    setLager(normalizeTrackerState(data, 0))
   }
 
   async function loadAffirmation() {
@@ -189,12 +221,18 @@ export default function LovelyTab() {
   }
 
   useEffect(() => {
-    Promise.all([loadAffirmation(), loadDashboard(), loadWater()])
+    Promise.all([loadAffirmation(), loadDashboard()])
       .catch(() => {
         // Keep tab usable even if requests fail.
       })
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    Promise.all([loadWater(selectedDate), loadLager(selectedDate)]).catch(() => {
+      // Keep trackers usable even if requests fail.
+    })
+  }, [selectedDate])
 
   async function saveCheckin() {
     setSaving(true)
@@ -233,18 +271,30 @@ export default function LovelyTab() {
       const res = await fetch('/api/lovely/water', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, date: selectedDate }),
       })
       const data = await res.json()
-      setWater({
-        glasses: Number(data.glasses) || 0,
-        goal: Number(data.goal) || 8,
-        log: Array.isArray(data.log) ? data.log.filter((item: unknown): item is string => typeof item === 'string') : [],
-      })
+      setWater(normalizeTrackerState(data, 8))
     } catch {
       // no-op
     }
     setWaterSaving(false)
+  }
+
+  async function updateLager(action: 'drink' | 'reset') {
+    setLagerSaving(true)
+    try {
+      const res = await fetch('/api/lovely/lager', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, date: selectedDate }),
+      })
+      const data = await res.json()
+      setLager(normalizeTrackerState(data, 0))
+    } catch {
+      // no-op
+    }
+    setLagerSaving(false)
   }
 
   function drinkWater() {
@@ -255,6 +305,16 @@ export default function LovelyTab() {
   function resetWater() {
     if (waterSaving) return
     updateWater('reset')
+  }
+
+  function drinkLager() {
+    if (lagerSaving) return
+    updateLager('drink')
+  }
+
+  function resetLager() {
+    if (lagerSaving) return
+    updateLager('reset')
   }
 
   const calendarCells = useMemo(() => {
@@ -285,6 +345,8 @@ export default function LovelyTab() {
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const waterProgress = Math.min((water.glasses / Math.max(1, water.goal)) * 100, 100)
+  const lagerProgress = Math.min((lager.glasses / 8) * 100, 100)
+  const selectedDateLabel = formatSelectedDateLabel(selectedDate, today)
 
   if (loading) {
     return (
@@ -328,7 +390,7 @@ export default function LovelyTab() {
           <div className="grid grid-cols-7 gap-1">
             {calendarCells.map((cell) => {
               const clickable = !cell.isFuture
-              const isSelected = showCheckin && selectedDate === cell.date
+              const isSelected = selectedDate === cell.date
               const background = isSelected
                 ? 'rgba(255,215,0,0.3)'
                 : cell.hasCheckin
@@ -408,6 +470,7 @@ export default function LovelyTab() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <div className="text-xs uppercase tracking-widest" style={{ color: MUTED_COLOR }}>Water Intake</div>
+              <div className="text-[11px]" style={{ color: MUTED_COLOR }}>{selectedDateLabel}</div>
               <div className="text-sm" style={{ color: TEXT_COLOR }}>
                 <motion.span
                   key={water.glasses}
@@ -465,7 +528,75 @@ export default function LovelyTab() {
               )
             })}
             {water.log.length === 0 && (
-              <span className="text-xs" style={{ color: MUTED_COLOR }}>No glasses logged yet today.</span>
+              <span className="text-xs" style={{ color: MUTED_COLOR }}>No glasses logged yet for this day.</span>
+            )}
+          </div>
+        </div>
+
+        {/* Lager Intake */}
+        <div className="card rounded-2xl p-4 mb-4" style={{ border: `1px solid ${BORDER_COLOR}` }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest" style={{ color: MUTED_COLOR }}>Lager Tracker 🍺</div>
+              <div className="text-[11px]" style={{ color: MUTED_COLOR }}>{selectedDateLabel}</div>
+              <div className="text-sm" style={{ color: TEXT_COLOR }}>
+                <motion.span
+                  key={lager.glasses}
+                  initial={{ y: -8, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                  className="inline-block font-semibold"
+                  style={{ color: '#f59e0b' }}
+                >
+                  {lager.glasses}
+                </motion.span>
+                {' '}glasses
+              </div>
+            </div>
+            <button
+              onClick={resetLager}
+              disabled={lagerSaving || lager.glasses === 0}
+              className="px-2.5 py-1 rounded-lg text-[11px] disabled:opacity-50"
+              style={{ color: MUTED_COLOR, border: `1px solid ${BORDER_COLOR}` }}
+            >
+              Reset
+            </button>
+          </div>
+
+          <div className="w-full rounded-full h-2.5 mb-3" style={{ background: PANEL_COLOR }}>
+            <motion.div
+              className="rounded-full h-2.5"
+              style={{ background: 'linear-gradient(90deg, #f59e0b, #fbbf24)' }}
+              animate={{ width: `${lagerProgress}%` }}
+              transition={{ type: 'spring', stiffness: 170, damping: 22 }}
+            />
+          </div>
+
+          <button
+            onClick={drinkLager}
+            disabled={lagerSaving}
+            className="w-full rounded-xl py-3 text-sm font-semibold mb-3 disabled:opacity-60"
+            style={{ color: '#1F1200', background: '#f59e0b' }}
+          >
+            + Lager
+          </button>
+
+          <div className="flex flex-wrap gap-1.5">
+            {(lager.log || []).slice(-10).map((entry, idx) => {
+              const formatted = formatWaterTime(entry)
+              if (!formatted) return null
+              return (
+                <span
+                  key={`${entry}-${idx}`}
+                  className="px-2 py-1 rounded-md text-[10px]"
+                  style={{ color: TEXT_COLOR, background: PANEL_COLOR, border: `1px solid ${BORDER_COLOR}` }}
+                >
+                  {formatted}
+                </span>
+              )
+            })}
+            {lager.log.length === 0 && (
+              <span className="text-xs" style={{ color: MUTED_COLOR }}>No pints logged yet for this day.</span>
             )}
           </div>
         </div>

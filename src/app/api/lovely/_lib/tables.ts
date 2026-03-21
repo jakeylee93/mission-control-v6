@@ -64,7 +64,37 @@ END
 $$;
 `
 
-const SQL_STATEMENTS = [CHECKINS_TABLE_SQL, CHECKINS_POLICY_SQL, WATER_TABLE_SQL, WATER_POLICY_SQL]
+const LAGER_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS lovely_lager (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  date text NOT NULL,
+  glasses integer NOT NULL DEFAULT 0,
+  goal integer NOT NULL DEFAULT 0,
+  log jsonb DEFAULT '[]',
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_lager_date ON lovely_lager(date);
+ALTER TABLE lovely_lager ENABLE ROW LEVEL SECURITY;
+`
+
+const LAGER_POLICY_SQL = `
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'lovely_lager'
+      AND policyname = 'allow_all_lager'
+  ) THEN
+    CREATE POLICY allow_all_lager ON lovely_lager FOR ALL USING (true);
+  END IF;
+END
+$$;
+`
+
+const SQL_STATEMENTS = [CHECKINS_TABLE_SQL, CHECKINS_POLICY_SQL, WATER_TABLE_SQL, WATER_POLICY_SQL, LAGER_TABLE_SQL, LAGER_POLICY_SQL]
 
 const RPC_FUNCTIONS = ['exec_sql', 'execute_sql', 'run_sql', 'query_sql']
 
