@@ -1,20 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 
 type TabId = 'business' | 'personal' | 'laboratory'
+type ActiveApp = string | null
 
 interface Agent {
-  id: string
-  name: string
-  role: string
-  model: string
-  provider: string
-  avatar: string
-  accent: string
-  monthSpend: string
-  lastActive: string
+  id: string; name: string; role: string; model: string; provider: string
+  avatar: string; accent: string; monthSpend: string; lastActive: string
 }
 
 const AGENTS: Agent[] = [
@@ -23,275 +17,284 @@ const AGENTS: Agent[] = [
   { id: 'cindy', name: 'Cindy', role: 'Assistant', model: 'Kimi (Moonshot)', provider: 'Moonshot', avatar: '/images/cindy.png', accent: '#C084FC', monthSpend: '£31.80', lastActive: '5h ago' },
 ]
 
-interface AppIcon {
-  emoji: string
-  label: string
-  color: string
-  href?: string
+/* ── SVG Icons ── */
+const I = {
+  email: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>,
+  calendar: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  costs: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  analytics: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+  tasks: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+  contacts: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  docs: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+  alerts: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  web: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+  messages: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  weather: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
+  health: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  music: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
+  photos: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+  maps: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+  notes: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  shopping: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>,
+  home: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  reading: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
+  downtime: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+  agents: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>,
+  memory: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+  settings: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  apis: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>,
+  tools: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>,
+  playground: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+  usage: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  automations: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+  database: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+  deploy: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>,
+  back: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
+  briefcase: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+  user: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  flask: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8a3 3 0 0 1-2.5 4.5h-11A3 3 0 0 1 4 18l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg>,
 }
 
-const BUSINESS_APPS: AppIcon[] = [
-  { emoji: '📧', label: 'Email', color: '#3b82f6' },
-  { emoji: '📅', label: 'Calendar', color: '#10b981' },
-  { emoji: '💷', label: 'Costs', color: '#f59e0b' },
-  { emoji: '📊', label: 'Analytics', color: '#8b5cf6' },
-  { emoji: '📋', label: 'Tasks', color: '#ef4444' },
-  { emoji: '👥', label: 'Contacts', color: '#06b6d4' },
-  { emoji: '📄', label: 'Documents', color: '#64748b' },
-  { emoji: '🔔', label: 'Alerts', color: '#f43f5e' },
-  { emoji: '🌐', label: 'Websites', color: '#6366f1', href: 'https://anyos.co.uk/portfolio' },
-  { emoji: '💬', label: 'Messages', color: '#22c55e' },
+interface AppDef { icon: JSX.Element; label: string; color: string; id: string; href?: string }
+
+const BUSINESS: AppDef[] = [
+  { icon: I.email, label: 'Email', color: '#3b82f6', id: 'email' },
+  { icon: I.calendar, label: 'Calendar', color: '#10b981', id: 'calendar' },
+  { icon: I.costs, label: 'Costs', color: '#f59e0b', id: 'costs' },
+  { icon: I.analytics, label: 'Analytics', color: '#8b5cf6', id: 'analytics' },
+  { icon: I.tasks, label: 'Tasks', color: '#ef4444', id: 'tasks' },
+  { icon: I.contacts, label: 'Contacts', color: '#06b6d4', id: 'contacts' },
+  { icon: I.docs, label: 'Docs', color: '#64748b', id: 'docs' },
+  { icon: I.alerts, label: 'Alerts', color: '#f43f5e', id: 'alerts' },
+  { icon: I.web, label: 'Websites', color: '#6366f1', id: 'websites', href: 'https://anyos.co.uk/portfolio' },
+  { icon: I.messages, label: 'Messages', color: '#22c55e', id: 'messages' },
 ]
 
-const PERSONAL_APPS: AppIcon[] = [
-  { emoji: '☀️', label: 'Weather', color: '#f59e0b' },
-  { emoji: '🏋️', label: 'Health', color: '#ef4444' },
-  { emoji: '🎵', label: 'Music', color: '#ec4899' },
-  { emoji: '📸', label: 'Photos', color: '#8b5cf6' },
-  { emoji: '🗺️', label: 'Maps', color: '#10b981' },
-  { emoji: '📝', label: 'Notes', color: '#f59e0b' },
-  { emoji: '🛒', label: 'Shopping', color: '#06b6d4' },
-  { emoji: '🏠', label: 'Home', color: '#64748b' },
-  { emoji: '📚', label: 'Reading', color: '#a855f7' },
-  { emoji: '🎮', label: 'Downtime', color: '#6366f1' },
+const PERSONAL: AppDef[] = [
+  { icon: I.weather, label: 'Weather', color: '#f59e0b', id: 'weather' },
+  { icon: I.health, label: 'Health', color: '#ef4444', id: 'health' },
+  { icon: I.music, label: 'Music', color: '#ec4899', id: 'music' },
+  { icon: I.photos, label: 'Photos', color: '#8b5cf6', id: 'photos' },
+  { icon: I.maps, label: 'Maps', color: '#10b981', id: 'maps' },
+  { icon: I.notes, label: 'Notes', color: '#f59e0b', id: 'notes' },
+  { icon: I.shopping, label: 'Shopping', color: '#06b6d4', id: 'shopping' },
+  { icon: I.home, label: 'Home', color: '#64748b', id: 'home' },
+  { icon: I.reading, label: 'Reading', color: '#a855f7', id: 'reading' },
+  { icon: I.downtime, label: 'Downtime', color: '#6366f1', id: 'downtime' },
 ]
 
-const LAB_APPS: AppIcon[] = [
-  { emoji: '🤖', label: 'Agents', color: '#6366f1' },
-  { emoji: '🧠', label: 'Memory', color: '#ec4899' },
-  { emoji: '⚙️', label: 'Settings', color: '#64748b' },
-  { emoji: '📡', label: 'APIs', color: '#10b981' },
-  { emoji: '🔧', label: 'Tools', color: '#f59e0b' },
-  { emoji: '🧪', label: 'Playground', color: '#8b5cf6' },
-  { emoji: '📈', label: 'Usage', color: '#ef4444' },
-  { emoji: '🔄', label: 'Automations', color: '#06b6d4' },
-  { emoji: '🗄️', label: 'Database', color: '#22c55e' },
-  { emoji: '📦', label: 'Deploy', color: '#3b82f6' },
+const LAB: AppDef[] = [
+  { icon: I.agents, label: 'Agents', color: '#6366f1', id: 'agents' },
+  { icon: I.memory, label: 'Memory', color: '#ec4899', id: 'memory' },
+  { icon: I.settings, label: 'Settings', color: '#64748b', id: 'settings' },
+  { icon: I.apis, label: 'APIs', color: '#10b981', id: 'apis' },
+  { icon: I.tools, label: 'Tools', color: '#f59e0b', id: 'tools' },
+  { icon: I.playground, label: 'Playground', color: '#8b5cf6', id: 'playground' },
+  { icon: I.usage, label: 'Usage', color: '#ef4444', id: 'usage' },
+  { icon: I.automations, label: 'Autos', color: '#06b6d4', id: 'automations' },
+  { icon: I.database, label: 'Database', color: '#22c55e', id: 'database' },
+  { icon: I.deploy, label: 'Deploy', color: '#3b82f6', id: 'deploy' },
 ]
 
-const TAB_APPS: Record<TabId, AppIcon[]> = {
-  business: BUSINESS_APPS,
-  personal: PERSONAL_APPS,
-  laboratory: LAB_APPS,
-}
+const TABS: Record<TabId, AppDef[]> = { business: BUSINESS, personal: PERSONAL, laboratory: LAB }
 
-const TAB_META: Record<TabId, { label: string; emoji: string }> = {
-  business: { label: 'Business', emoji: '🏢' },
-  personal: { label: 'Personal', emoji: '🏠' },
-  laboratory: { label: 'Laboratory', emoji: '🧪' },
-}
+interface CalEvent { summary: string; start: string; end: string; location?: string; color?: string }
 
-function AgentCard({ agent }: { agent: Agent }) {
+/* ── Calendar App View ── */
+function CalendarView({ onBack }: { onBack: () => void }) {
+  const [events, setEvents] = useState<CalEvent[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/calendar/events')
+      .then(r => r.json())
+      .then(data => { setEvents(data.events || []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  const today = new Date()
+  const upcoming = events.filter(e => new Date(e.start) >= today).slice(0, 20)
+  const grouped: Record<string, CalEvent[]> = {}
+  upcoming.forEach(e => {
+    const d = new Date(e.start).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+    if (!grouped[d]) grouped[d] = []
+    grouped[d].push(e)
+  })
+
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      border: `1px solid ${agent.accent}20`,
-      borderRadius: 20,
-      padding: 16,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 14,
-      cursor: 'pointer',
-      transition: 'all 0.2s',
-    }}>
-      <div style={{
-        width: 56, height: 56, borderRadius: 16,
-        background: `linear-gradient(145deg, ${agent.accent}20, ${agent.accent}08)`,
-        border: `1.5px solid ${agent.accent}30`,
-        overflow: 'hidden', flexShrink: 0,
-      }}>
-        <Image src={agent.avatar} alt={agent.name} width={56} height={56} style={{ width: 56, height: 56, objectFit: 'cover' }} />
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-          <span style={{ fontWeight: 700, fontSize: 15 }}>{agent.name}</span>
-          <span style={{ fontSize: 11, color: '#666', background: 'rgba(255,255,255,0.06)', padding: '1px 6px', borderRadius: 6 }}>{agent.role}</span>
+    <div style={{ padding: '0 4px' }}>
+      <button onClick={onBack} style={{
+        background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
+        color: '#aaa', padding: '8px 14px', fontSize: 13, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16,
+      }}>{I.back} Back</button>
+      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>Calendar</h2>
+      <p style={{ fontSize: 12, color: '#666', marginBottom: 20 }}>Upcoming events from Google Calendar</p>
+
+      {loading && <div style={{ color: '#666', fontSize: 13 }}>Loading events...</div>}
+
+      {!loading && Object.entries(grouped).map(([date, dayEvents]) => (
+        <div key={date} style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{date}</div>
+          {dayEvents.map((ev, i) => {
+            const start = new Date(ev.start)
+            const end = new Date(ev.end)
+            const time = start.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+            const endTime = end.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+            return (
+              <div key={i} style={{
+                background: 'rgba(255,255,255,0.04)', borderRadius: 14,
+                padding: '14px 16px', marginBottom: 8,
+                borderLeft: `3px solid ${ev.color || '#6366f1'}`,
+              }}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{ev.summary}</div>
+                <div style={{ fontSize: 12, color: '#888' }}>{time} – {endTime}</div>
+                {ev.location && <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>{ev.location}</div>}
+              </div>
+            )
+          })}
         </div>
-        <div style={{ fontSize: 12, color: '#888', marginBottom: 4 }}>{agent.model} · {agent.provider}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12 }}>
-          <span style={{ color: agent.accent, fontWeight: 700 }}>{agent.monthSpend}</span>
-          <span style={{ color: '#555' }}>this month</span>
-          <span style={{ color: '#444', marginLeft: 'auto' }}>{agent.lastActive}</span>
+      ))}
+
+      {!loading && upcoming.length === 0 && (
+        <div style={{ textAlign: 'center', color: '#666', padding: '40px 0', fontSize: 14 }}>
+          No upcoming events
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
-function AppIconButton({ app }: { app: AppIcon }) {
-  const handleClick = () => {
-    if (app.href) {
-      window.open(app.href, '_blank')
-    }
-  }
-
-  return (
-    <button
-      onClick={handleClick}
-      style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-        background: 'none', border: 'none', cursor: 'pointer',
-        padding: 8, borderRadius: 16, transition: 'transform 0.1s',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-      className="app-icon-btn"
-    >
-      <div style={{
-        width: 60, height: 60, borderRadius: 16,
-        background: `${app.color}15`,
-        border: `1px solid ${app.color}20`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 28,
-        transition: 'all 0.2s',
-      }}>
-        {app.emoji}
-      </div>
-      <span style={{ fontSize: 11, color: '#999', fontWeight: 500, letterSpacing: 0.2 }}>
-        {app.label}
-      </span>
-    </button>
-  )
-}
-
+/* ── Main ── */
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<TabId>('business')
+  const [tab, setTab] = useState<TabId>('business')
+  const [activeApp, setActiveApp] = useState<ActiveApp>(null)
   const [now, setNow] = useState(new Date())
 
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(t)
-  }, [])
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
 
   const dayName = now.toLocaleDateString('en-GB', { weekday: 'long' })
   const dateFmt = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
   const timeFmt = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-  const apps = TAB_APPS[activeTab]
+
+  const handleAppClick = useCallback((app: AppDef) => {
+    if (app.href) { window.open(app.href, '_blank'); return }
+    if (app.id === 'calendar') { setActiveApp('calendar'); return }
+    // Future: other apps
+  }, [])
 
   return (
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
-      color: '#F0EEE8',
-      fontFamily: "'Inter', system-ui, sans-serif",
-      display: 'flex',
-      flexDirection: 'column',
+      color: '#F0EEE8', fontFamily: "'Inter', system-ui, sans-serif",
     }}>
-      {/* Ambient glow */}
-      <div style={{
-        position: 'fixed', top: '5%', left: '50%', transform: 'translateX(-50%)',
-        width: 500, height: 500, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(99,102,241,0.06), transparent 70%)',
-        pointerEvents: 'none', zIndex: 0,
-      }} />
+      <div style={{ position: 'fixed', top: '5%', left: '50%', transform: 'translateX(-50%)', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.06), transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
 
-      <div style={{
-        position: 'relative', zIndex: 1,
-        maxWidth: 500, margin: '0 auto', padding: '0 20px',
-        display: 'flex', flexDirection: 'column',
-        minHeight: '100vh', width: '100%',
-      }}>
-        {/* Header */}
-        <header style={{ paddingTop: 48, marginBottom: 20, textAlign: 'center' }}>
-          <div style={{ color: '#555', fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 }}>
-            {dayName} · {dateFmt}
-          </div>
-          <h1 style={{
-            fontSize: 40, fontWeight: 700, margin: 0, letterSpacing: -1,
-            fontFamily: "'Space Grotesk', 'Inter', sans-serif",
-          }}>Jake</h1>
-          <div style={{ color: '#666', fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', marginTop: 2 }}>
-            Mission Control
-          </div>
-          <div style={{
-            fontSize: 30, fontWeight: 200, fontFamily: 'monospace',
-            letterSpacing: 3, marginTop: 8, opacity: 0.7,
-          }}>{timeFmt}</div>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: 500, margin: '0 auto', padding: '0 16px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+
+        {/* Header — compact on mobile */}
+        <header style={{ paddingTop: 44, marginBottom: 16, textAlign: 'center' }}>
+          <div style={{ color: '#555', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' }}>{dayName} · {dateFmt}</div>
+          <h1 style={{ fontSize: 34, fontWeight: 700, margin: '2px 0', letterSpacing: -1, fontFamily: "'Space Grotesk', sans-serif" }}>Jake</h1>
+          <div style={{ color: '#555', fontSize: 10, letterSpacing: 3, textTransform: 'uppercase' }}>Mission Control</div>
+          <div style={{ fontSize: 26, fontWeight: 200, fontFamily: 'monospace', letterSpacing: 3, marginTop: 6, opacity: 0.7 }}>{timeFmt}</div>
         </header>
 
-        {/* Agent Cards */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-          {AGENTS.map(agent => (
-            <AgentCard key={agent.id} agent={agent} />
-          ))}
-          {/* Total spend */}
-          <div style={{
-            textAlign: 'center', fontSize: 12, color: '#555', marginTop: 4,
-          }}>
-            Total this month: <span style={{ color: '#6366f1', fontWeight: 700 }}>£1,003.50</span>
-          </div>
-        </div>
-
-        {/* App Grid */}
-        <div style={{
-          flex: 1,
-          background: 'rgba(255,255,255,0.02)',
-          borderRadius: '24px 24px 0 0',
-          border: '1px solid rgba(255,255,255,0.05)',
-          borderBottom: 'none',
-          padding: '24px 16px 120px',
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
-            gap: 4,
-            justifyItems: 'center',
-          }}>
-            {apps.map((app, i) => (
-              <AppIconButton key={i} app={app} />
+        {/* Agent Cards — smaller on mobile */}
+        {!activeApp && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+            {AGENTS.map(a => (
+              <div key={a.id} style={{
+                background: 'rgba(255,255,255,0.04)', border: `1px solid ${a.accent}18`,
+                borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12,
+              }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: `${a.accent}15`, border: `1px solid ${a.accent}25`, overflow: 'hidden', flexShrink: 0 }}>
+                  <Image src={a.avatar} alt={a.name} width={44} height={44} style={{ width: 44, height: 44, objectFit: 'cover' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontWeight: 700, fontSize: 14 }}>{a.name}</span>
+                    <span style={{ fontSize: 10, color: '#666', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>{a.role}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#777' }}>{a.model} · <span style={{ color: a.accent, fontWeight: 700 }}>{a.monthSpend}</span></div>
+                </div>
+                <span style={{ fontSize: 10, color: '#555' }}>{a.lastActive}</span>
+              </div>
             ))}
+            <div style={{ textAlign: 'center', fontSize: 11, color: '#555', marginTop: 2 }}>
+              Total: <span style={{ color: '#6366f1', fontWeight: 700 }}>£1,003.50</span>
+            </div>
           </div>
+        )}
+
+        {/* App Content Area */}
+        <div style={{
+          flex: 1, background: 'rgba(255,255,255,0.02)',
+          borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.05)',
+          borderBottom: 'none', padding: '20px 12px 110px',
+        }}>
+          {activeApp === 'calendar' ? (
+            <CalendarView onBack={() => setActiveApp(null)} />
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(5, 1fr)',
+              gap: '12px 2px',
+              justifyItems: 'center',
+            }}>
+              {TABS[tab].map(app => (
+                <button key={app.id} onClick={() => handleAppClick(app)} style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+                  WebkitTapHighlightColor: 'transparent',
+                }} className="app-btn">
+                  <div style={{
+                    width: 52, height: 52, borderRadius: 14,
+                    background: `${app.color}12`, border: `1px solid ${app.color}20`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: app.color, transition: 'transform 0.1s',
+                  }}>{app.icon}</div>
+                  <span style={{ fontSize: 10, color: '#888', fontWeight: 500 }}>{app.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Tab Bar */}
       <div style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: 'rgba(10,8,18,0.95)',
-        backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+        background: 'rgba(10,8,18,0.95)', backdropFilter: 'blur(20px)',
         borderTop: '1px solid rgba(255,255,255,0.06)',
         display: 'flex', justifyContent: 'center',
-        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-        paddingTop: 10,
-        zIndex: 100,
+        paddingBottom: 'max(10px, env(safe-area-inset-bottom))', paddingTop: 8, zIndex: 100,
       }}>
-        <div style={{ display: 'flex', gap: 0, maxWidth: 400, width: '100%', justifyContent: 'space-around' }}>
-          {(['business', 'personal', 'laboratory'] as TabId[]).map(tab => {
-            const isActive = activeTab === tab
-            const meta = TAB_META[tab]
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: '4px 16px',
-                  opacity: isActive ? 1 : 0.4,
-                  transition: 'opacity 0.2s',
-                }}
-              >
-                <span style={{ fontSize: 20 }}>{meta.emoji}</span>
-                <span style={{
-                  fontSize: 10, fontWeight: isActive ? 700 : 500,
-                  color: isActive ? '#6366f1' : '#888',
-                  letterSpacing: 0.5,
-                }}>{meta.label}</span>
-                {isActive && (
-                  <div style={{
-                    width: 4, height: 4, borderRadius: 2,
-                    background: '#6366f1', marginTop: 1,
-                  }} />
-                )}
-              </button>
-            )
-          })}
+        <div style={{ display: 'flex', maxWidth: 360, width: '100%', justifyContent: 'space-around' }}>
+          {([
+            { id: 'business' as TabId, icon: I.briefcase, label: 'Business' },
+            { id: 'personal' as TabId, icon: I.user, label: 'Personal' },
+            { id: 'laboratory' as TabId, icon: I.flask, label: 'Laboratory' },
+          ]).map(t => (
+            <button key={t.id} onClick={() => { setTab(t.id); setActiveApp(null) }} style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              background: 'none', border: 'none', cursor: 'pointer', padding: '2px 16px',
+              color: tab === t.id ? '#6366f1' : '#555', transition: 'color 0.2s',
+            }}>
+              {t.icon}
+              <span style={{ fontSize: 9, fontWeight: tab === t.id ? 700 : 500, letterSpacing: 0.5 }}>{t.label}</span>
+              {tab === t.id && <div style={{ width: 4, height: 4, borderRadius: 2, background: '#6366f1' }} />}
+            </button>
+          ))}
         </div>
       </div>
 
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-        .app-icon-btn:active { transform: scale(0.92); }
-        .app-icon-btn:active > div:first-child { background: rgba(255,255,255,0.08) !important; }
+        .app-btn:active > div:first-child { transform: scale(0.9); }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { -webkit-font-smoothing: antialiased; }
       `}</style>
     </div>
   )
