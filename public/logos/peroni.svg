@@ -1,4 +1,6 @@
-<svg width="60" height="30" viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg">
-  <rect width="60" height="30" fill="#0066CC" rx="3"/>
-  <text x="30" y="20" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" font-weight="bold" fill="white">PERONI</text>
+<svg width="80" height="40" viewBox="0 0 80 40" xmlns="http://www.w3.org/2000/svg">
+  <rect width="80" height="40" fill="#0066CC" rx="4"/>
+  <rect x="5" y="8" width="70" height="24" fill="#FFF" rx="2"/>
+  <text x="40" y="16" text-anchor="middle" font-family="serif" font-size="8" font-weight="bold" fill="#0066CC">PERONI</text>
+  <text x="40" y="26" text-anchor="middle" font-family="serif" font-size="6" fill="#0066CC">NASTRO AZZURRO</text>
 </svg>

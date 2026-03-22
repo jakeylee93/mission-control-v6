@@ -34,10 +34,10 @@ interface DrinkOption {
 }
 
 const QUICK_DRINKS: { [key: string]: DrinkOption } = {
-  'stella-artois': { name: 'Stella Artois', calories: 154, alcoholUnits: 1.4, emoji: '🍺', logo: 'https://seeklogo.com/images/S/stella-artois-logo-4A5C74A9B4-seeklogo.com.png' },
-  'peroni': { name: 'Peroni', calories: 142, alcoholUnits: 1.4, emoji: '🍺', logo: 'https://seeklogo.com/images/P/peroni-logo-B0B6A4B2B2-seeklogo.com.png' },
-  'corona': { name: 'Corona', calories: 148, alcoholUnits: 1.4, emoji: '🍺', logo: 'https://seeklogo.com/images/C/corona-logo-AC5142DDA2-seeklogo.com.png' },
-  'guinness': { name: 'Guinness', calories: 125, alcoholUnits: 1.2, emoji: '🍺', logo: 'https://seeklogo.com/images/G/guinness-logo-2B62FCF23D-seeklogo.com.png' },
+  'stella-artois': { name: 'Stella Artois', calories: 154, alcoholUnits: 1.4, emoji: '🍺', logo: '/logos/stella.svg' },
+  'peroni': { name: 'Peroni', calories: 142, alcoholUnits: 1.4, emoji: '🍺', logo: '/logos/peroni.svg' },
+  'corona': { name: 'Corona', calories: 148, alcoholUnits: 1.4, emoji: '🍺', logo: '/logos/corona.svg' },
+  'guinness': { name: 'Guinness', calories: 125, alcoholUnits: 1.2, emoji: '🍺', logo: '/logos/guinness.svg' },
   'wine-red': { name: 'Red Wine', calories: 85, alcoholUnits: 1.6, emoji: '🍷' },
   'wine-white': { name: 'White Wine', calories: 82, alcoholUnits: 1.5, emoji: '🥂' },
   'prosecco': { name: 'Prosecco', calories: 89, alcoholUnits: 1.4, emoji: '🥂' },
