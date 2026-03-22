@@ -678,13 +678,13 @@ export function HealthApp({ onBack }: HealthAppProps) {
                           borderRadius: 8
                         }}>
                           <div style={{ color: '#fff' }}>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{food.description}</div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{food.foods?.[0]?.name || 'Food Item'}</div>
                             <div style={{ color: '#888', fontSize: 12 }}>
                               {food.total_calories} cal • {food.total_protein}g protein
                             </div>
                           </div>
                           <div style={{ color: '#888', fontSize: 11 }}>
-                            {new Date(food.created_at).toLocaleTimeString('en-GB', { 
+                            {new Date(food.timestamp).toLocaleTimeString('en-GB', { 
                               hour: '2-digit', 
                               minute: '2-digit' 
                             })}
@@ -718,13 +718,13 @@ export function HealthApp({ onBack }: HealthAppProps) {
                           borderRadius: 8
                         }}>
                           <div style={{ color: '#fff' }}>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{food.description}</div>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{food.foods?.[0]?.name || 'Food Item'}</div>
                             <div style={{ color: '#888', fontSize: 12 }}>
                               {food.total_calories} cal • {food.total_protein}g protein • {food.total_carbs}g carbs • {food.total_fat}g fat
                             </div>
                           </div>
                           <div style={{ color: '#888', fontSize: 11 }}>
-                            {new Date(food.created_at).toLocaleString('en-GB', { 
+                            {new Date(food.timestamp).toLocaleString('en-GB', { 
                               day: '2-digit',
                               month: 'short',
                               hour: '2-digit', 
