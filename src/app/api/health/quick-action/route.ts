@@ -77,12 +77,13 @@ export async function POST(req: NextRequest) {
     })
 
     const drinksResult = await drinksResponse.json().catch(() => null)
-    if (!drinksResponse.ok || !drinksResult?.ok) {
-      const details =
-        (drinksResult && typeof drinksResult.error === 'string' && drinksResult.error) ||
-        `Drinks save failed (${drinksResponse.status})`
+    if (!drinksResponse.ok) {
+      const details = drinksResult?.error || `Drinks save failed (${drinksResponse.status})`
       return NextResponse.json({ error: details }, { status: 500 })
     }
+    
+    // Success if we got here - drinks API returns {ok: true, glasses: N, drinks: [...]}
+    console.log('✅ Drinks API success:', drinksResult)
     
     return NextResponse.json({ 
       success: true, 
