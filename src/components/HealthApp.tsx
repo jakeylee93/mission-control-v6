@@ -54,6 +54,14 @@ export function HealthApp({ onBack }: HealthAppProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [drinksData, setDrinksData] = useState<any>(null)
+  const [showAddDrink, setShowAddDrink] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [customDrink, setCustomDrink] = useState({
+    name: '',
+    calories: '',
+    alcoholUnits: '',
+    portion: 'pint'
+  })
   const [dailyTotals, setDailyTotals] = useState({
     calories: 0,
     protein: 0,
@@ -81,6 +89,61 @@ export function HealthApp({ onBack }: HealthAppProps) {
       day: 'numeric',
       month: 'short'
     })
+  }
+
+  async function deleteDrink(drinkIndex: number) {
+    try {
+      const response = await fetch('/api/lovely/drinks/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: selectedDate,
+          drinkIndex: drinkIndex
+        })
+      })
+
+      if (response.ok) {
+        // Reload data to reflect deletion
+        loadDataForDate(selectedDate)
+      } else {
+        const error = await response.text()
+        alert(`Failed to delete drink: ${error}`)
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Failed to delete drink')
+    }
+  }
+
+  async function addCustomDrink() {
+    try {
+      const response = await fetch('/api/health/quick-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actionType: 'alcohol',
+          customDrink: {
+            name: customDrink.name,
+            calories: parseInt(customDrink.calories) || 0,
+            alcoholUnits: parseFloat(customDrink.alcoholUnits) || 0,
+          },
+          quantity: 1,
+          portionSize: customDrink.portion
+        })
+      })
+
+      if (response.ok) {
+        setShowAddDrink(false)
+        setCustomDrink({ name: '', calories: '', alcoholUnits: '', portion: 'pint' })
+        loadDataForDate(selectedDate)
+      } else {
+        const error = await response.text()
+        alert(`Failed to add drink: ${error}`)
+      }
+    } catch (error) {
+      console.error('Add custom drink error:', error)
+      alert('Failed to add custom drink')
+    }
   }
 
   async function loadDataForDate(date: string) {
@@ -544,7 +607,24 @@ export function HealthApp({ onBack }: HealthAppProps) {
                 </div>
 
                 {/* Recent Drinks */}
-                <h4 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>Recent Drinks</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h4 style={{ color: '#fff', fontSize: 16, margin: 0 }}>Recent Drinks</h4>
+                  <button
+                    onClick={() => setShowAddDrink(true)}
+                    style={{
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100)',
+                      border: 'none',
+                      borderRadius: 8,
+                      color: '#fff',
+                      padding: '6px 12px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    + Add Custom
+                  </button>
+                </div>
                 <div style={{ 
                   background: 'rgba(255,255,255,0.03)', 
                   borderRadius: 12, 
@@ -553,29 +633,48 @@ export function HealthApp({ onBack }: HealthAppProps) {
                 }}>
                   {drinksData?.drinks?.length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {drinksData.drinks.slice(-5).reverse().map((drink: any, idx: number) => (
-                        <div key={idx} style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '8px 12px',
-                          background: 'rgba(255,255,255,0.05)',
-                          borderRadius: 8
-                        }}>
-                          <div style={{ color: '#fff' }}>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{drink.name}</div>
-                            <div style={{ color: '#888', fontSize: 12 }}>
-                              {drink.portion} • {drink.calories} cal • {drink.alcoholUnits} units
+                      {drinksData.drinks.slice(-5).reverse().map((drink: any, idx: number) => {
+                        const actualIndex = drinksData.drinks.length - 1 - idx
+                        return (
+                          <div key={idx} style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '8px 12px',
+                            background: 'rgba(255,255,255,0.05)',
+                            borderRadius: 8
+                          }}>
+                            <div style={{ color: '#fff', flex: 1 }}>
+                              <div style={{ fontWeight: 600, fontSize: 14 }}>{drink.name}</div>
+                              <div style={{ color: '#888', fontSize: 12 }}>
+                                {drink.portion} • {drink.calories} cal • {drink.alcoholUnits} units
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <div style={{ color: '#888', fontSize: 11 }}>
+                                {new Date(drink.timestamp).toLocaleTimeString('en-GB', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </div>
+                              <button
+                                onClick={() => deleteDrink(actualIndex)}
+                                style={{
+                                  background: 'rgba(239,68,68,0.2)',
+                                  border: '1px solid rgba(239,68,68,0.4)',
+                                  borderRadius: 6,
+                                  color: '#ef4444',
+                                  padding: '4px 8px',
+                                  fontSize: 10,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Delete
+                              </button>
                             </div>
                           </div>
-                          <div style={{ color: '#888', fontSize: 11 }}>
-                            {new Date(drink.timestamp).toLocaleTimeString('en-GB', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
                     <div style={{ color: '#666', textAlign: 'center', fontSize: 14 }}>
@@ -742,6 +841,182 @@ export function HealthApp({ onBack }: HealthAppProps) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Add Custom Drink Modal */}
+      {showAddDrink && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.8)',
+          zIndex: 1001,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16
+        }}>
+          <div style={{
+            background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+            borderRadius: 20,
+            padding: 24,
+            maxWidth: 400,
+            width: '100%'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600 }}>Add Custom Drink</h3>
+              <button 
+                onClick={() => setShowAddDrink(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  borderRadius: 8,
+                  color: '#aaa',
+                  padding: 8,
+                  cursor: 'pointer',
+                  fontSize: 16
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Search/Name Input */}
+              <div>
+                <label style={{ color: '#aaa', fontSize: 12, marginBottom: 6, display: 'block' }}>
+                  Drink Name or Search
+                </label>
+                <input
+                  type="text"
+                  value={customDrink.name}
+                  onChange={(e) => setCustomDrink(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="e.g. Heineken, Vodka Tonic, etc."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    fontSize: 14
+                  }}
+                />
+              </div>
+
+              {/* Portion Size */}
+              <div>
+                <label style={{ color: '#aaa', fontSize: 12, marginBottom: 6, display: 'block' }}>
+                  Portion Size
+                </label>
+                <select
+                  value={customDrink.portion}
+                  onChange={(e) => setCustomDrink(prev => ({ ...prev, portion: e.target.value }))}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: '#fff',
+                    fontSize: 14
+                  }}
+                >
+                  <option value="half-pint">Half Pint (284ml)</option>
+                  <option value="pint">Pint (568ml)</option>
+                  <option value="can">Can (330ml)</option>
+                  <option value="bottle">Bottle (500ml)</option>
+                  <option value="glass">Glass (175ml)</option>
+                  <option value="shot">Shot (25ml)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {/* Calories */}
+                <div>
+                  <label style={{ color: '#aaa', fontSize: 12, marginBottom: 6, display: 'block' }}>
+                    Calories
+                  </label>
+                  <input
+                    type="number"
+                    value={customDrink.calories}
+                    onChange={(e) => setCustomDrink(prev => ({ ...prev, calories: e.target.value }))}
+                    placeholder="150"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: '#fff',
+                      fontSize: 14
+                    }}
+                  />
+                </div>
+
+                {/* Alcohol Units */}
+                <div>
+                  <label style={{ color: '#aaa', fontSize: 12, marginBottom: 6, display: 'block' }}>
+                    Alcohol Units
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={customDrink.alcoholUnits}
+                    onChange={(e) => setCustomDrink(prev => ({ ...prev, alcoholUnits: e.target.value }))}
+                    placeholder="1.4"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: 8,
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      background: 'rgba(255,255,255,0.05)',
+                      color: '#fff',
+                      fontSize: 14
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                <button
+                  onClick={() => setShowAddDrink(false)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    background: 'transparent',
+                    color: '#aaa',
+                    fontSize: 14,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={addCustomDrink}
+                  disabled={!customDrink.name}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: customDrink.name ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255,255,255,0.1)',
+                    color: '#fff',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    cursor: customDrink.name ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  Add Drink
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

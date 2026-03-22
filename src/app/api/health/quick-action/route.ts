@@ -34,15 +34,26 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { actionType, itemKey, quantity = 1, portionSize = 'pint' } = body
+    const { actionType, itemKey, customDrink, quantity = 1, portionSize = 'pint' } = body
     
     if (actionType !== 'alcohol') {
       return NextResponse.json({ error: 'Invalid action type' }, { status: 400 })
     }
     
-    const drink = DRINK_OPTIONS[itemKey]
-    if (!drink) {
-      return NextResponse.json({ error: 'Invalid drink' }, { status: 400 })
+    let drink
+    if (customDrink) {
+      // Use custom drink data
+      drink = {
+        name: customDrink.name,
+        calories: customDrink.calories,
+        alcoholUnits: customDrink.alcoholUnits
+      }
+    } else {
+      // Use predefined drink
+      drink = DRINK_OPTIONS[itemKey]
+      if (!drink) {
+        return NextResponse.json({ error: 'Invalid drink' }, { status: 400 })
+      }
     }
     
     const date = new Date().toISOString().slice(0, 10)
