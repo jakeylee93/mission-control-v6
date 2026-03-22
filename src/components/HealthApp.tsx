@@ -62,6 +62,10 @@ export function HealthApp({ onBack }: HealthAppProps) {
     alcoholUnits: '',
     portion: 'pint'
   })
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false)
+  const drinkPhotoRef = useRef<HTMLInputElement>(null)
   const [dailyTotals, setDailyTotals] = useState({
     calories: 0,
     protein: 0,
@@ -115,6 +119,76 @@ export function HealthApp({ onBack }: HealthAppProps) {
     }
   }
 
+  async function searchDrinks(query: string) {
+    if (query.length < 2) {
+      setSearchResults([])
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const response = await fetch(`/api/drinks/search?q=${encodeURIComponent(query)}`)
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResults(data.results || [])
+      }
+    } catch (error) {
+      console.error('Search error:', error)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  async function analyzeDrinkPhoto(file: File) {
+    setIsAnalyzingPhoto(true)
+    try {
+      // Convert to base64
+      const base64 = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(file)
+      })
+
+      const response = await fetch('/api/drinks/identify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64 })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.drink.confidence > 0.7) {
+          // Auto-populate form with AI-identified drink
+          setCustomDrink({
+            name: data.drink.name,
+            calories: data.drink.calories.toString(),
+            alcoholUnits: data.drink.alcoholUnits.toString(),
+            portion: data.drink.portion
+          })
+        } else {
+          alert(`Could not identify drink clearly (${Math.round(data.drink.confidence * 100)}% confidence). Please enter details manually.`)
+        }
+      } else {
+        alert('Failed to analyze photo. Please try again or enter details manually.')
+      }
+    } catch (error) {
+      console.error('Photo analysis error:', error)
+      alert('Failed to analyze photo')
+    } finally {
+      setIsAnalyzingPhoto(false)
+    }
+  }
+
+  function selectSearchResult(result: any) {
+    setCustomDrink({
+      name: result.name,
+      calories: result.calories.toString(),
+      alcoholUnits: result.alcoholUnits.toString(),
+      portion: result.portion
+    })
+    setSearchResults([])
+  }
+
   async function addCustomDrink() {
     try {
       const response = await fetch('/api/health/quick-action', {
@@ -135,6 +209,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
       if (response.ok) {
         setShowAddDrink(false)
         setCustomDrink({ name: '', calories: '', alcoholUnits: '', portion: 'pint' })
+        setSearchResults([])
         loadDataForDate(selectedDate)
       } else {
         const error = await response.text()
@@ -870,7 +945,11 @@ export function HealthApp({ onBack }: HealthAppProps) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600 }}>Add Custom Drink</h3>
               <button 
-                onClick={() => setShowAddDrink(false)}
+                onClick={() => {
+                  setShowAddDrink(false)
+                  setSearchResults([])
+                  setCustomDrink({ name: '', calories: '', alcoholUnits: '', portion: 'pint' })
+                }}
                 style={{
                   background: 'rgba(255,255,255,0.1)',
                   border: 'none',
@@ -885,16 +964,56 @@ export function HealthApp({ onBack }: HealthAppProps) {
               </button>
             </div>
 
+            {/* Photo Recognition */}
+            <div style={{ marginBottom: 20 }}>
+              <button
+                onClick={() => drinkPhotoRef.current?.click()}
+                disabled={isAnalyzingPhoto}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: 8,
+                  border: '1px solid rgba(255,215,0,0.3)',
+                  background: 'linear-gradient(135deg, rgba(255,215,0,0.1) 0%, rgba(255,215,0,0.05) 100%)',
+                  color: isAnalyzingPhoto ? '#888' : '#FFD700',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: isAnalyzingPhoto ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8
+                }}
+              >
+                📸 {isAnalyzingPhoto ? 'Analyzing Photo...' : 'Take Photo to Identify Drink'}
+              </button>
+              <input
+                ref={drinkPhotoRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) analyzeDrinkPhoto(file)
+                }}
+              />
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {/* Search/Name Input */}
-              <div>
+              <div style={{ position: 'relative' }}>
                 <label style={{ color: '#aaa', fontSize: 12, marginBottom: 6, display: 'block' }}>
-                  Drink Name or Search
+                  Drink Name or Search {isSearching && '(searching...)'}
                 </label>
                 <input
                   type="text"
                   value={customDrink.name}
-                  onChange={(e) => setCustomDrink(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setCustomDrink(prev => ({ ...prev, name: value }))
+                    searchDrinks(value)
+                  }}
                   placeholder="e.g. Heineken, Vodka Tonic, etc."
                   style={{
                     width: '100%',
@@ -906,6 +1025,48 @@ export function HealthApp({ onBack }: HealthAppProps) {
                     fontSize: 14
                   }}
                 />
+                
+                {/* Search Results */}
+                {searchResults.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    background: 'rgba(17,13,32,0.95)',
+                    borderRadius: 8,
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    marginTop: 4,
+                    maxHeight: 200,
+                    overflowY: 'auto',
+                    zIndex: 10
+                  }}>
+                    {searchResults.map((result, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => selectSearchResult(result)}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          border: 'none',
+                          background: 'transparent',
+                          color: '#fff',
+                          textAlign: 'left',
+                          fontSize: 14,
+                          cursor: 'pointer',
+                          borderBottom: idx < searchResults.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none'
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
+                        onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                      >
+                        <div style={{ fontWeight: 600 }}>{result.name}</div>
+                        <div style={{ fontSize: 12, color: '#888' }}>
+                          {result.type} • {result.calories} cal • {result.alcoholUnits} units • {result.portion}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Portion Size */}
