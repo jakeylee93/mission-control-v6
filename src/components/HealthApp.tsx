@@ -30,14 +30,13 @@ interface DrinkOption {
   calories: number
   alcoholUnits: number
   emoji: string
-  logo?: string
 }
 
 const QUICK_DRINKS: { [key: string]: DrinkOption } = {
-  'stella-artois': { name: 'Stella Artois', calories: 154, alcoholUnits: 1.4, emoji: '🍺', logo: 'https://logos-world.net/wp-content/uploads/2020/04/Stella-Artois-Logo.png' },
-  'peroni': { name: 'Peroni', calories: 142, alcoholUnits: 1.4, emoji: '🍺', logo: 'https://logos-world.net/wp-content/uploads/2020/04/Peroni-Logo.png' },
-  'corona': { name: 'Corona', calories: 148, alcoholUnits: 1.4, emoji: '🍺', logo: 'https://logos-world.net/wp-content/uploads/2020/04/Corona-Logo.png' },
-  'guinness': { name: 'Guinness', calories: 125, alcoholUnits: 1.2, emoji: '🍺', logo: 'https://logos-world.net/wp-content/uploads/2020/04/Guinness-Logo.png' },
+  'stella-artois': { name: 'Stella Artois', calories: 154, alcoholUnits: 1.4, emoji: '🍺' },
+  'peroni': { name: 'Peroni', calories: 142, alcoholUnits: 1.4, emoji: '🍺' },
+  'corona': { name: 'Corona', calories: 148, alcoholUnits: 1.4, emoji: '🍺' },
+  'guinness': { name: 'Guinness', calories: 125, alcoholUnits: 1.2, emoji: '🍺' },
   'wine-red': { name: 'Red Wine', calories: 85, alcoholUnits: 1.6, emoji: '🍷' },
   'wine-white': { name: 'White Wine', calories: 82, alcoholUnits: 1.5, emoji: '🥂' },
   'prosecco': { name: 'Prosecco', calories: 89, alcoholUnits: 1.4, emoji: '🥂' },
@@ -384,30 +383,8 @@ export function HealthApp({ onBack }: HealthAppProps) {
                     fontSize: 14
                   }}
                 >
-                  <div style={{ height: 40, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {drink.logo ? (
-                      <img 
-                        src={drink.logo} 
-                        alt={drink.name}
-                        style={{ 
-                          height: 32, 
-                          width: 'auto', 
-                          maxWidth: 80,
-                          filter: 'brightness(0.9)'
-                        }}
-                        onError={(e) => {
-                          // Fallback to emoji if logo fails to load
-                          const target = e.target as HTMLImageElement
-                          target.style.display = 'none'
-                          const parent = target.parentElement
-                          if (parent) {
-                            parent.innerHTML = `<div style="fontSize: 24px">${drink.emoji}</div>`
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div style={{ fontSize: 24 }}>{drink.emoji}</div>
-                    )}
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>
+                    {drink.emoji}
                   </div>
                   <div style={{ fontWeight: 600, marginBottom: 2 }}>{drink.name}</div>
                   <div style={{ color: '#aaa', fontSize: 12 }}>
