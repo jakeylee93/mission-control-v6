@@ -76,11 +76,11 @@ export async function POST(req: NextRequest) {
       }),
     })
 
-    const lagerResult = await drinksResponse.json().catch(() => null)
-    if (!drinksResponse.ok || !lagerResult?.ok) {
+    const drinksResult = await drinksResponse.json().catch(() => null)
+    if (!drinksResponse.ok || !drinksResult?.ok) {
       const details =
-        (lagerResult && typeof lagerResult.error === 'string' && lagerResult.error) ||
-        `Lager save failed (${drinksResponse.status})`
+        (drinksResult && typeof drinksResult.error === 'string' && drinksResult.error) ||
+        `Drinks save failed (${drinksResponse.status})`
       return NextResponse.json({ error: details }, { status: 500 })
     }
     
