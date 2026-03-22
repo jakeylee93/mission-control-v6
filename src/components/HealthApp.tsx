@@ -186,8 +186,8 @@ export function HealthApp({ onBack }: HealthAppProps) {
         
       } else {
         const error = await response.text()
-        console.error('Quick action failed:', error)
-        alert(`Failed to add drink: ${error}`)
+        console.error('❌ Quick action failed:', response.status, error)
+        alert(`Failed to add drink (${response.status}): ${error}`)
       }
     } catch (error) {
       console.error('Quick action error:', error)

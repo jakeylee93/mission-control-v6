@@ -29,6 +29,19 @@ interface LagerState {
   log: string[]
 }
 
+interface DrinkData {
+  glasses: number
+  goal: number
+  log: string[]
+  drinks: Array<{
+    name: string
+    portion: string
+    calories: number
+    alcoholUnits: number
+    timestamp: string
+  }>
+}
+
 const MOOD_EMOJIS = ['😞', '😔', '😐', '🙂', '😊']
 const MOOD_LABELS = ['Rough', 'Low', 'Okay', 'Good', 'Great']
 const MOOD_COLORS = ['#EF4444', '#F59E0B', '#6B7280', '#22C55E', '#10B981']
@@ -123,6 +136,7 @@ export default function LovelyTab() {
   const [waterSaving, setWaterSaving] = useState(false)
   const [lager, setLager] = useState<LagerState>({ glasses: 0, goal: 0, log: [] })
   const [lagerSaving, setLagerSaving] = useState(false)
+  const [drinks, setDrinks] = useState<DrinkData>({ glasses: 0, goal: 0, log: [], drinks: [] })
   const [selectedDate, setSelectedDate] = useState(todayDate())
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date()
@@ -163,6 +177,12 @@ export default function LovelyTab() {
     const response = await fetch(`/api/lovely/lager?date=${date}`)
     const data = await response.json()
     setLager(normalizeTrackerState(data, 0))
+  }
+
+  async function loadDrinks(date: string) {
+    const response = await fetch(`/api/lovely/drinks?date=${date}`)
+    const data = await response.json()
+    setDrinks(data)
   }
 
   async function loadAffirmation() {
@@ -254,7 +274,7 @@ export default function LovelyTab() {
   }, [])
 
   useEffect(() => {
-    Promise.all([loadWater(selectedDate), loadLager(selectedDate)]).catch(() => {
+    Promise.all([loadWater(selectedDate), loadLager(selectedDate), loadDrinks(selectedDate)]).catch(() => {
       // Keep trackers usable even if requests fail.
     })
   }, [selectedDate])
@@ -624,6 +644,76 @@ export default function LovelyTab() {
               <span className="text-xs" style={{ color: MUTED_COLOR }}>No pints logged yet for this day.</span>
             )}
           </div>
+        </div>
+
+        {/* Food & Drinks Summary */}
+        <div className="card rounded-2xl p-4 mb-4" style={{ border: `1px solid ${BORDER_COLOR}` }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="text-xs uppercase tracking-widest" style={{ color: MUTED_COLOR }}>Food & Drinks 🍺🍽️</div>
+              <div className="text-[11px]" style={{ color: MUTED_COLOR }}>{selectedDateLabel}</div>
+              <div className="text-sm" style={{ color: TEXT_COLOR }}>
+                <span className="font-semibold" style={{ color: '#f59e0b' }}>
+                  {drinks.drinks?.length || 0}
+                </span>
+                {' '}drinks logged
+              </div>
+            </div>
+          </div>
+
+          {drinks.drinks?.length > 0 ? (
+            <div className="space-y-2 mb-3">
+              {drinks.drinks.slice(-5).map((drink, idx) => (
+                <div 
+                  key={`${drink.timestamp}-${idx}`}
+                  className="flex items-center justify-between py-2 px-3 rounded-lg"
+                  style={{ background: PANEL_COLOR, border: `1px solid ${BORDER_COLOR}` }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🍺</span>
+                    <div>
+                      <div className="text-sm font-medium" style={{ color: TEXT_COLOR }}>
+                        {drink.name}
+                      </div>
+                      <div className="text-xs" style={{ color: MUTED_COLOR }}>
+                        {drink.portion} • {drink.calories} cal • {drink.alcoholUnits} units
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-xs" style={{ color: MUTED_COLOR }}>
+                    {formatWaterTime(drink.timestamp)}
+                  </div>
+                </div>
+              ))}
+              {drinks.drinks.length > 5 && (
+                <div className="text-xs text-center" style={{ color: MUTED_COLOR }}>
+                  +{drinks.drinks.length - 5} more drinks
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-xs mb-3" style={{ color: MUTED_COLOR }}>
+              No drinks logged for this day.
+            </div>
+          )}
+
+          {/* Totals */}
+          {drinks.drinks?.length > 0 && (
+            <div className="flex gap-4 pt-2 border-t" style={{ borderColor: BORDER_COLOR }}>
+              <div className="text-center">
+                <div className="text-xs" style={{ color: MUTED_COLOR }}>Calories</div>
+                <div className="font-semibold" style={{ color: '#f59e0b' }}>
+                  {drinks.drinks.reduce((sum, d) => sum + (d.calories || 0), 0)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs" style={{ color: MUTED_COLOR }}>Alcohol</div>
+                <div className="font-semibold" style={{ color: '#ef4444' }}>
+                  {drinks.drinks.reduce((sum, d) => sum + (d.alcoholUnits || 0), 0).toFixed(1)}u
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Check-in Button / Status */}
