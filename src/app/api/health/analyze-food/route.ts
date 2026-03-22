@@ -193,10 +193,11 @@ export async function POST(req: NextRequest) {
     // Store image in Supabase Storage (optional - for now we'll skip this)
     // const imageUrl = await uploadImage(imageBuffer, imageFile.type)
     
-    // Create nutrition entry
+    // Create nutrition entry (for now, just return the analysis without storing)
     const entry = {
+      id: 'temp-' + Date.now(),
       timestamp: new Date().toISOString(),
-      image_url: null, // We'd set this if we stored the image
+      image_url: null,
       foods: analysis.foods,
       total_calories: Math.round(analysis.total_calories),
       total_protein: Math.round(analysis.total_protein * 100) / 100,
@@ -204,37 +205,8 @@ export async function POST(req: NextRequest) {
       total_fat: Math.round(analysis.total_fat * 100) / 100
     }
     
-    const { data, error } = await supabase
-      .from('nutrition_entries')
-      .insert(entry)
-      .select()
-      .single()
-    
-    if (error) {
-      if (isMissingTableError(error)) {
-        // Try to create the table
-        const setupResult = await ensureNutritionTable(supabase)
-        if (setupResult.success) {
-          // Retry the insert
-          const { data: retryData, error: retryError } = await supabase
-            .from('nutrition_entries')
-            .insert(entry)
-            .select()
-            .single()
-          
-          if (retryError) {
-            throw new Error(`Failed to insert after table creation: ${retryError.message}`)
-          }
-          
-          return NextResponse.json({ entry: retryData })
-        } else {
-          throw new Error('Failed to create nutrition table')
-        }
-      }
-      throw error
-    }
-    
-    return NextResponse.json({ entry: data })
+    // Skip database storage for now - just return the analysis
+    return NextResponse.json({ entry })
     
   } catch (error: any) {
     console.error('Food analysis error:', error)
