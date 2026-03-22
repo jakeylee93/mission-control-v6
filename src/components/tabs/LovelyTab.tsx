@@ -166,6 +166,19 @@ export default function LovelyTab() {
   }
 
   async function loadAffirmation() {
+    try {
+      // Try smart message first
+      const smartResponse = await fetch('/api/lovely/smart-message')
+      if (smartResponse.ok) {
+        const smartData = await smartResponse.json()
+        setAffirmation(smartData.message || '')
+        return
+      }
+    } catch (error) {
+      console.log('Smart message failed, falling back to random affirmation')
+    }
+    
+    // Fallback to regular affirmation
     const response = await fetch('/api/lovely/affirmation')
     const data = await response.json()
     setAffirmation(data.daily || '')
@@ -209,6 +222,18 @@ export default function LovelyTab() {
   }
 
   async function requestAnotherAffirmation() {
+    try {
+      // Always try smart message when refreshing
+      const smartResponse = await fetch('/api/lovely/smart-message')
+      if (smartResponse.ok) {
+        const smartData = await smartResponse.json()
+        setAffirmation(smartData.message || '')
+        return
+      }
+    } catch (error) {
+      console.log('Smart message failed, using random affirmation')
+    }
+    
     try {
       const response = await fetch('/api/lovely/affirmation')
       const data = await response.json()
