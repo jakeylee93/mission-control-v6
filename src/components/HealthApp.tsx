@@ -47,7 +47,10 @@ const QUICK_DRINKS: { [key: string]: DrinkOption } = {
 export function HealthApp({ onBack }: HealthAppProps) {
   const [entries, setEntries] = useState<NutritionEntry[]>([])
   const [isLoading, setIsLoading] = useState(false)
-  const [showDrinks, setShowDrinks] = useState(false)
+  const [showFoodAndDrinks, setShowFoodAndDrinks] = useState(false)
+  const [activeTab, setActiveTab] = useState<'food' | 'drinks'>('drinks')
+  const [recentDrinks, setRecentDrinks] = useState<any[]>([])
+  const [allDrinks, setAllDrinks] = useState<any[]>([])
   const [dailyTotals, setDailyTotals] = useState({
     calories: 0,
     protein: 0,
@@ -176,7 +179,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
           }))
         }
         
-        setShowDrinks(false)
+        setShowFoodAndDrinks(false)
         
         // Show quick success message
         const drink = QUICK_DRINKS[drinkKey]
@@ -274,48 +277,27 @@ export function HealthApp({ onBack }: HealthAppProps) {
 
       {/* Quick Actions */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-          <button 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading}
-            style={{
-              background: isLoading ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              border: 'none',
-              borderRadius: 12,
-              color: '#fff',
-              padding: '16px 12px',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6
-            }}
-          >
-            📸 {isLoading ? 'Analyzing...' : 'Food Photo'}
-          </button>
-          
-          <button 
-            onClick={() => setShowDrinks(true)}
-            style={{
-              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-              border: 'none',
-              borderRadius: 12,
-              color: '#fff',
-              padding: '16px 12px',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6
-            }}
-          >
-            🍺 Quick Drinks
-          </button>
-        </div>
+        <button 
+          onClick={() => setShowFoodAndDrinks(true)}
+          style={{
+            background: 'linear-gradient(135deg, #667eea 0%, #f093fb 100%)',
+            border: 'none',
+            borderRadius: 12,
+            color: '#fff',
+            padding: '16px 12px',
+            fontSize: 16,
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            width: '100%',
+            marginBottom: 16
+          }}
+        >
+          🍽️ Food & Drinks
+        </button>
         
         <input
           ref={fileInputRef}
@@ -326,8 +308,8 @@ export function HealthApp({ onBack }: HealthAppProps) {
         />
       </div>
 
-      {/* Drinks Modal */}
-      {showDrinks && (
+      {/* Food & Drinks Modal */}
+      {showFoodAndDrinks && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -345,15 +327,15 @@ export function HealthApp({ onBack }: HealthAppProps) {
             background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
             borderRadius: 20,
             padding: 24,
-            maxWidth: 400,
+            maxWidth: 500,
             width: '100%',
-            maxHeight: '80vh',
+            maxHeight: '85vh',
             overflowY: 'auto'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600 }}>Quick Drinks</h3>
+              <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600 }}>Food & Drinks</h3>
               <button 
-                onClick={() => setShowDrinks(false)}
+                onClick={() => setShowFoodAndDrinks(false)}
                 style={{
                   background: 'rgba(255,255,255,0.1)',
                   border: 'none',
@@ -368,53 +350,181 @@ export function HealthApp({ onBack }: HealthAppProps) {
               </button>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {Object.entries(QUICK_DRINKS).map(([key, drink]) => (
-                <button
-                  key={key}
-                  onClick={() => handleQuickAction(key)}
+            {/* Tabs */}
+            <div style={{ display: 'flex', marginBottom: 20, background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 4 }}>
+              <button
+                onClick={() => setActiveTab('drinks')}
+                style={{
+                  flex: 1,
+                  padding: '12px 16px',
+                  border: 'none',
+                  borderRadius: 8,
+                  background: activeTab === 'drinks' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  color: activeTab === 'drinks' ? '#fff' : '#888',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                🍺 Drinks
+              </button>
+              <button
+                onClick={() => setActiveTab('food')}
+                style={{
+                  flex: 1,
+                  padding: '12px 16px',
+                  border: 'none',
+                  borderRadius: 8,
+                  background: activeTab === 'food' ? 'rgba(255,255,255,0.1)' : 'transparent',
+                  color: activeTab === 'food' ? '#fff' : '#888',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                📸 Food
+              </button>
+            </div>
+
+            {/* Drinks Tab */}
+            {activeTab === 'drinks' && (
+              <div>
+                {/* Quick Drinks */}
+                <h4 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>Quick Add</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                  {Object.entries(QUICK_DRINKS).map(([key, drink]) => (
+                    <button
+                      key={key}
+                      onClick={() => handleQuickAction(key)}
+                      style={{
+                        background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 12,
+                        padding: 16,
+                        color: '#fff',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        fontSize: 14
+                      }}
+                    >
+                      <div style={{ height: 40, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {drink.logo ? (
+                          <img 
+                            src={drink.logo} 
+                            alt={drink.name}
+                            style={{ 
+                              height: 32, 
+                              width: 'auto', 
+                              maxWidth: 80
+                            }}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.style.display = 'none'
+                              const parent = target.parentElement
+                              if (parent) {
+                                parent.innerHTML = `<div style="font-size: 28px">${drink.emoji}</div>`
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div style={{ fontSize: 32 }}>{drink.emoji}</div>
+                        )}
+                      </div>
+                      <div style={{ fontWeight: 600, marginBottom: 2 }}>{drink.name}</div>
+                      <div style={{ color: '#aaa', fontSize: 12 }}>
+                        {drink.calories} cal • {drink.alcoholUnits} units
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Recent Drinks */}
+                <h4 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>Recent Drinks</h4>
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.03)', 
+                  borderRadius: 12, 
+                  padding: 16, 
+                  marginBottom: 20,
+                  color: '#666',
+                  textAlign: 'center',
+                  fontSize: 14
+                }}>
+                  Recent drinks will show here once loaded
+                </div>
+
+                {/* All Drinks History */}
+                <h4 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>All Drinks History</h4>
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.03)', 
+                  borderRadius: 12, 
+                  padding: 16,
+                  color: '#666',
+                  textAlign: 'center',
+                  fontSize: 14
+                }}>
+                  Complete drink history will show here
+                </div>
+              </div>
+            )}
+
+            {/* Food Tab */}
+            {activeTab === 'food' && (
+              <div>
+                {/* Food Photo */}
+                <button 
+                  onClick={() => {
+                    fileInputRef.current?.click()
+                    setShowFoodAndDrinks(false)
+                  }}
+                  disabled={isLoading}
                   style={{
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    width: '100%',
+                    background: isLoading ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    border: 'none',
                     borderRadius: 12,
-                    padding: 16,
                     color: '#fff',
-                    cursor: 'pointer',
-                    textAlign: 'center',
-                    fontSize: 14
+                    padding: '20px 16px',
+                    fontSize: 16,
+                    fontWeight: 600,
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    marginBottom: 20
                   }}
                 >
-                  <div style={{ height: 40, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {drink.logo ? (
-                      <img 
-                        src={drink.logo} 
-                        alt={drink.name}
-                        style={{ 
-                          height: 32, 
-                          width: 'auto', 
-                          maxWidth: 80
-                        }}
-                        onError={(e) => {
-                          // Fallback to emoji if logo fails
-                          const target = e.target as HTMLImageElement
-                          target.style.display = 'none'
-                          const parent = target.parentElement
-                          if (parent) {
-                            parent.innerHTML = `<div style="font-size: 28px">${drink.emoji}</div>`
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div style={{ fontSize: 32 }}>{drink.emoji}</div>
-                    )}
-                  </div>
-                  <div style={{ fontWeight: 600, marginBottom: 2 }}>{drink.name}</div>
-                  <div style={{ color: '#aaa', fontSize: 12 }}>
-                    {drink.calories} cal • {drink.alcoholUnits} units
-                  </div>
+                  📸 {isLoading ? 'Analyzing...' : 'Take Food Photo'}
                 </button>
-              ))}
-            </div>
+
+                {/* Recent Food */}
+                <h4 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>Recent Food</h4>
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.03)', 
+                  borderRadius: 12, 
+                  padding: 16, 
+                  marginBottom: 20,
+                  color: '#666',
+                  textAlign: 'center',
+                  fontSize: 14
+                }}>
+                  Recent food items will show here
+                </div>
+
+                {/* All Food History */}
+                <h4 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>All Food History</h4>
+                <div style={{ 
+                  background: 'rgba(255,255,255,0.03)', 
+                  borderRadius: 12, 
+                  padding: 16,
+                  color: '#666',
+                  textAlign: 'center',
+                  fontSize: 14
+                }}>
+                  Complete food history will show here
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
