@@ -51,6 +51,9 @@ export function HealthApp({ onBack }: HealthAppProps) {
   const [activeTab, setActiveTab] = useState<'food' | 'drinks'>('drinks')
   const [recentDrinks, setRecentDrinks] = useState<any[]>([])
   const [allDrinks, setAllDrinks] = useState<any[]>([])
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [drinksData, setDrinksData] = useState<any>(null)
   const [dailyTotals, setDailyTotals] = useState({
     calories: 0,
     protein: 0,
@@ -64,18 +67,31 @@ export function HealthApp({ onBack }: HealthAppProps) {
   // Load today's data
   useEffect(() => {
     loadTodaysData()
-  }, [])
+  }, [selectedDate])
 
-  async function loadTodaysData() {
+  function changeMonth(delta: number) {
+    const newMonth = new Date(currentMonth)
+    newMonth.setMonth(newMonth.getMonth() + delta)
+    setCurrentMonth(newMonth)
+  }
+
+  function formatDate(date: string) {
+    return new Date(date + 'T00:00:00').toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short'
+    })
+  }
+
+  async function loadDataForDate(date: string) {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      
       // Load drinks from working drinks API
-      const drinksResponse = await fetch(`/api/lovely/drinks?date=${today}`)
+      const drinksResponse = await fetch(`/api/lovely/drinks?date=${date}`)
       let drinkTotals = { calories: 0, alcoholUnits: 0 }
+      let drinksData = { drinks: [] }
       
       if (drinksResponse.ok) {
-        const drinksData = await drinksResponse.json()
+        drinksData = await drinksResponse.json()
         const drinks = drinksData.drinks || []
         
         drinkTotals = drinks.reduce((acc: any, drink: any) => ({
@@ -85,7 +101,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
       }
       
       // Load foods from nutrition API (if any)
-      const foodResponse = await fetch(`/api/health/nutrition?date=${today}`)
+      const foodResponse = await fetch(`/api/health/nutrition?date=${date}`)
       let foodTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 }
       let foods = []
       
@@ -101,8 +117,9 @@ export function HealthApp({ onBack }: HealthAppProps) {
         }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
       }
       
-      // Set combined totals
+      // Set data
       setEntries(foods)
+      setDrinksData(drinksData)
       setDailyTotals({
         calories: drinkTotals.calories + foodTotals.calories,
         protein: foodTotals.protein,
@@ -112,8 +129,12 @@ export function HealthApp({ onBack }: HealthAppProps) {
       })
       
     } catch (error) {
-      console.error('Failed to load daily data:', error)
+      console.error('Failed to load data for date:', error)
     }
+  }
+
+  async function loadTodaysData() {
+    loadDataForDate(selectedDate)
   }
 
 
@@ -226,13 +247,97 @@ export function HealthApp({ onBack }: HealthAppProps) {
         </button>
       </div>
 
+      {/* Calendar */}
+      <div style={{
+        background: 'rgba(255,255,255,0.04)',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+        border: '1px solid rgba(255,255,255,0.08)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <button onClick={() => changeMonth(-1)} style={{
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            borderRadius: 8,
+            color: '#fff',
+            padding: '8px 12px',
+            cursor: 'pointer',
+            fontSize: 14
+          }}>
+            ←
+          </button>
+          <div style={{ color: '#FFD700', fontWeight: 600, fontSize: 16 }}>
+            {currentMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+          </div>
+          <button onClick={() => changeMonth(1)} style={{
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            borderRadius: 8,
+            color: '#fff',
+            padding: '8px 12px',
+            cursor: 'pointer',
+            fontSize: 14
+          }}>
+            →
+          </button>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 8 }}>
+          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => (
+            <div key={day} style={{ textAlign: 'center', color: '#888', fontSize: 10, padding: 4 }}>
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+          {(() => {
+            const year = currentMonth.getFullYear()
+            const month = currentMonth.getMonth()
+            const firstDay = new Date(year, month, 1)
+            const lastDay = new Date(year, month + 1, 0)
+            const startDate = new Date(firstDay)
+            startDate.setDate(startDate.getDate() - ((firstDay.getDay() + 6) % 7))
+            
+            const days = []
+            for (let d = new Date(startDate); d <= lastDay || days.length % 7 !== 0; d.setDate(d.getDate() + 1)) {
+              const dateStr = d.toISOString().split('T')[0]
+              const isCurrentMonth = d.getMonth() === month
+              const isSelected = dateStr === selectedDate
+              const isToday = dateStr === new Date().toISOString().split('T')[0]
+              
+              days.push(
+                <button
+                  key={dateStr}
+                  onClick={() => setSelectedDate(dateStr)}
+                  style={{
+                    border: 'none',
+                    borderRadius: 6,
+                    padding: 8,
+                    background: isSelected ? '#FFD700' : isToday ? 'rgba(255,215,0,0.2)' : 'transparent',
+                    color: isSelected ? '#000' : isCurrentMonth ? '#fff' : '#666',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    fontWeight: isSelected || isToday ? 600 : 400
+                  }}
+                >
+                  {d.getDate()}
+                </button>
+              )
+            }
+            return days
+          })()}
+        </div>
+      </div>
+
       {/* Daily Overview */}
       <div style={{
         background: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 20, marginBottom: 20,
         border: '1px solid rgba(255,255,255,0.08)'
       }}>
         <h2 style={{ color: '#fff', fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
-          Today's Nutrition
+          {selectedDate === new Date().toISOString().split('T')[0] ? "Today's" : formatDate(selectedDate)} Nutrition
         </h2>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
@@ -444,12 +549,39 @@ export function HealthApp({ onBack }: HealthAppProps) {
                   background: 'rgba(255,255,255,0.03)', 
                   borderRadius: 12, 
                   padding: 16, 
-                  marginBottom: 20,
-                  color: '#666',
-                  textAlign: 'center',
-                  fontSize: 14
+                  marginBottom: 20
                 }}>
-                  Recent drinks will show here once loaded
+                  {drinksData?.drinks?.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {drinksData.drinks.slice(-5).reverse().map((drink: any, idx: number) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '8px 12px',
+                          background: 'rgba(255,255,255,0.05)',
+                          borderRadius: 8
+                        }}>
+                          <div style={{ color: '#fff' }}>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{drink.name}</div>
+                            <div style={{ color: '#888', fontSize: 12 }}>
+                              {drink.portion} • {drink.calories} cal • {drink.alcoholUnits} units
+                            </div>
+                          </div>
+                          <div style={{ color: '#888', fontSize: 11 }}>
+                            {new Date(drink.timestamp).toLocaleTimeString('en-GB', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#666', textAlign: 'center', fontSize: 14 }}>
+                      No drinks logged for {selectedDate === new Date().toISOString().split('T')[0] ? 'today' : 'this date'}
+                    </div>
+                  )}
                 </div>
 
                 {/* All Drinks History */}
@@ -457,12 +589,41 @@ export function HealthApp({ onBack }: HealthAppProps) {
                 <div style={{ 
                   background: 'rgba(255,255,255,0.03)', 
                   borderRadius: 12, 
-                  padding: 16,
-                  color: '#666',
-                  textAlign: 'center',
-                  fontSize: 14
+                  padding: 16
                 }}>
-                  Complete drink history will show here
+                  {drinksData?.drinks?.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {drinksData.drinks.map((drink: any, idx: number) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '8px 12px',
+                          background: 'rgba(255,255,255,0.05)',
+                          borderRadius: 8
+                        }}>
+                          <div style={{ color: '#fff' }}>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{drink.name}</div>
+                            <div style={{ color: '#888', fontSize: 12 }}>
+                              {drink.portion} • {drink.calories} cal • {drink.alcoholUnits} units
+                            </div>
+                          </div>
+                          <div style={{ color: '#888', fontSize: 11 }}>
+                            {new Date(drink.timestamp).toLocaleString('en-GB', { 
+                              day: '2-digit',
+                              month: 'short',
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#666', textAlign: 'center', fontSize: 14 }}>
+                      No drinks logged for {selectedDate === new Date().toISOString().split('T')[0] ? 'today' : 'this date'}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -503,12 +664,39 @@ export function HealthApp({ onBack }: HealthAppProps) {
                   background: 'rgba(255,255,255,0.03)', 
                   borderRadius: 12, 
                   padding: 16, 
-                  marginBottom: 20,
-                  color: '#666',
-                  textAlign: 'center',
-                  fontSize: 14
+                  marginBottom: 20
                 }}>
-                  Recent food items will show here
+                  {entries.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {entries.slice(-5).reverse().map((food, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '8px 12px',
+                          background: 'rgba(255,255,255,0.05)',
+                          borderRadius: 8
+                        }}>
+                          <div style={{ color: '#fff' }}>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{food.description}</div>
+                            <div style={{ color: '#888', fontSize: 12 }}>
+                              {food.total_calories} cal • {food.total_protein}g protein
+                            </div>
+                          </div>
+                          <div style={{ color: '#888', fontSize: 11 }}>
+                            {new Date(food.created_at).toLocaleTimeString('en-GB', { 
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#666', textAlign: 'center', fontSize: 14 }}>
+                      No food logged for {selectedDate === new Date().toISOString().split('T')[0] ? 'today' : 'this date'}
+                    </div>
+                  )}
                 </div>
 
                 {/* All Food History */}
@@ -516,12 +704,41 @@ export function HealthApp({ onBack }: HealthAppProps) {
                 <div style={{ 
                   background: 'rgba(255,255,255,0.03)', 
                   borderRadius: 12, 
-                  padding: 16,
-                  color: '#666',
-                  textAlign: 'center',
-                  fontSize: 14
+                  padding: 16
                 }}>
-                  Complete food history will show here
+                  {entries.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {entries.map((food, idx) => (
+                        <div key={idx} style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '8px 12px',
+                          background: 'rgba(255,255,255,0.05)',
+                          borderRadius: 8
+                        }}>
+                          <div style={{ color: '#fff' }}>
+                            <div style={{ fontWeight: 600, fontSize: 14 }}>{food.description}</div>
+                            <div style={{ color: '#888', fontSize: 12 }}>
+                              {food.total_calories} cal • {food.total_protein}g protein • {food.total_carbs}g carbs • {food.total_fat}g fat
+                            </div>
+                          </div>
+                          <div style={{ color: '#888', fontSize: 11 }}>
+                            {new Date(food.created_at).toLocaleString('en-GB', { 
+                              day: '2-digit',
+                              month: 'short',
+                              hour: '2-digit', 
+                              minute: '2-digit' 
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ color: '#666', textAlign: 'center', fontSize: 14 }}>
+                      No food logged for {selectedDate === new Date().toISOString().split('T')[0] ? 'today' : 'this date'}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
