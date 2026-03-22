@@ -66,19 +66,48 @@ export function HealthApp({ onBack }: HealthAppProps) {
   async function loadTodaysData() {
     try {
       const today = new Date().toISOString().split('T')[0]
-      const response = await fetch(`/api/health/daily?date=${today}`)
       
-      if (response.ok) {
-        const data = await response.json()
-        setEntries(data.foods || [])
-        setDailyTotals({
-          calories: data.totals.calories || 0,
-          protein: data.totals.protein || 0,
-          carbs: data.totals.carbs || 0,
-          fat: data.totals.fat || 0,
-          alcoholUnits: data.totals.alcoholUnits || 0
-        })
+      // Load drinks from working drinks API
+      const drinksResponse = await fetch(`/api/lovely/drinks?date=${today}`)
+      let drinkTotals = { calories: 0, alcoholUnits: 0 }
+      
+      if (drinksResponse.ok) {
+        const drinksData = await drinksResponse.json()
+        const drinks = drinksData.drinks || []
+        
+        drinkTotals = drinks.reduce((acc: any, drink: any) => ({
+          calories: acc.calories + (drink.calories || 0),
+          alcoholUnits: acc.alcoholUnits + (drink.alcoholUnits || 0)
+        }), { calories: 0, alcoholUnits: 0 })
       }
+      
+      // Load foods from nutrition API (if any)
+      const foodResponse = await fetch(`/api/health/nutrition?date=${today}`)
+      let foodTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      let foods = []
+      
+      if (foodResponse.ok) {
+        const foodData = await foodResponse.json()
+        foods = foodData.entries || []
+        
+        foodTotals = foods.reduce((acc: any, food: any) => ({
+          calories: acc.calories + (food.total_calories || 0),
+          protein: acc.protein + (food.total_protein || 0),
+          carbs: acc.carbs + (food.total_carbs || 0),
+          fat: acc.fat + (food.total_fat || 0)
+        }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+      }
+      
+      // Set combined totals
+      setEntries(foods)
+      setDailyTotals({
+        calories: drinkTotals.calories + foodTotals.calories,
+        protein: foodTotals.protein,
+        carbs: foodTotals.carbs,
+        fat: foodTotals.fat,
+        alcoholUnits: drinkTotals.alcoholUnits
+      })
+      
     } catch (error) {
       console.error('Failed to load daily data:', error)
     }
@@ -149,19 +178,17 @@ export function HealthApp({ onBack }: HealthAppProps) {
         
         setShowDrinks(false)
         
-        // Show quick success message without slow alert
+        // Show quick success message
         const drink = QUICK_DRINKS[drinkKey]
         console.log(`Added ${drink.name} (${portionSize})`)
         
-        // Reload data to get fresh state
-        setTimeout(() => {
-          loadTodaysData()
-        }, 100)
+        // Reload data immediately
+        loadTodaysData()
         
       } else {
         const error = await response.text()
         console.error('Quick action failed:', error)
-        alert('Failed to add drink. Please try again.')
+        alert(`Failed to add drink: ${error}`)
       }
     } catch (error) {
       console.error('Quick action error:', error)
