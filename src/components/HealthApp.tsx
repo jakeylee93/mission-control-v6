@@ -65,6 +65,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false)
+  const [personalFavorites, setPersonalFavorites] = useState<any[]>([])
   const drinkPhotoRef = useRef<HTMLInputElement>(null)
   const [dailyTotals, setDailyTotals] = useState({
     calories: 0,
@@ -79,7 +80,20 @@ export function HealthApp({ onBack }: HealthAppProps) {
   // Load today's data
   useEffect(() => {
     loadTodaysData()
+    loadPersonalFavorites()
   }, [selectedDate])
+
+  async function loadPersonalFavorites() {
+    try {
+      const response = await fetch('/api/drinks/favorites')
+      if (response.ok) {
+        const data = await response.json()
+        setPersonalFavorites(data.favorites || [])
+      }
+    } catch (error) {
+      console.error('Failed to load favorites:', error)
+    }
+  }
 
   function changeMonth(delta: number) {
     const newMonth = new Date(currentMonth)
@@ -107,8 +121,8 @@ export function HealthApp({ onBack }: HealthAppProps) {
       })
 
       if (response.ok) {
-        // Reload data to reflect deletion
-        loadDataForDate(selectedDate)
+        // Reload data to reflect deletion and wait for it
+        await loadDataForDate(selectedDate)
       } else {
         const error = await response.text()
         alert(`Failed to delete drink: ${error}`)
@@ -158,12 +172,18 @@ export function HealthApp({ onBack }: HealthAppProps) {
       if (response.ok) {
         const data = await response.json()
         if (data.success && data.drink.confidence > 0.7) {
-          // Auto-populate form with AI-identified drink
+          // Auto-populate form with AI-identified drink and store photo
           setCustomDrink({
             name: data.drink.name,
             calories: data.drink.calories.toString(),
             alcoholUnits: data.drink.alcoholUnits.toString(),
             portion: data.drink.portion
+          })
+          
+          // Store the photo for this drink in personal favorites
+          await addToPersonalFavorites({
+            ...data.drink,
+            customPhoto: base64
           })
         } else {
           alert(`Could not identify drink clearly (${Math.round(data.drink.confidence * 100)}% confidence). Please enter details manually.`)
@@ -176,6 +196,51 @@ export function HealthApp({ onBack }: HealthAppProps) {
       alert('Failed to analyze photo')
     } finally {
       setIsAnalyzingPhoto(false)
+    }
+  }
+
+  async function addToPersonalFavorites(drinkData: any) {
+    try {
+      await fetch('/api/drinks/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add',
+          favorite: drinkData
+        })
+      })
+    } catch (error) {
+      console.error('Failed to add to favorites:', error)
+    }
+  }
+
+  async function addFavoriteQuick(favorite: any) {
+    try {
+      const response = await fetch('/api/health/quick-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actionType: 'alcohol',
+          customDrink: {
+            name: favorite.name,
+            calories: favorite.calories,
+            alcoholUnits: favorite.alcohol_units
+          },
+          quantity: 1,
+          portionSize: favorite.portion
+        })
+      })
+
+      if (response.ok) {
+        await loadDataForDate(selectedDate)
+        setShowFoodAndDrinks(false)
+      } else {
+        const error = await response.text()
+        alert(`Failed to add drink: ${error}`)
+      }
+    } catch (error) {
+      console.error('Add favorite error:', error)
+      alert('Failed to add favorite drink')
     }
   }
 
@@ -208,9 +273,20 @@ export function HealthApp({ onBack }: HealthAppProps) {
 
       if (response.ok) {
         setShowAddDrink(false)
+        // Add to personal favorites
+        await addToPersonalFavorites({
+          name: customDrink.name,
+          calories: parseInt(customDrink.calories) || 0,
+          alcoholUnits: parseFloat(customDrink.alcoholUnits) || 0,
+          portion: customDrink.portion
+        })
+        
         setCustomDrink({ name: '', calories: '', alcoholUnits: '', portion: 'pint' })
         setSearchResults([])
-        loadDataForDate(selectedDate)
+        // Reload data immediately and wait for it
+        await loadDataForDate(selectedDate)
+        // Reload favorites to show new addition
+        await loadPersonalFavorites()
       } else {
         const error = await response.text()
         alert(`Failed to add drink: ${error}`)
@@ -344,8 +420,8 @@ export function HealthApp({ onBack }: HealthAppProps) {
         const drink = QUICK_DRINKS[drinkKey]
         console.log(`Added ${drink.name} (${portionSize})`)
         
-        // Reload data immediately
-        loadTodaysData()
+        // Reload data immediately and wait for it
+        await loadDataForDate(selectedDate)
         
       } else {
         const error = await response.text()
@@ -632,54 +708,93 @@ export function HealthApp({ onBack }: HealthAppProps) {
             {/* Drinks Tab */}
             {activeTab === 'drinks' && (
               <div>
-                {/* Quick Drinks */}
-                <h4 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>Quick Add</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-                  {Object.entries(QUICK_DRINKS).map(([key, drink]) => (
-                    <button
-                      key={key}
-                      onClick={() => handleQuickAction(key)}
-                      style={{
-                        background: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: 12,
-                        padding: 16,
-                        color: '#fff',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        fontSize: 14
-                      }}
-                    >
-                      <div style={{ height: 40, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        {drink.logo ? (
-                          <img 
-                            src={drink.logo} 
-                            alt={drink.name}
-                            style={{ 
-                              height: 32, 
-                              width: 'auto', 
-                              maxWidth: 80
-                            }}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.style.display = 'none'
-                              const parent = target.parentElement
-                              if (parent) {
-                                parent.innerHTML = `<div style="font-size: 28px">${drink.emoji}</div>`
-                              }
-                            }}
-                          />
-                        ) : (
-                          <div style={{ fontSize: 32 }}>{drink.emoji}</div>
-                        )}
-                      </div>
-                      <div style={{ fontWeight: 600, marginBottom: 2 }}>{drink.name}</div>
-                      <div style={{ color: '#aaa', fontSize: 12 }}>
-                        {drink.calories} cal • {drink.alcoholUnits} units
-                      </div>
-                    </button>
-                  ))}
+                {/* Personal Favorites */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h4 style={{ color: '#fff', fontSize: 16, margin: 0 }}>Your Favorites</h4>
+                  <div style={{ color: '#888', fontSize: 12 }}>
+                    {personalFavorites.length} drinks
+                  </div>
                 </div>
+                
+                {personalFavorites.length > 0 ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+                    {personalFavorites.map((favorite: any) => (
+                      <button
+                        key={favorite.id}
+                        onClick={() => addFavoriteQuick(favorite)}
+                        style={{
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: 12,
+                          padding: 16,
+                          color: '#fff',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          fontSize: 14,
+                          position: 'relative'
+                        }}
+                      >
+                        <div style={{ height: 40, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {favorite.custom_photo ? (
+                            <img 
+                              src={favorite.custom_photo} 
+                              alt={favorite.name}
+                              style={{ 
+                                height: 32, 
+                                width: 32, 
+                                borderRadius: 6,
+                                objectFit: 'cover'
+                              }}
+                            />
+                          ) : (
+                            <div style={{ 
+                              width: 32, 
+                              height: 32, 
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              borderRadius: 6,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 16
+                            }}>
+                              🍺
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ fontWeight: 600, marginBottom: 2 }}>{favorite.name}</div>
+                        <div style={{ color: '#aaa', fontSize: 12 }}>
+                          {favorite.calories} cal • {favorite.alcohol_units} units
+                        </div>
+                        <div style={{ 
+                          position: 'absolute',
+                          top: 6,
+                          right: 6,
+                          background: 'rgba(0,0,0,0.7)',
+                          borderRadius: 10,
+                          padding: '2px 6px',
+                          fontSize: 9,
+                          color: '#aaa'
+                        }}>
+                          {favorite.use_count}×
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: 12,
+                    padding: 20,
+                    textAlign: 'center',
+                    marginBottom: 20
+                  }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📸</div>
+                    <div style={{ color: '#aaa', fontSize: 14, marginBottom: 4 }}>No favorites yet</div>
+                    <div style={{ color: '#666', fontSize: 12 }}>
+                      Take a photo or add custom drinks to build your personal collection
+                    </div>
+                  </div>
+                )}
 
                 {/* Recent Drinks */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
