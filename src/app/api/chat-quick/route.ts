@@ -1,8 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdmin } from '@/lib/supabase'
+import fs from 'fs/promises'
+import path from 'path'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
-const SYSTEM_PROMPT = "You are a helpful assistant for Jake. Keep answers concise and practical. You are embedded in Mission Control, Jake's personal dashboard."
+
+async function buildContextualPrompt(): Promise<string> {
+  try {
+    // Get workspace path
+    const workspacePath = '/Users/margaritabot/.openclaw/workspace'
+    
+    // Read USER.md for business context
+    let userContext = ''
+    try {
+      userContext = await fs.readFile(path.join(workspacePath, 'USER.md'), 'utf-8')
+    } catch (e) {
+      console.warn('Could not read USER.md')
+    }
+
+    // Read recent memory entries
+    let recentMemory = ''
+    try {
+      const today = new Date()
+      const yesterday = new Date(today)
+      yesterday.setDate(yesterday.getDate() - 1)
+      
+      const todayFile = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}.md`
+      const yesterdayFile = `${yesterday.getFullYear()}-${(yesterday.getMonth() + 1).toString().padStart(2, '0')}-${yesterday.getDate().toString().padStart(2, '0')}.md`
+      
+      try {
+        const todayContent = await fs.readFile(path.join(workspacePath, 'memory', todayFile), 'utf-8')
+        recentMemory += `\n## Today (${todayFile.replace('.md', '')}):\n${todayContent}`
+      } catch (e) {
+        // Today's file might not exist yet
+      }
+      
+      try {
+        const yesterdayContent = await fs.readFile(path.join(workspacePath, 'memory', yesterdayFile), 'utf-8')
+        recentMemory += `\n## Yesterday (${yesterdayFile.replace('.md', '')}):\n${yesterdayContent}`
+      } catch (e) {
+        // Yesterday's file might not exist
+      }
+    } catch (e) {
+      console.warn('Could not read recent memory files')
+    }
+
+    return `You are Jake's intelligent assistant embedded in Mission Control, his personal dashboard. You have deep knowledge about his life and businesses.
+
+${userContext}
+
+## Recent Activity:${recentMemory}
+
+## Current Time:
+${new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' })} (UK time)
+
+## Your Role:
+- Answer questions about Jake's businesses (The Bar People, AnyVendor/Booked Events, anyOS)
+- Help with calendar/diary queries
+- Summarize projects and activities
+- Provide quick insights and reminders
+- Keep responses concise and practical
+
+You have access to Jake's recent activity and business context. Use this knowledge to provide informed, helpful responses.`
+  } catch (error) {
+    console.error('Failed to build contextual prompt:', error)
+    // Fallback to basic prompt
+    return "You are a helpful assistant for Jake. Keep answers concise and practical. You are embedded in Mission Control, Jake's personal dashboard."
+  }
+}
 
 type ChatRole = 'user' | 'assistant'
 type ChatMessage = { role: ChatRole; content: string }
@@ -59,8 +124,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No message provided' }, { status: 400 })
     }
 
+    // Build contextual system prompt
+    const systemPrompt = await buildContextualPrompt()
+    console.log('System prompt length:', systemPrompt.length)
+
+
+
     const messages = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: systemPrompt },
       ...history,
       { role: 'user', content: message },
     ]
