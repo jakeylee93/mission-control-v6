@@ -61,29 +61,65 @@ export async function POST(req: NextRequest) {
       alcoholUnits: adjustedUnits,
     }
 
-    const drinksUrl = new URL('/api/lovely/drinks', req.url)
-    const drinksResponse = await fetch(drinksUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
-      body: JSON.stringify({
-        action: 'add-drink',
-        date,
-        drinkName: drinkPayload.name,
-        portion: drinkPayload.portion,
-        calories: drinkPayload.calories,
-        alcoholUnits: drinkPayload.alcoholUnits,
-      }),
-    })
+    // Use the drinks API logic directly instead of internal fetch call
+    const { createServerSupabaseAdmin } = await import('@/lib/supabase')
+    const supabase = createServerSupabaseAdmin()
+    
+    // Get current drinks data 
+    const { data: currentRow, error: currentError } = await supabase
+      .from('lovely_water')  // Using water table as drinks storage
+      .select('*')
+      .eq('date', date)
+      .maybeSingle()
 
-    const drinksResult = await drinksResponse.json().catch(() => null)
-    if (!drinksResponse.ok) {
-      const details = drinksResult?.error || `Drinks save failed (${drinksResponse.status})`
-      return NextResponse.json({ error: details }, { status: 500 })
+    const existing = (currentRow as any) ?? null
+    const existingLog = existing?.log || []
+    const now = new Date().toISOString()
+
+    // Separate existing drinks from timestamps
+    const existingDrinks = []
+    const existingTimestamps = []
+    
+    for (const item of existingLog) {
+      if (typeof item === 'string') {
+        existingTimestamps.push(item)
+      } else if (typeof item === 'object' && item.name) {
+        existingDrinks.push(item)
+      }
+    }
+
+    const newDrink = {
+      name: drinkPayload.name,
+      portion: drinkPayload.portion,
+      calories: drinkPayload.calories,
+      alcoholUnits: drinkPayload.alcoholUnits,
+      timestamp: now
     }
     
-    // Success if we got here - drinks API returns {ok: true, glasses: N, drinks: [...]}
-    console.log('✅ Drinks API success:', drinksResult)
+    // Combine timestamps and drink objects in log field
+    const nextLog = [...existingTimestamps, now, ...existingDrinks, newDrink]
+
+    const { data: upserted, error: upsertError } = await supabase
+      .from('lovely_water')
+      .upsert(
+        {
+          date,
+          glasses: (Number(existing?.glasses) || 0) + 1,
+          goal: Number(existing?.goal) || 8,
+          log: nextLog,
+          updated_at: now,
+        },
+        { onConflict: 'date' },
+      )
+      .select('*')
+      .single()
+
+    if (upsertError) {
+      console.error('Direct Supabase error:', upsertError)
+      return NextResponse.json({ error: `Database save failed: ${upsertError.message}` }, { status: 500 })
+    }
+
+    console.log('✅ Direct Supabase save success:', upserted)
     
     return NextResponse.json({ 
       success: true, 
