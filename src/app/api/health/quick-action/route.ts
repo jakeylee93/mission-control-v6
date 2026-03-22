@@ -98,17 +98,8 @@ export async function POST(req: NextRequest) {
     
   } catch (error: any) {
     console.error('Quick action error:', error)
-    
-    // Better error details for debugging
-    const errorDetails = {
-      error: error.message || 'Failed to add quick action',
-      timestamp: new Date().toISOString(),
-      action: actionType,
-      item: itemKey,
-      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      hasSupabaseKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY
-    }
-    
-    return NextResponse.json(errorDetails, { status: 500 })
+    return NextResponse.json({
+      error: error.message || 'Failed to add quick action'
+    }, { status: 500 })
   }
 }

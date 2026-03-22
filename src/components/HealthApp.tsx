@@ -30,14 +30,13 @@ interface DrinkOption {
   calories: number
   alcoholUnits: number
   emoji: string
-  logo?: string
 }
 
 const QUICK_DRINKS: { [key: string]: DrinkOption } = {
-  'stella-artois': { name: 'Stella Artois', calories: 154, alcoholUnits: 1.4, emoji: '🍺', logo: '/logos/stella.svg' },
-  'peroni': { name: 'Peroni', calories: 142, alcoholUnits: 1.4, emoji: '🍺', logo: '/logos/peroni.svg' },
-  'corona': { name: 'Corona', calories: 148, alcoholUnits: 1.4, emoji: '🍺', logo: '/logos/corona.svg' },
-  'guinness': { name: 'Guinness', calories: 125, alcoholUnits: 1.2, emoji: '🍺', logo: '/logos/guinness.svg' },
+  'stella-artois': { name: 'Stella Artois', calories: 154, alcoholUnits: 1.4, emoji: '🍺' },
+  'peroni': { name: 'Peroni', calories: 142, alcoholUnits: 1.4, emoji: '🍺' },
+  'corona': { name: 'Corona', calories: 148, alcoholUnits: 1.4, emoji: '🍺' },
+  'guinness': { name: 'Guinness', calories: 125, alcoholUnits: 1.2, emoji: '🍺' },
   'wine-red': { name: 'Red Wine', calories: 85, alcoholUnits: 1.6, emoji: '🍷' },
   'wine-white': { name: 'White Wine', calories: 82, alcoholUnits: 1.5, emoji: '🥂' },
   'prosecco': { name: 'Prosecco', calories: 89, alcoholUnits: 1.4, emoji: '🥂' },
@@ -384,30 +383,8 @@ export function HealthApp({ onBack }: HealthAppProps) {
                     fontSize: 14
                   }}
                 >
-                  <div style={{ height: 48, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {drink.logo ? (
-                      <img 
-                        src={drink.logo} 
-                        alt={drink.name}
-                        style={{ 
-                          height: 40, 
-                          width: 'auto', 
-                          maxWidth: 100,
-                          filter: 'brightness(1.1)'
-                        }}
-                        onError={(e) => {
-                          // Fallback to emoji if logo fails to load
-                          const target = e.target as HTMLImageElement
-                          target.style.display = 'none'
-                          const parent = target.parentElement
-                          if (parent) {
-                            parent.innerHTML = `<div style="font-size: 32px">${drink.emoji}</div>`
-                          }
-                        }}
-                      />
-                    ) : (
-                      <div style={{ fontSize: 32 }}>{drink.emoji}</div>
-                    )}
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>
+                    {drink.emoji}
                   </div>
                   <div style={{ fontWeight: 600, marginBottom: 2 }}>{drink.name}</div>
                   <div style={{ color: '#aaa', fontSize: 12 }}>
