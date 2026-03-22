@@ -193,9 +193,8 @@ export async function POST(req: NextRequest) {
     // Store image in Supabase Storage (optional - for now we'll skip this)
     // const imageUrl = await uploadImage(imageBuffer, imageFile.type)
     
-    // Create nutrition entry (for now, just return the analysis without storing)
+    // Create nutrition entry
     const entry = {
-      id: 'temp-' + Date.now(),
       timestamp: new Date().toISOString(),
       image_url: null,
       foods: analysis.foods,
@@ -205,8 +204,30 @@ export async function POST(req: NextRequest) {
       total_fat: Math.round(analysis.total_fat * 100) / 100
     }
     
-    // Skip database storage for now - just return the analysis
-    return NextResponse.json({ entry })
+    // Try to save to database
+    const { data, error } = await supabase
+      .from('nutrition_entries')
+      .insert(entry)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Database save error:', error)
+      // Return with temp ID if database fails
+      return NextResponse.json({ 
+        entry: {
+          id: 'temp-' + Date.now(),
+          ...entry
+        },
+        saved: false,
+        error: 'Database save failed'
+      })
+    }
+    
+    return NextResponse.json({ 
+      entry: data,
+      saved: true
+    })
     
   } catch (error: any) {
     console.error('Food analysis error:', error)

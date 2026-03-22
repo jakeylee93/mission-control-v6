@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json()
-    const { actionType, itemKey, quantity = 1 } = body
+    const { actionType, itemKey, quantity = 1, portionSize = 'pint' } = body
     
     if (actionType !== 'alcohol') {
       return NextResponse.json({ error: 'Invalid action type' }, { status: 400 })
@@ -79,19 +79,59 @@ export async function POST(req: NextRequest) {
     }
     
     const date = dateStringUTC(new Date())
+    const now = new Date().toISOString()
     
-    // Sync with lovely app (this works since lovely tables exist)
-    await updateLovelyLager(supabase, drink.alcoholUnits * quantity, date)
+    // Adjust values for portion size
+    let portionMultiplier = 1
+    if (portionSize === 'half-pint') portionMultiplier = 0.5
     
-    // Return success without storing to quick_actions for now
+    const adjustedCalories = Math.round(drink.calories * quantity * portionMultiplier)
+    const adjustedUnits = drink.alcoholUnits * quantity * portionMultiplier
+    
+    // Save to quick_drinks table
+    const drinkEntry = {
+      date,
+      drink_name: drink.name,
+      quantity,
+      portion_size: portionSize,
+      calories: adjustedCalories,
+      alcohol_units: adjustedUnits,
+      timestamp: now
+    }
+    
+    const { data: drinkData, error: drinkError } = await supabase
+      .from('quick_drinks')
+      .insert(drinkEntry)
+      .select()
+      .single()
+    
+    // Even if save fails, try to sync with lovely app
+    try {
+      await updateLovelyLager(supabase, adjustedUnits, date)
+    } catch (lagerError) {
+      console.error('Lovely sync failed:', lagerError)
+    }
+    
+    if (drinkError) {
+      console.error('Drink save error:', drinkError)
+      return NextResponse.json({ 
+        success: true, // Still return success for UI
+        action: {
+          item_name: drink.name,
+          calories: adjustedCalories,
+          alcohol_units: adjustedUnits,
+          quantity,
+          portion_size: portionSize
+        },
+        saved: false,
+        error: 'Database save failed'
+      })
+    }
+    
     return NextResponse.json({ 
       success: true, 
-      action: {
-        item_name: drink.name,
-        calories: drink.calories * quantity,
-        alcohol_units: drink.alcoholUnits * quantity,
-        quantity
-      }
+      action: drinkData,
+      saved: true
     })
     
   } catch (error: any) {

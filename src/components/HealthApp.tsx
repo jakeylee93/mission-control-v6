@@ -58,47 +58,33 @@ export function HealthApp({ onBack }: HealthAppProps) {
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load today's entries
+  // Load today's data
   useEffect(() => {
-    loadTodaysEntries()
-    loadQuickActions()
+    loadTodaysData()
   }, [])
 
-  // Calculate daily totals when entries change
-  useEffect(() => {
-    const totals = entries.reduce((acc, entry) => ({
-      calories: acc.calories + entry.total_calories,
-      protein: acc.protein + entry.total_protein,
-      carbs: acc.carbs + entry.total_carbs,
-      fat: acc.fat + entry.total_fat,
-      alcoholUnits: acc.alcoholUnits
-    }), { calories: 0, protein: 0, carbs: 0, fat: 0, alcoholUnits: 0 })
-    
-    setDailyTotals(totals)
-  }, [entries])
-
-  async function loadQuickActions() {
+  async function loadTodaysData() {
     try {
       const today = new Date().toISOString().split('T')[0]
-      const response = await fetch(`/api/health/quick-action`)
-      // This just loads available drinks for now
-    } catch (error) {
-      console.error('Failed to load quick actions:', error)
-    }
-  }
-
-  async function loadTodaysEntries() {
-    try {
-      const today = new Date().toISOString().split('T')[0]
-      const response = await fetch(`/api/health/nutrition?date=${today}`)
+      const response = await fetch(`/api/health/daily?date=${today}`)
+      
       if (response.ok) {
         const data = await response.json()
-        setEntries(data.entries || [])
+        setEntries(data.foods || [])
+        setDailyTotals({
+          calories: data.totals.calories || 0,
+          protein: data.totals.protein || 0,
+          carbs: data.totals.carbs || 0,
+          fat: data.totals.fat || 0,
+          alcoholUnits: data.totals.alcoholUnits || 0
+        })
       }
     } catch (error) {
-      console.error('Failed to load entries:', error)
+      console.error('Failed to load daily data:', error)
     }
   }
+
+
 
   async function handleImageUpload(file: File) {
     setIsLoading(true)
@@ -113,8 +99,16 @@ export function HealthApp({ onBack }: HealthAppProps) {
       
       if (response.ok) {
         const result = await response.json()
-        // Add the new entry
-        setEntries(prev => [result.entry, ...prev])
+        
+        if (result.saved) {
+          // Successfully saved, reload data
+          loadTodaysData()
+          alert('Food analyzed and saved! 🍎')
+        } else {
+          // Analysis worked but save failed
+          alert('Food analyzed but not saved. Database issue.')
+          console.error('Save failed:', result.error)
+        }
       } else {
         const error = await response.text()
         console.error('Failed to analyze food:', error)
@@ -128,7 +122,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
     }
   }
 
-  async function handleQuickAction(drinkKey: string) {
+  async function handleQuickAction(drinkKey: string, portionSize: string = 'pint') {
     try {
       const response = await fetch('/api/health/quick-action', {
         method: 'POST',
@@ -136,23 +130,34 @@ export function HealthApp({ onBack }: HealthAppProps) {
         body: JSON.stringify({
           actionType: 'alcohol',
           itemKey: drinkKey,
-          quantity: 1
+          quantity: 1,
+          portionSize
         })
       })
       
       if (response.ok) {
         const result = await response.json()
-        const drink = QUICK_DRINKS[drinkKey]
         
         // Update daily totals immediately
-        setDailyTotals(prev => ({
-          ...prev,
-          calories: prev.calories + drink.calories,
-          alcoholUnits: prev.alcoholUnits + drink.alcoholUnits
-        }))
+        if (result.action) {
+          setDailyTotals(prev => ({
+            ...prev,
+            calories: prev.calories + (result.action.calories || 0),
+            alcoholUnits: prev.alcoholUnits + (result.action.alcohol_units || 0)
+          }))
+        }
         
         setShowDrinks(false)
-        alert(`Added ${drink.name}! 🍻`)
+        
+        // Show quick success message without slow alert
+        const drink = QUICK_DRINKS[drinkKey]
+        console.log(`Added ${drink.name} (${portionSize})`)
+        
+        // Reload data to get fresh state
+        setTimeout(() => {
+          loadTodaysData()
+        }, 100)
+        
       } else {
         const error = await response.text()
         console.error('Quick action failed:', error)
