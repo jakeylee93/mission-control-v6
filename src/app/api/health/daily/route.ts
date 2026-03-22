@@ -1,10 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseAdmin } from '@/lib/supabase'
 
+type LagerDrink = {
+  name?: string
+  calories?: number
+  alcoholUnits?: number
+  timestamp?: string
+}
+
 function dateStringUTC(date: Date): string {
-  return date.getFullYear() + '-' + 
-    String(date.getMonth() + 1).padStart(2, '0') + '-' + 
-    String(date.getDate()).padStart(2, '0')
+  return date.toISOString().slice(0, 10)
+}
+
+function isMissingTableError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const code = String((err as { code?: unknown }).code || '')
+  const message = String((err as { message?: unknown }).message || '').toLowerCase()
+  return code === '42P01' || code === 'PGRST205' || message.includes('does not exist')
+}
+
+function parseLagerDrinks(row: { drinks?: unknown; log?: unknown }): LagerDrink[] {
+  if (Array.isArray(row.drinks)) return row.drinks as LagerDrink[]
+  if (Array.isArray(row.log)) return row.log as LagerDrink[]
+  return []
 }
 
 export async function GET(req: NextRequest) {
@@ -13,12 +31,18 @@ export async function GET(req: NextRequest) {
   const date = searchParams.get('date') || dateStringUTC(new Date())
   
   try {
-    // Get drinks for the day
-    const { data: drinks, error: drinksError } = await supabase
-      .from('quick_drinks')
+    // Get drinks for the day from lovely_lager (single daily row with drinks array)
+    const { data: lagerRow, error: lagerError } = await supabase
+      .from('lovely_lager')
       .select('*')
       .eq('date', date)
-      .order('timestamp', { ascending: false })
+      .maybeSingle()
+
+    if (lagerError && !isMissingTableError(lagerError)) {
+      throw new Error(lagerError.message || 'Failed to load drinks')
+    }
+
+    const drinks = lagerRow ? parseLagerDrinks(lagerRow) : []
     
     // Get food for the day  
     const { data: foods, error: foodsError } = await supabase
@@ -29,9 +53,13 @@ export async function GET(req: NextRequest) {
       .order('timestamp', { ascending: false })
     
     // Calculate totals
-    const drinkTotals = (drinks || []).reduce((acc, drink) => ({
+    if (foodsError && !isMissingTableError(foodsError)) {
+      throw new Error(foodsError.message || 'Failed to load foods')
+    }
+
+    const drinkTotals = drinks.reduce<{ calories: number; alcoholUnits: number }>((acc, drink) => ({
       calories: acc.calories + (drink.calories || 0),
-      alcoholUnits: acc.alcoholUnits + (drink.alcohol_units || 0)
+      alcoholUnits: acc.alcoholUnits + (drink.alcoholUnits || 0)
     }), { calories: 0, alcoholUnits: 0 })
     
     const foodTotals = (foods || []).reduce((acc, food) => ({
@@ -43,7 +71,7 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json({
       date,
-      drinks: drinks || [],
+      drinks,
       foods: foods || [],
       totals: {
         calories: drinkTotals.calories + foodTotals.calories,
@@ -53,7 +81,7 @@ export async function GET(req: NextRequest) {
         fat: foodTotals.fat
       },
       counts: {
-        drinks: (drinks || []).length,
+        drinks: drinks.length,
         foods: (foods || []).length
       }
     })

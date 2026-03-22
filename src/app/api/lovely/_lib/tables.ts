@@ -71,9 +71,11 @@ CREATE TABLE IF NOT EXISTS lovely_lager (
   glasses integer NOT NULL DEFAULT 0,
   goal integer NOT NULL DEFAULT 0,
   log jsonb DEFAULT '[]',
+  drinks jsonb DEFAULT '[]',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
+ALTER TABLE IF EXISTS lovely_lager ADD COLUMN IF NOT EXISTS drinks jsonb DEFAULT '[]';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_lager_date ON lovely_lager(date);
 ALTER TABLE lovely_lager ENABLE ROW LEVEL SECURITY;
 `

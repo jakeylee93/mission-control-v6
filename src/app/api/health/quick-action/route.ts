@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseAdmin } from '@/lib/supabase'
 
 interface DrinkOption {
   name: string
@@ -21,50 +20,18 @@ const DRINK_OPTIONS: { [key: string]: DrinkOption } = {
   'whiskey': { name: 'Whiskey (25ml)', calories: 61, alcoholUnits: 1.0 },
 }
 
-function dateStringUTC(date: Date): string {
-  return date.getFullYear() + '-' + 
-    String(date.getMonth() + 1).padStart(2, '0') + '-' + 
-    String(date.getDate()).padStart(2, '0')
+type LagerActionInput = {
+  name: string
+  portion: string
+  calories: number
+  alcoholUnits: number
 }
 
-async function updateLovelyLager(supabase: any, alcoholUnits: number, date: string) {
-  try {
-    // Get current lager count
-    const { data: current } = await supabase
-      .from('lovely_lager')
-      .select('*')
-      .eq('date', date)
-      .maybeSingle()
-    
-    const currentGlasses = current?.glasses || 0
-    const currentLog = current?.log || []
-    const now = new Date().toISOString()
-    
-    // Convert alcohol units to "glasses" (rough estimate: 1 unit = 1 glass)
-    const glassesToAdd = Math.round(alcoholUnits)
-    
-    await supabase
-      .from('lovely_lager')
-      .upsert({
-        date,
-        glasses: currentGlasses + glassesToAdd,
-        goal: current?.goal || 0,
-        log: [...currentLog, now],
-        updated_at: now
-      }, { onConflict: 'date' })
-      
-  } catch (error) {
-    console.error('Failed to sync with lovely lager:', error)
-  }
-}
-
-export async function GET(req: NextRequest) {
+export async function GET() {
   return NextResponse.json({ drinks: DRINK_OPTIONS })
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createServerSupabaseAdmin()
-  
   try {
     const body = await req.json()
     const { actionType, itemKey, quantity = 1, portionSize = 'pint' } = body
@@ -78,8 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid drink' }, { status: 400 })
     }
     
-    const date = dateStringUTC(new Date())
-    const now = new Date().toISOString()
+    const date = new Date().toISOString().slice(0, 10)
     
     // Adjust values for portion size
     let portionMultiplier = 1
@@ -88,49 +54,45 @@ export async function POST(req: NextRequest) {
     const adjustedCalories = Math.round(drink.calories * quantity * portionMultiplier)
     const adjustedUnits = drink.alcoholUnits * quantity * portionMultiplier
     
-    // Save to quick_drinks table
-    const drinkEntry = {
-      date,
-      drink_name: drink.name,
-      quantity,
-      portion_size: portionSize,
+    const drinkPayload: LagerActionInput = {
+      name: drink.name,
+      portion: portionSize,
       calories: adjustedCalories,
-      alcohol_units: adjustedUnits,
-      timestamp: now
+      alcoholUnits: adjustedUnits,
     }
-    
-    const { data: drinkData, error: drinkError } = await supabase
-      .from('quick_drinks')
-      .insert(drinkEntry)
-      .select()
-      .single()
-    
-    // Even if save fails, try to sync with lovely app
-    try {
-      await updateLovelyLager(supabase, adjustedUnits, date)
-    } catch (lagerError) {
-      console.error('Lovely sync failed:', lagerError)
-    }
-    
-    if (drinkError) {
-      console.error('Drink save error:', drinkError)
-      return NextResponse.json({ 
-        success: true, // Still return success for UI
-        action: {
-          item_name: drink.name,
-          calories: adjustedCalories,
-          alcohol_units: adjustedUnits,
-          quantity,
-          portion_size: portionSize
-        },
-        saved: false,
-        error: 'Database save failed'
-      })
+
+    const drinksUrl = new URL('/api/lovely/drinks', req.url)
+    const drinksResponse = await fetch(drinksUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({
+        action: 'add-drink',
+        date,
+        drinkName: drinkPayload.name,
+        portion: drinkPayload.portion,
+        calories: drinkPayload.calories,
+        alcoholUnits: drinkPayload.alcoholUnits,
+      }),
+    })
+
+    const lagerResult = await drinksResponse.json().catch(() => null)
+    if (!drinksResponse.ok || !lagerResult?.ok) {
+      const details =
+        (lagerResult && typeof lagerResult.error === 'string' && lagerResult.error) ||
+        `Lager save failed (${drinksResponse.status})`
+      return NextResponse.json({ error: details }, { status: 500 })
     }
     
     return NextResponse.json({ 
       success: true, 
-      action: drinkData,
+      action: {
+        item_name: drink.name,
+        calories: adjustedCalories,
+        alcohol_units: adjustedUnits,
+        quantity,
+        portion_size: portionSize
+      },
       saved: true
     })
     
