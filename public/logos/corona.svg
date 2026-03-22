@@ -1,0 +1,5 @@
+<svg width="60" height="30" viewBox="0 0 60 30" xmlns="http://www.w3.org/2000/svg">
+  <rect width="60" height="30" fill="#FFD700" rx="3"/>
+  <circle cx="12" cy="15" r="6" fill="#FF6B00"/>
+  <text x="38" y="20" text-anchor="middle" font-family="Arial,sans-serif" font-size="7" font-weight="bold" fill="#000">CORONA</text>
+</svg>
