@@ -1171,8 +1171,8 @@ export function HealthApp({ onBack }: HealthAppProps) {
                           cursor: 'pointer',
                           borderBottom: idx < searchResults.length - 1 ? '1px solid rgba(255,255,255,0.1)' : 'none'
                         }}
-                        onMouseEnter={(e) => e.target.style.background = 'rgba(255,255,255,0.05)'}
-                        onMouseLeave={(e) => e.target.style.background = 'transparent'}
+                        onMouseEnter={(e) => (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)'}
+                        onMouseLeave={(e) => (e.target as HTMLElement).style.background = 'transparent'}
                       >
                         <div style={{ fontWeight: 600 }}>{result.name}</div>
                         <div style={{ fontSize: 12, color: '#888' }}>

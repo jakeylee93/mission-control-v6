@@ -68,11 +68,12 @@ export async function POST(req: NextRequest) {
       `
 
       // Try to create table (will be ignored if exists)
-      await supabase.rpc('query_sql', { query_text: createTableQuery }).then(() => {
+      try {
+        await supabase.rpc('query_sql', { query_text: createTableQuery })
         console.log('✅ Personal favorites table ready')
-      }).catch(() => {
+      } catch {
         console.log('ℹ️ Using existing personal_favorites table')
-      })
+      }
 
       // Check if favorite already exists
       const { data: existing } = await supabase
