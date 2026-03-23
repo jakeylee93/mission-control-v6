@@ -6,6 +6,8 @@ import LovelyTab from '@/components/tabs/LovelyTab'
 import MapsApp from '@/components/apps/MapsApp'
 import { HealthApp } from '@/components/HealthApp'
 import { MemoryView } from '@/components/tabs/MemoryView'
+import DocsTab from '@/components/tabs/DocsTab'
+import PlansTab from '@/components/tabs/PlansTab'
 
 type TabId = 'business' | 'personal' | 'laboratory'
 type ActiveApp = string | null
@@ -71,6 +73,7 @@ const BUSINESS: AppDef[] = [
   { icon: I.tasks, label: 'Tasks', color: '#ef4444', id: 'tasks' },
   { icon: I.contacts, label: 'Contacts', color: '#06b6d4', id: 'contacts' },
   { icon: I.docs, label: 'Docs', color: '#64748b', id: 'docs' },
+  { icon: I.notes, label: 'Plans', color: '#a855f7', id: 'plans' },
   { icon: I.alerts, label: 'Alerts', color: '#f43f5e', id: 'alerts' },
   { icon: I.web, label: 'Websites', color: '#6366f1', id: 'websites', href: 'https://anyos.co.uk/portfolio' },
   { icon: I.messages, label: 'Messages', color: '#22c55e', id: 'messages' },
@@ -273,6 +276,8 @@ export default function HomePage() {
     if (app.id === 'lovely') { setActiveApp('lovely'); return }
     if (app.id === 'health') { setActiveApp('health'); return }
     if (app.id === 'memory') { setActiveApp('memory'); return }
+    if (app.id === 'docs') { setActiveApp('docs'); return }
+    if (app.id === 'plans') { setActiveApp('plans'); return }
     // Future: other apps
   }, [])
 
@@ -443,7 +448,7 @@ export default function HomePage() {
           borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.05)',
           borderBottom: 'none', padding: '20px 12px 110px',
         }}>
-          {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps' || activeApp === 'health' || activeApp === 'memory') ? null : (
+          {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps' || activeApp === 'health' || activeApp === 'memory' || activeApp === 'docs' || activeApp === 'plans') ? null : (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(5, 1fr)',
@@ -548,6 +553,46 @@ export default function HomePage() {
         }}>
           <div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px' }}>
             <HealthApp onBack={() => setActiveApp(null)} />
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'docs' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const,
+          paddingBottom: 80,
+        }}>
+          <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 16px' }}>
+            <div style={{ paddingTop: 52, marginBottom: 8 }}>
+              <button onClick={() => setActiveApp(null)} style={{
+                background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
+                color: '#aaa', padding: '10px 16px', fontSize: 14, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>{I.back} Back</button>
+            </div>
+            <DocsTab />
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'plans' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const,
+          paddingBottom: 80,
+        }}>
+          <div style={{ maxWidth: 600, margin: '0 auto', padding: '0 16px' }}>
+            <div style={{ paddingTop: 52, marginBottom: 8 }}>
+              <button onClick={() => setActiveApp(null)} style={{
+                background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
+                color: '#aaa', padding: '10px 16px', fontSize: 14, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>{I.back} Back</button>
+            </div>
+            <PlansTab />
           </div>
         </div>
       )}
