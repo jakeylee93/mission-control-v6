@@ -124,21 +124,21 @@ export function MemoryView() {
 
       {/* Date Sidebar */}
       <div style={{
-        width: 180,
-        minWidth: 180,
+        width: 130,
+        minWidth: 130,
         borderRight: '1px solid rgba(255,255,255,0.08)',
         overflowY: 'auto',
-        padding: '12px 0',
+        padding: '52px 0 12px',
         flexShrink: 0
       }}>
-        <div style={{ padding: '0 12px', marginBottom: 12 }}>
+        <div style={{ padding: '0 8px', marginBottom: 10 }}>
           <div style={{
-            fontSize: 11,
+            fontSize: 10,
             color: 'rgba(255,255,255,0.4)',
             fontWeight: 600,
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
-            marginBottom: 8
+            marginBottom: 6
           }}>
             Journal
           </div>
@@ -146,12 +146,12 @@ export function MemoryView() {
             onClick={() => setSelectedDate(null)}
             style={{
               width: '100%',
-              padding: '8px 10px',
-              borderRadius: 8,
+              padding: '6px 8px',
+              borderRadius: 6,
               border: 'none',
               background: !selectedDate ? 'rgba(102,126,234,0.2)' : 'transparent',
               color: !selectedDate ? '#667eea' : 'rgba(255,255,255,0.6)',
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: !selectedDate ? 600 : 400,
               textAlign: 'left',
               cursor: 'pointer',
@@ -163,8 +163,8 @@ export function MemoryView() {
         </div>
 
         <div style={{
-          padding: '0 12px',
-          fontSize: 11,
+          padding: '0 8px',
+          fontSize: 10,
           color: 'rgba(255,255,255,0.3)',
           fontWeight: 600,
           textTransform: 'uppercase',
@@ -180,24 +180,26 @@ export function MemoryView() {
             onClick={() => setSelectedDate(date)}
             style={{
               width: '100%',
-              padding: '6px 12px',
+              padding: '5px 8px',
               border: 'none',
               background: selectedDate === date ? 'rgba(102,126,234,0.15)' : 'transparent',
               color: selectedDate === date ? '#667eea' : 'rgba(255,255,255,0.5)',
-              fontSize: 12,
+              fontSize: 11,
               textAlign: 'left',
               cursor: 'pointer',
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center'
+              alignItems: 'center',
+              gap: 4
             }}
           >
             <span>{formatDateLabel(date)}</span>
             <span style={{
               background: selectedDate === date ? 'rgba(102,126,234,0.3)' : 'rgba(255,255,255,0.08)',
-              borderRadius: 10,
-              padding: '1px 6px',
-              fontSize: 10,
+              borderRadius: 8,
+              padding: '1px 5px',
+              fontSize: 9,
+              flexShrink: 0,
               color: selectedDate === date ? '#667eea' : 'rgba(255,255,255,0.4)'
             }}>
               {count}
@@ -210,7 +212,7 @@ export function MemoryView() {
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: 16
+        padding: '52px 16px 16px'
       }}>
         {/* Search Bar */}
         <div style={{ marginBottom: 16 }}>
