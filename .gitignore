@@ -20,7 +20,8 @@ Thumbs.db
 .idea/
 
 # Memory files (private)
-memory/
+# memory/ workspace files (not src/app/api/memory)
+/memory/
 
 # Capture queue (private)
 capture/
