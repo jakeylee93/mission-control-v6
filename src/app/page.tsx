@@ -5,6 +5,7 @@ import Image from 'next/image'
 import LovelyTab from '@/components/tabs/LovelyTab'
 import MapsApp from '@/components/apps/MapsApp'
 import { HealthApp } from '@/components/HealthApp'
+import { MemoryView } from '@/components/tabs/MemoryView'
 
 type TabId = 'business' | 'personal' | 'laboratory'
 type ActiveApp = string | null
@@ -271,6 +272,7 @@ export default function HomePage() {
     if (app.id === 'maps') { setActiveApp('maps'); return }
     if (app.id === 'lovely') { setActiveApp('lovely'); return }
     if (app.id === 'health') { setActiveApp('health'); return }
+    if (app.id === 'memory') { setActiveApp('memory'); return }
     // Future: other apps
   }, [])
 
@@ -441,7 +443,7 @@ export default function HomePage() {
           borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.05)',
           borderBottom: 'none', padding: '20px 12px 110px',
         }}>
-          {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps' || activeApp === 'health') ? null : (
+          {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps' || activeApp === 'health' || activeApp === 'memory') ? null : (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(5, 1fr)',
@@ -511,6 +513,28 @@ export default function HomePage() {
         }}>
           <div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px', paddingTop: 52 }}>
             <MapsApp onBack={() => setActiveApp(null)} />
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'memory' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ maxWidth: 800, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ padding: '52px 16px 8px' }}>
+              <button onClick={() => setActiveApp(null)} style={{
+                background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12,
+                color: '#aaa', padding: '10px 16px', fontSize: 14, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>{I.back} Back</button>
+            </div>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <MemoryView />
+            </div>
           </div>
         </div>
       )}
