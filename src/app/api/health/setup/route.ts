@@ -109,7 +109,7 @@ export async function POST() {
   const missingTables: string[] = []
   for (const table of ['nutrition_entries', 'drink_collection']) {
     const { error } = await supabase.from(table).select('id').limit(1)
-    if (error && (error.code === '42P01' || error.message?.includes('does not exist'))) {
+    if (error && (error.code === '42P01' || error.code === 'PGRST205' || error.message?.includes('does not exist') || error.message?.includes('Could not find'))) {
       missingTables.push(table)
     }
   }
