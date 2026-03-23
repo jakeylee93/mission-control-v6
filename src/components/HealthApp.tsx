@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
-import { BeerIcon, WineIcon, SpiritsIcon, CocktailIcon, SoftDrinkIcon } from './icons/DrinkIcons'
+import { BeerIcon, WineIcon, SpiritsIcon, CocktailIcon, SoftDrinkIcon, WaterIcon, BreakfastIcon, LunchIcon, DinnerIcon, SnackIcon } from './icons/DrinkIcons'
 
 interface NutritionEntry {
   id: string
@@ -37,12 +37,22 @@ interface HealthAppProps {
 }
 
 const DRINK_CATEGORIES = [
+  { key: 'water', label: 'Water', Icon: WaterIcon },
   { key: 'beer', label: 'Beer', Icon: BeerIcon },
   { key: 'wine', label: 'Wine', Icon: WineIcon },
   { key: 'spirits', label: 'Spirits', Icon: SpiritsIcon },
   { key: 'cocktails', label: 'Cocktails', Icon: CocktailIcon },
   { key: 'soft-drinks', label: 'Soft Drinks', Icon: SoftDrinkIcon },
 ] as const
+
+const FOOD_CATEGORIES = [
+  { key: 'breakfast', label: 'Breakfast', Icon: BreakfastIcon },
+  { key: 'lunch', label: 'Lunch', Icon: LunchIcon },
+  { key: 'dinner', label: 'Dinner', Icon: DinnerIcon },
+  { key: 'snack', label: 'Snacks', Icon: SnackIcon },
+] as const
+
+const DAILY_GOALS = { calories: 2000, protein: 150, carbs: 250, fat: 67, alcoholUnits: 2 }
 
 export function HealthApp({ onBack }: HealthAppProps) {
   const [entries, setEntries] = useState<NutritionEntry[]>([])
@@ -62,18 +72,30 @@ export function HealthApp({ onBack }: HealthAppProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [showAddToCollection, setShowAddToCollection] = useState(false)
   const [newDrink, setNewDrink] = useState({
-    name: '', calories: '', alcohol_units: '', portion: 'pint'
+    name: '', calories: '', alcohol_units: '', portion: 'pint', image_url: ''
   })
 
   // Food state
   const [foodCategories, setFoodCategories] = useState<any>({})
-  const [activeFoodCategory, setActiveFoodCategory] = useState('breakfast')
+  const [selectedFoodCategory, setSelectedFoodCategory] = useState<string | null>(null)
   const [showAddFood, setShowAddFood] = useState(false)
   const [customFood, setCustomFood] = useState({
     name: '', calories: '', protein: '', carbs: '', fat: ''
   })
 
+  // Toast state
+  const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false })
+
+  // Quantity selector state
+  const [quantityDrink, setQuantityDrink] = useState<CollectionDrink | null>(null)
+  const [quantityValue, setQuantityValue] = useState(1)
+
+  // AI identify state
+  const [isIdentifying, setIsIdentifying] = useState(false)
+
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const collectionImageRef = useRef<HTMLInputElement>(null)
+  const aiPhotoRef = useRef<HTMLInputElement>(null)
 
   // Load data on date change
   useEffect(() => {
@@ -90,6 +112,11 @@ export function HealthApp({ onBack }: HealthAppProps) {
   useEffect(() => {
     loadDrinkCollection()
   }, [])
+
+  function showToast(message: string) {
+    setToast({ message, visible: true })
+    setTimeout(() => setToast({ message: '', visible: false }), 2000)
+  }
 
   async function loadDrinkCollection() {
     try {
@@ -115,12 +142,14 @@ export function HealthApp({ onBack }: HealthAppProps) {
           calories: parseInt(newDrink.calories) || 0,
           alcohol_units: parseFloat(newDrink.alcohol_units) || 0,
           portion: newDrink.portion,
+          image_url: newDrink.image_url || null,
         })
       })
       if (res.ok) {
         setShowAddToCollection(false)
-        setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint' })
+        setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint', image_url: '' })
         await loadDrinkCollection()
+        showToast(`Added ${newDrink.name} to collection`)
       }
     } catch (error) {
       console.error('Add drink to collection error:', error)
@@ -142,30 +171,61 @@ export function HealthApp({ onBack }: HealthAppProps) {
     }
   }
 
-  async function logDrinkFromCollection(drink: CollectionDrink) {
+  async function logDrinkFromCollection(drink: CollectionDrink, qty: number = 1) {
     try {
       const res = await fetch('/api/health/quick-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actionType: 'alcohol',
+          date: selectedDate,
           customDrink: {
             name: drink.name,
             calories: drink.calories,
             alcoholUnits: drink.alcohol_units,
           },
-          quantity: 1,
+          quantity: qty,
           portionSize: drink.portion,
         })
       })
       if (res.ok) {
         setShowFoodAndDrinks(false)
         setSelectedCategory(null)
+        setQuantityDrink(null)
+        setQuantityValue(1)
         await loadDataForDate(selectedDate)
         loadMonthSummary()
+        showToast(`Added ${drink.name}${qty > 1 ? ` x${qty}` : ''}`)
       }
     } catch (error) {
       console.error('Log drink error:', error)
+    }
+  }
+
+  async function logWater() {
+    try {
+      const res = await fetch('/api/health/quick-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actionType: 'alcohol',
+          date: selectedDate,
+          customDrink: {
+            name: 'Water',
+            calories: 0,
+            alcoholUnits: 0,
+          },
+          quantity: 1,
+          portionSize: 'glass',
+        })
+      })
+      if (res.ok) {
+        await loadDataForDate(selectedDate)
+        loadMonthSummary()
+        showToast('Added Water')
+      }
+    } catch (error) {
+      console.error('Log water error:', error)
     }
   }
 
@@ -204,6 +264,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
       })
       if (res.ok) {
         await loadDataForDate(selectedDate)
+        showToast('Added food item')
       }
     } catch (error) {
       console.error('Quick add food error:', error)
@@ -229,6 +290,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
         setShowAddFood(false)
         setCustomFood({ name: '', calories: '', protein: '', carbs: '', fat: '' })
         await loadDataForDate(selectedDate)
+        showToast(`Added ${customFood.name}`)
       }
     } catch (error) {
       console.error('Add custom food error:', error)
@@ -360,6 +422,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
         if (result.saved) {
           loadDataForDate(selectedDate)
           loadMonthSummary()
+          showToast('Food analyzed and saved')
         }
       }
     } catch (error) {
@@ -374,12 +437,103 @@ export function HealthApp({ onBack }: HealthAppProps) {
     if (file) handleImageUpload(file)
   }
 
-  const goals = { calories: 2000, protein: 150, carbs: 250, fat: 67 }
+  function handleCollectionImageSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string
+      setNewDrink(prev => ({ ...prev, image_url: base64 }))
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function handleAIPhotoSelect(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setIsIdentifying(true)
+    try {
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        const base64 = e.target?.result as string
+        try {
+          const res = await fetch('/api/drinks/identify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64 })
+          })
+          if (res.ok) {
+            const data = await res.json()
+            if (data.drink) {
+              setNewDrink(prev => ({
+                ...prev,
+                name: data.drink.name || prev.name,
+                calories: String(data.drink.calories || ''),
+                alcohol_units: String(data.drink.alcoholUnits || ''),
+                image_url: base64,
+              }))
+              showToast(data.mock ? 'Mock result — set OPENAI_API_KEY for real AI' : `Identified: ${data.drink.name}`)
+            }
+          }
+        } catch (err) {
+          console.error('AI identify error:', err)
+        } finally {
+          setIsIdentifying(false)
+        }
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      setIsIdentifying(false)
+    }
+  }
+
+  function getProgressColor(ratio: number) {
+    if (ratio >= 1) return '#ef4444'
+    if (ratio >= 0.75) return '#f59e0b'
+    return '#22c55e'
+  }
+
+  function ProgressBar({ value, max, color, label, unit }: { value: number; max: number; color: string; label: string; unit: string }) {
+    const ratio = max > 0 ? value / max : 0
+    const barColor = getProgressColor(ratio)
+    const pct = Math.min(ratio * 100, 100)
+    return (
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+          <span style={{ color: '#ccc', fontSize: 12, fontWeight: 500 }}>{label}</span>
+          <span style={{ color: '#aaa', fontSize: 12 }}>
+            {typeof value === 'number' && value % 1 !== 0 ? value.toFixed(1) : Math.round(value)}{unit} / {max}{unit}
+          </span>
+        </div>
+        <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+          <div style={{
+            height: '100%', borderRadius: 4, background: barColor,
+            width: `${pct}%`, transition: 'width 0.6s ease-out',
+          }} />
+        </div>
+      </div>
+    )
+  }
+
   const isToday = selectedDate === new Date().toISOString().split('T')[0]
   const dateLabel = isToday ? "Today's" : formatDate(selectedDate)
 
   return (
     <div style={{ paddingBottom: 20 }}>
+      {/* Toast */}
+      {toast.visible && (
+        <div style={{
+          position: 'fixed', top: 20, left: '50%', transform: 'translateX(-50%)',
+          background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff',
+          padding: '12px 24px', borderRadius: 12, fontSize: 14, fontWeight: 600,
+          zIndex: 2000, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          animation: 'slideIn 0.3s ease-out',
+        }}>
+          {toast.message}
+        </div>
+      )}
+      <style>{`@keyframes slideIn { from { opacity: 0; transform: translateX(-50%) translateY(-20px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }`}</style>
+
       {/* Header */}
       <div style={{ paddingTop: 52, marginBottom: 20 }}>
         <button onClick={onBack} style={{
@@ -456,7 +610,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
         </div>
       </div>
 
-      {/* Daily Overview */}
+      {/* Daily Overview with Progress Bars (#9) */}
       <div style={{
         background: 'rgba(255,255,255,0.05)', borderRadius: 16, padding: 20, marginBottom: 20,
         border: '1px solid rgba(255,255,255,0.08)'
@@ -464,30 +618,11 @@ export function HealthApp({ onBack }: HealthAppProps) {
         <h2 style={{ color: '#fff', fontSize: 18, fontWeight: 600, marginBottom: 16 }}>
           {dateLabel} Nutrition
         </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#ff6b6b', fontSize: 20, fontWeight: 700 }}>{dailyTotals.calories}</div>
-            <div style={{ color: '#888', fontSize: 11 }}>/{goals.calories} cal</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#4ecdc4', fontSize: 20, fontWeight: 700 }}>{dailyTotals.protein}g</div>
-            <div style={{ color: '#888', fontSize: 11 }}>/{goals.protein}g protein</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#f093fb', fontSize: 20, fontWeight: 700 }}>{dailyTotals.alcoholUnits.toFixed(1)}</div>
-            <div style={{ color: '#888', fontSize: 11 }}>alcohol units</div>
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#ffe066', fontSize: 20, fontWeight: 700 }}>{dailyTotals.carbs}g</div>
-            <div style={{ color: '#888', fontSize: 11 }}>/{goals.carbs}g carbs</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ color: '#a8e6cf', fontSize: 20, fontWeight: 700 }}>{dailyTotals.fat}g</div>
-            <div style={{ color: '#888', fontSize: 11 }}>/{goals.fat}g fat</div>
-          </div>
-        </div>
+        <ProgressBar value={dailyTotals.calories} max={DAILY_GOALS.calories} color="#ff6b6b" label="Calories" unit=" cal" />
+        <ProgressBar value={dailyTotals.protein} max={DAILY_GOALS.protein} color="#4ecdc4" label="Protein" unit="g" />
+        <ProgressBar value={dailyTotals.carbs} max={DAILY_GOALS.carbs} color="#ffe066" label="Carbs" unit="g" />
+        <ProgressBar value={dailyTotals.fat} max={DAILY_GOALS.fat} color="#a8e6cf" label="Fat" unit="g" />
+        <ProgressBar value={dailyTotals.alcoholUnits} max={DAILY_GOALS.alcoholUnits} color="#f093fb" label="Alcohol" unit=" units" />
       </div>
 
       {/* Add Food & Drinks Button */}
@@ -501,6 +636,8 @@ export function HealthApp({ onBack }: HealthAppProps) {
           + Add Food & Drinks
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} />
+        <input ref={collectionImageRef} type="file" accept="image/*" onChange={handleCollectionImageSelect} style={{ display: 'none' }} />
+        <input ref={aiPhotoRef} type="file" accept="image/*" capture="environment" onChange={handleAIPhotoSelect} style={{ display: 'none' }} />
       </div>
 
       {/* Daily Food & Drinks Log */}
@@ -616,7 +753,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600, margin: 0 }}>Food & Drinks</h3>
-              <button onClick={() => { setShowFoodAndDrinks(false); setSelectedCategory(null) }} style={{
+              <button onClick={() => { setShowFoodAndDrinks(false); setSelectedCategory(null); setSelectedFoodCategory(null) }} style={{
                 background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8,
                 color: '#aaa', padding: 8, cursor: 'pointer', fontSize: 16
               }}>✕</button>
@@ -624,12 +761,12 @@ export function HealthApp({ onBack }: HealthAppProps) {
 
             {/* Tabs */}
             <div style={{ display: 'flex', marginBottom: 20, background: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 4 }}>
-              <button onClick={() => { setActiveTab('drinks'); setSelectedCategory(null) }} style={{
+              <button onClick={() => { setActiveTab('drinks'); setSelectedCategory(null); setSelectedFoodCategory(null) }} style={{
                 flex: 1, padding: '12px 16px', border: 'none', borderRadius: 8,
                 background: activeTab === 'drinks' ? 'rgba(255,255,255,0.1)' : 'transparent',
                 color: activeTab === 'drinks' ? '#fff' : '#888', fontSize: 14, fontWeight: 600, cursor: 'pointer'
               }}>Drinks</button>
-              <button onClick={() => setActiveTab('food')} style={{
+              <button onClick={() => { setActiveTab('food'); setSelectedCategory(null); setSelectedFoodCategory(null) }} style={{
                 flex: 1, padding: '12px 16px', border: 'none', borderRadius: 8,
                 background: activeTab === 'food' ? 'rgba(255,255,255,0.1)' : 'transparent',
                 color: activeTab === 'food' ? '#fff' : '#888', fontSize: 14, fontWeight: 600, cursor: 'pointer'
@@ -639,6 +776,17 @@ export function HealthApp({ onBack }: HealthAppProps) {
             {/* ============ DRINKS TAB ============ */}
             {activeTab === 'drinks' && !selectedCategory && (
               <div>
+                {/* Quick Water Button (#6) */}
+                <button onClick={logWater} style={{
+                  width: '100%', background: 'linear-gradient(135deg, #38bdf8, #0ea5e9)',
+                  border: 'none', borderRadius: 12, color: '#fff', padding: '14px 16px',
+                  fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 16,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+                }}>
+                  <WaterIcon size={22} color="#fff" />
+                  Quick Add Water
+                </button>
+
                 <h4 style={{ color: '#aaa', fontSize: 13, fontWeight: 500, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
                   Choose a category
                 </h4>
@@ -689,26 +837,37 @@ export function HealthApp({ onBack }: HealthAppProps) {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                     {(drinkCollection[selectedCategory] || []).map((drink) => (
                       <div key={drink.id} style={{ position: 'relative' }}>
-                        <button onClick={() => logDrinkFromCollection(drink)} style={{
+                        <button onClick={() => { setQuantityDrink(drink); setQuantityValue(1) }} style={{
                           width: '100%', background: 'rgba(255,255,255,0.05)',
                           border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
                           padding: '16px 10px', cursor: 'pointer',
                           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6
                         }}>
-                          <div style={{
-                            width: 36, height: 36, borderRadius: 8,
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center'
-                          }}>
-                            {(() => {
-                              const cat = DRINK_CATEGORIES.find(c => c.key === selectedCategory)
-                              if (cat) {
-                                const CatIcon = cat.Icon
-                                return <CatIcon size={24} color="#fff" />
-                              }
-                              return null
-                            })()}
-                          </div>
+                          {/* Show uploaded image or category icon (#4) */}
+                          {drink.image_url ? (
+                            <div style={{
+                              width: 36, height: 36, borderRadius: 8, overflow: 'hidden',
+                            }}>
+                              <img src={drink.image_url} alt={drink.name} style={{
+                                width: '100%', height: '100%', objectFit: 'cover'
+                              }} />
+                            </div>
+                          ) : (
+                            <div style={{
+                              width: 36, height: 36, borderRadius: 8,
+                              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                              {(() => {
+                                const cat = DRINK_CATEGORIES.find(c => c.key === selectedCategory)
+                                if (cat) {
+                                  const CatIcon = cat.Icon
+                                  return <CatIcon size={24} color="#fff" />
+                                }
+                                return null
+                              })()}
+                            </div>
+                          )}
                           <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, textAlign: 'center' }}>{drink.name}</div>
                           <div style={{ color: '#888', fontSize: 11, textAlign: 'center' }}>
                             {drink.calories} cal · {drink.alcohol_units} units
@@ -748,9 +907,10 @@ export function HealthApp({ onBack }: HealthAppProps) {
               </div>
             )}
 
-            {/* ============ FOOD TAB ============ */}
-            {activeTab === 'food' && (
+            {/* ============ FOOD TAB (#10 — category folders) ============ */}
+            {activeTab === 'food' && !selectedFoodCategory && (
               <div>
+                {/* Action buttons */}
                 <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
                   <button onClick={() => { fileInputRef.current?.click(); setShowFoodAndDrinks(false) }}
                     disabled={isLoading} style={{
@@ -769,55 +929,30 @@ export function HealthApp({ onBack }: HealthAppProps) {
                   }}>Custom Entry</button>
                 </div>
 
-                {/* Macro Summary */}
-                {entries.length > 0 && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-                    {[
-                      { label: 'Calories', value: dailyTotals.calories, color: '#ef4444', unit: '' },
-                      { label: 'Protein', value: dailyTotals.protein, color: '#3b82f6', unit: 'g' },
-                      { label: 'Carbs', value: dailyTotals.carbs, color: '#f59e0b', unit: 'g' },
-                      { label: 'Fat', value: dailyTotals.fat, color: '#10b981', unit: 'g' }
-                    ].map((macro) => (
-                      <div key={macro.label} style={{
-                        background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '10px 8px', textAlign: 'center'
+                <h4 style={{ color: '#aaa', fontSize: 13, fontWeight: 500, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>
+                  Choose a category
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                  {FOOD_CATEGORIES.map(({ key, label, Icon }) => {
+                    const items = foodCategories[key] || []
+                    return (
+                      <button key={key} onClick={() => setSelectedFoodCategory(key)} style={{
+                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: 14, padding: '20px 12px', cursor: 'pointer',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10
                       }}>
-                        <div style={{ color: macro.color, fontSize: 18, fontWeight: 700 }}>
-                          {Math.round(macro.value)}{macro.unit}
+                        <Icon size={40} color="#e0e0e0" />
+                        <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{label}</div>
+                        <div style={{ color: '#666', fontSize: 11 }}>
+                          {items.length === 0 ? 'Empty' : `${items.length} item${items.length !== 1 ? 's' : ''}`}
                         </div>
-                        <div style={{ color: '#666', fontSize: 10, marginTop: 2 }}>{macro.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Quick Add Categories */}
-                <h4 style={{ color: '#fff', fontSize: 14, marginBottom: 8 }}>Quick Add</h4>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
-                  {['breakfast', 'lunch', 'dinner', 'snack', 'drink'].map((cat) => (
-                    <button key={cat} onClick={() => setActiveFoodCategory(cat)} style={{
-                      padding: '6px 12px', borderRadius: 20, border: 'none',
-                      background: activeFoodCategory === cat ? 'rgba(102,126,234,0.25)' : 'rgba(255,255,255,0.06)',
-                      color: activeFoodCategory === cat ? '#667eea' : '#888',
-                      fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap', textTransform: 'capitalize'
-                    }}>{cat}</button>
-                  ))}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: 16 }}>
-                  {(foodCategories[activeFoodCategory] || []).map((food: any) => (
-                    <button key={food.key} onClick={() => quickAddFood(food.key)} style={{
-                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                      borderRadius: 10, padding: '10px', color: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: 12
-                    }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{food.name}</div>
-                      <div style={{ color: '#888', fontSize: 11 }}>
-                        {food.calories} cal · {food.protein}g P · {food.carbs}g C · {food.fat}g F
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    )
+                  })}
                 </div>
 
                 {/* Food Log */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, marginBottom: 8 }}>
                   <h4 style={{ color: '#fff', fontSize: 14, margin: 0 }}>Food Log</h4>
                   <span style={{ color: '#666', fontSize: 11 }}>{entries.length} items</span>
                 </div>
@@ -856,6 +991,56 @@ export function HealthApp({ onBack }: HealthAppProps) {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* ============ FOOD CATEGORY DETAIL VIEW (#10) ============ */}
+            {activeTab === 'food' && selectedFoodCategory && (
+              <div>
+                <button onClick={() => setSelectedFoodCategory(null)} style={{
+                  background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8,
+                  color: '#aaa', padding: '6px 12px', fontSize: 13, cursor: 'pointer', marginBottom: 16,
+                  display: 'flex', alignItems: 'center', gap: 4
+                }}>
+                  ← Back to categories
+                </button>
+
+                <h4 style={{ color: '#fff', fontSize: 16, fontWeight: 600, marginBottom: 16 }}>
+                  {FOOD_CATEGORIES.find(c => c.key === selectedFoodCategory)?.label}
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                  {(foodCategories[selectedFoodCategory] || []).map((food: any) => (
+                    <button key={food.key} onClick={() => { quickAddFood(food.key); showToast(`Added ${food.name}`) }} style={{
+                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 10, padding: '12px 10px', color: '#fff', cursor: 'pointer', textAlign: 'left', fontSize: 12
+                    }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{food.name}</div>
+                      <div style={{ color: '#888', fontSize: 11 }}>
+                        {food.calories} cal · {food.protein}g P · {food.carbs}g C · {food.fat}g F
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {(foodCategories[selectedFoodCategory] || []).length === 0 && (
+                  <div style={{
+                    background: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 30,
+                    textAlign: 'center'
+                  }}>
+                    <div style={{ marginBottom: 12 }}>
+                      {(() => {
+                        const cat = FOOD_CATEGORIES.find(c => c.key === selectedFoodCategory)
+                        if (cat) {
+                          const CatIcon = cat.Icon
+                          return <CatIcon size={48} color="#555" />
+                        }
+                        return null
+                      })()}
+                    </div>
+                    <div style={{ color: '#aaa', fontSize: 14, marginBottom: 4 }}>No items yet</div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -921,7 +1106,56 @@ export function HealthApp({ onBack }: HealthAppProps) {
         </div>
       )}
 
-      {/* Add Drink to Collection Modal */}
+      {/* Quantity Selector Modal (#8) */}
+      {quantityDrink && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', zIndex: 1003,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+        }}>
+          <div style={{
+            background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+            borderRadius: 20, padding: 24, maxWidth: 320, width: '100%', textAlign: 'center'
+          }}>
+            <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 600, margin: '0 0 4px' }}>{quantityDrink.name}</h3>
+            <div style={{ color: '#888', fontSize: 12, marginBottom: 20 }}>
+              {quantityDrink.calories} cal · {quantityDrink.alcohol_units} units · {quantityDrink.portion}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 24 }}>
+              <button onClick={() => setQuantityValue(Math.max(1, quantityValue - 1))} style={{
+                width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 22, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+              }}>−</button>
+              <span style={{ color: '#FFD700', fontSize: 36, fontWeight: 700, minWidth: 40 }}>{quantityValue}</span>
+              <button onClick={() => setQuantityValue(Math.min(10, quantityValue + 1))} style={{
+                width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 22, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+              }}>+</button>
+            </div>
+
+            <div style={{ color: '#aaa', fontSize: 12, marginBottom: 16 }}>
+              Total: {quantityDrink.calories * quantityValue} cal · {(quantityDrink.alcohol_units * quantityValue).toFixed(1)} units
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { setQuantityDrink(null); setQuantityValue(1) }} style={{
+                flex: 1, padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)',
+                background: 'transparent', color: '#aaa', fontSize: 14, cursor: 'pointer'
+              }}>Cancel</button>
+              <button onClick={() => logDrinkFromCollection(quantityDrink, quantityValue)} style={{
+                flex: 1, padding: 12, borderRadius: 10, border: 'none',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer'
+              }}>Add</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Drink to Collection Modal (#4 image upload + #5 AI photo) */}
       {showAddToCollection && selectedCategory && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -930,19 +1164,45 @@ export function HealthApp({ onBack }: HealthAppProps) {
         }}>
           <div style={{
             background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
-            borderRadius: 20, padding: 24, maxWidth: 400, width: '100%'
+            borderRadius: 20, padding: 24, maxWidth: 400, width: '100%', maxHeight: '85vh', overflowY: 'auto'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600, margin: 0 }}>
                 Add to {DRINK_CATEGORIES.find(c => c.key === selectedCategory)?.label}
               </h3>
-              <button onClick={() => { setShowAddToCollection(false); setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint' }) }} style={{
+              <button onClick={() => { setShowAddToCollection(false); setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint', image_url: '' }) }} style={{
                 background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8,
                 color: '#aaa', padding: 8, cursor: 'pointer', fontSize: 16
               }}>✕</button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Image upload area (#4) */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => collectionImageRef.current?.click()} style={{
+                  flex: 1, padding: '12px 8px', borderRadius: 10, border: '1px dashed rgba(255,255,255,0.2)',
+                  background: 'rgba(255,255,255,0.03)', color: '#aaa', fontSize: 12, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                }}>
+                  {newDrink.image_url ? 'Change Photo' : 'Upload Photo'}
+                </button>
+                <button onClick={() => aiPhotoRef.current?.click()} disabled={isIdentifying} style={{
+                  flex: 1, padding: '12px 8px', borderRadius: 10, border: 'none',
+                  background: isIdentifying ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  color: '#fff', fontSize: 12, fontWeight: 600, cursor: isIdentifying ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+                }}>
+                  {isIdentifying ? 'Analyzing...' : 'AI Identify'}
+                </button>
+              </div>
+
+              {/* Image preview */}
+              {newDrink.image_url && (
+                <div style={{ borderRadius: 10, overflow: 'hidden', height: 120 }}>
+                  <img src={newDrink.image_url} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              )}
+
               <div>
                 <label style={{ color: '#aaa', fontSize: 12, marginBottom: 6, display: 'block' }}>Drink Name</label>
                 <input type="text" value={newDrink.name}
@@ -983,7 +1243,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
               </div>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-                <button onClick={() => { setShowAddToCollection(false); setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint' }) }} style={{
+                <button onClick={() => { setShowAddToCollection(false); setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint', image_url: '' }) }} style={{
                   flex: 1, padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)',
                   background: 'transparent', color: '#aaa', fontSize: 14, cursor: 'pointer'
                 }}>Cancel</button>

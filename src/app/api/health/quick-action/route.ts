@@ -34,12 +34,12 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { actionType, itemKey, customDrink, quantity = 1, portionSize = 'pint' } = body
-    
+    const { actionType, itemKey, customDrink, quantity = 1, portionSize = 'pint', date: requestDate } = body
+
     if (actionType !== 'alcohol') {
       return NextResponse.json({ error: 'Invalid action type' }, { status: 400 })
     }
-    
+
     let drink
     if (customDrink) {
       // Use custom drink data
@@ -55,8 +55,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Invalid drink' }, { status: 400 })
       }
     }
-    
-    const date = new Date().toISOString().slice(0, 10)
+
+    const date = requestDate || new Date().toISOString().slice(0, 10)
     
     // Adjust values for portion size
     let portionMultiplier = 1

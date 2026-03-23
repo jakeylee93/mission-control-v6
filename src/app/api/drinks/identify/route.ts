@@ -9,7 +9,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 })
     }
 
-    // Use OpenAI Vision to identify the beer
+    // If no OpenAI API key, return mock response
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({
+        success: true,
+        mock: true,
+        drink: {
+          name: 'Unknown Drink',
+          type: 'beer',
+          brand: 'Unknown',
+          abv: 5.0,
+          portion: 'pint',
+          calories: 180,
+          alcoholUnits: 2.3,
+          confidence: 0.5
+        }
+      })
+    }
+
+    // Use OpenAI Vision to identify the drink
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -17,18 +35,18 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4-vision-preview',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: `Identify this alcoholic drink. Return ONLY a JSON object with this exact format:
+                text: `Identify this drink. Return ONLY a JSON object with this exact format:
 {
-  "name": "Beer Name",
-  "type": "beer/wine/spirit/cocktail",
-  "brand": "Brand Name", 
+  "name": "Drink Name",
+  "type": "beer/wine/spirit/cocktail/soft-drink/water",
+  "brand": "Brand Name",
   "abv": 4.5,
   "calories_per_100ml": 43,
   "portion_size": "pint/bottle/can/glass/shot",
@@ -64,10 +82,11 @@ If you cannot identify it clearly, set confidence below 0.7 and use generic esti
     }
 
     try {
-      const drinkInfo = JSON.parse(content)
-      
-      // Calculate calories and alcohol units based on standard portions
-      const portionSizes = {
+      // Strip markdown code fences if present
+      const cleaned = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+      const drinkInfo = JSON.parse(cleaned)
+
+      const portionSizes: Record<string, number> = {
         'pint': 568,
         'half-pint': 284,
         'bottle': 500,
@@ -75,8 +94,8 @@ If you cannot identify it clearly, set confidence below 0.7 and use generic esti
         'glass': 175,
         'shot': 25
       }
-      
-      const portionMl = portionSizes[drinkInfo.portion_size as keyof typeof portionSizes] || 568
+
+      const portionMl = portionSizes[drinkInfo.portion_size] || 568
       const calories = Math.round((drinkInfo.calories_per_100ml * portionMl) / 100)
       const alcoholUnits = Math.round(((drinkInfo.abv * portionMl * 0.8) / 1000) * 10) / 10
 
