@@ -62,6 +62,13 @@ export function HealthApp({ onBack }: HealthAppProps) {
     alcoholUnits: '',
     portion: 'pint'
   })
+  const [foodCategories, setFoodCategories] = useState<any>({})
+  const [activeFoodCategory, setActiveFoodCategory] = useState('breakfast')
+  const [foodSearch, setFoodSearch] = useState('')
+  const [showAddFood, setShowAddFood] = useState(false)
+  const [customFood, setCustomFood] = useState({
+    name: '', calories: '', protein: '', carbs: '', fat: ''
+  })
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false)
@@ -81,7 +88,75 @@ export function HealthApp({ onBack }: HealthAppProps) {
   useEffect(() => {
     loadTodaysData()
     loadPersonalFavorites()
+    loadFoodCategories()
   }, [selectedDate])
+
+  async function loadFoodCategories() {
+    try {
+      const res = await fetch('/api/health/nutrition/quick-add')
+      if (res.ok) {
+        const data = await res.json()
+        setFoodCategories(data.categories || {})
+      }
+    } catch (error) {
+      console.error('Failed to load food categories:', error)
+    }
+  }
+
+  async function quickAddFood(foodKey: string) {
+    try {
+      const res = await fetch('/api/health/nutrition/quick-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ foodKey })
+      })
+      if (res.ok) {
+        await loadDataForDate(selectedDate)
+      }
+    } catch (error) {
+      console.error('Quick add food error:', error)
+    }
+  }
+
+  async function addCustomFood() {
+    try {
+      const res = await fetch('/api/health/nutrition/quick-add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          custom: {
+            name: customFood.name,
+            calories: parseInt(customFood.calories) || 0,
+            protein: parseFloat(customFood.protein) || 0,
+            carbs: parseFloat(customFood.carbs) || 0,
+            fat: parseFloat(customFood.fat) || 0
+          }
+        })
+      })
+      if (res.ok) {
+        setShowAddFood(false)
+        setCustomFood({ name: '', calories: '', protein: '', carbs: '', fat: '' })
+        await loadDataForDate(selectedDate)
+      }
+    } catch (error) {
+      console.error('Add custom food error:', error)
+    }
+  }
+
+  async function deleteFood(entryId: string) {
+    try {
+      const res = await fetch('/api/health/nutrition/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: entryId })
+      })
+      if (res.ok) {
+        await loadDataForDate(selectedDate)
+      }
+    } catch (error) {
+      console.error('Delete food error:', error)
+    }
+  }
 
   async function loadPersonalFavorites() {
     try {
@@ -997,114 +1072,245 @@ export function HealthApp({ onBack }: HealthAppProps) {
             {/* Food Tab */}
             {activeTab === 'food' && (
               <div>
-                {/* Food Photo */}
-                <button 
-                  onClick={() => {
-                    fileInputRef.current?.click()
-                    setShowFoodAndDrinks(false)
-                  }}
-                  disabled={isLoading}
-                  style={{
-                    width: '100%',
-                    background: isLoading ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    border: 'none',
-                    borderRadius: 12,
-                    color: '#fff',
-                    padding: '20px 16px',
-                    fontSize: 16,
-                    fontWeight: 600,
-                    cursor: isLoading ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    marginBottom: 20
-                  }}
-                >
-                  📸 {isLoading ? 'Analyzing...' : 'Take Food Photo'}
-                </button>
+                {/* Action Buttons Row */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  <button 
+                    onClick={() => {
+                      fileInputRef.current?.click()
+                      setShowFoodAndDrinks(false)
+                    }}
+                    disabled={isLoading}
+                    style={{
+                      flex: 1,
+                      background: isLoading ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      border: 'none',
+                      borderRadius: 10,
+                      color: '#fff',
+                      padding: '14px 12px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6
+                    }}
+                  >
+                    📸 {isLoading ? 'Analyzing...' : 'Snap Food'}
+                  </button>
+                  <button
+                    onClick={() => setShowAddFood(true)}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: 10,
+                      color: '#fff',
+                      padding: '14px 12px',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6
+                    }}
+                  >
+                    ✏️ Custom Entry
+                  </button>
+                </div>
 
-                {/* Recent Food */}
-                <h4 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>Recent Food</h4>
+                {/* Macro Summary */}
+                {entries.length > 0 && (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(4, 1fr)',
+                    gap: 8,
+                    marginBottom: 16
+                  }}>
+                    {[
+                      { label: 'Calories', value: dailyTotals.calories, color: '#ef4444', unit: '' },
+                      { label: 'Protein', value: dailyTotals.protein, color: '#3b82f6', unit: 'g' },
+                      { label: 'Carbs', value: dailyTotals.carbs, color: '#f59e0b', unit: 'g' },
+                      { label: 'Fat', value: dailyTotals.fat, color: '#10b981', unit: 'g' }
+                    ].map((macro) => (
+                      <div key={macro.label} style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        borderRadius: 10,
+                        padding: '10px 8px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{ color: macro.color, fontSize: 18, fontWeight: 700 }}>
+                          {Math.round(macro.value)}{macro.unit}
+                        </div>
+                        <div style={{ color: '#666', fontSize: 10, marginTop: 2 }}>{macro.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Quick Add Categories */}
+                <h4 style={{ color: '#fff', fontSize: 14, marginBottom: 8 }}>Quick Add</h4>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto' }}>
+                  {['breakfast', 'lunch', 'dinner', 'snack', 'drink'].map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveFoodCategory(cat)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 20,
+                        border: 'none',
+                        background: activeFoodCategory === cat ? 'rgba(102,126,234,0.25)' : 'rgba(255,255,255,0.06)',
+                        color: activeFoodCategory === cat ? '#667eea' : '#888',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {cat === 'breakfast' ? '🍳' : cat === 'lunch' ? '🥪' : cat === 'dinner' ? '🍽️' : cat === 'snack' ? '🍎' : '☕'} {cat}
+                    </button>
+                  ))}
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: 8,
+                  marginBottom: 16
+                }}>
+                  {(foodCategories[activeFoodCategory] || []).map((food: any) => (
+                    <button
+                      key={food.key}
+                      onClick={() => quickAddFood(food.key)}
+                      style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: 10,
+                        padding: '10px',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        fontSize: 12
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{food.name}</div>
+                      <div style={{ color: '#888', fontSize: 11 }}>
+                        {food.calories} cal · {food.protein}g P · {food.carbs}g C · {food.fat}g F
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Today's Food Log */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h4 style={{ color: '#fff', fontSize: 14, margin: 0 }}>Food Log</h4>
+                  <span style={{ color: '#666', fontSize: 11 }}>{entries.length} items</span>
+                </div>
                 <div style={{ 
                   background: 'rgba(255,255,255,0.03)', 
                   borderRadius: 12, 
-                  padding: 16, 
+                  padding: entries.length > 0 ? 12 : 16, 
                   marginBottom: 20
                 }}>
                   {entries.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {entries.slice(-5).reverse().map((food, idx) => (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {entries.slice(-10).reverse().map((food, idx) => (
                         <div key={idx} style={{
                           display: 'flex',
-                          justifyContent: 'space-between',
                           alignItems: 'center',
-                          padding: '8px 12px',
-                          background: 'rgba(255,255,255,0.05)',
-                          borderRadius: 8
+                          padding: '10px 12px',
+                          background: 'rgba(255,255,255,0.04)',
+                          borderRadius: 8,
+                          gap: 10
                         }}>
-                          <div style={{ color: '#fff' }}>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{food.foods?.[0]?.name || 'Food Item'}</div>
-                            <div style={{ color: '#888', fontSize: 12 }}>
-                              {food.total_calories} cal • {food.total_protein}g protein
+                          <div style={{ flex: 1 }}>
+                            <div style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>
+                              {food.foods?.[0]?.name || 'Food Item'}
+                            </div>
+                            <div style={{ color: '#888', fontSize: 11, marginTop: 2 }}>
+                              {food.total_calories} cal · {food.total_protein}g P · {food.total_carbs}g C · {food.total_fat}g F
                             </div>
                           </div>
-                          <div style={{ color: '#888', fontSize: 11 }}>
+                          <div style={{ color: '#666', fontSize: 10 }}>
                             {new Date(food.timestamp).toLocaleTimeString('en-GB', { 
-                              hour: '2-digit', 
-                              minute: '2-digit' 
+                              hour: '2-digit', minute: '2-digit' 
                             })}
                           </div>
+                          <button
+                            onClick={() => deleteFood(food.id)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#ef4444',
+                              fontSize: 14,
+                              cursor: 'pointer',
+                              padding: '4px',
+                              opacity: 0.6
+                            }}
+                          >
+                            ✕
+                          </button>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div style={{ color: '#666', textAlign: 'center', fontSize: 14 }}>
-                      No food logged for {selectedDate === new Date().toISOString().split('T')[0] ? 'today' : 'this date'}
+                      No food logged yet — snap a photo or quick add above
                     </div>
                   )}
                 </div>
+              </div>
+            )}
 
-                {/* All Food History */}
-                <h4 style={{ color: '#fff', fontSize: 16, marginBottom: 12 }}>All Food History</h4>
-                <div style={{ 
-                  background: 'rgba(255,255,255,0.03)', 
-                  borderRadius: 12, 
-                  padding: 16
+            {/* Add Custom Food Modal */}
+            {showAddFood && (
+              <div style={{
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.8)', zIndex: 1002,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+              }}>
+                <div style={{
+                  background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+                  borderRadius: 20, padding: 24, maxWidth: 400, width: '100%'
                 }}>
-                  {entries.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {entries.map((food, idx) => (
-                        <div key={idx} style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '8px 12px',
-                          background: 'rgba(255,255,255,0.05)',
-                          borderRadius: 8
-                        }}>
-                          <div style={{ color: '#fff' }}>
-                            <div style={{ fontWeight: 600, fontSize: 14 }}>{food.foods?.[0]?.name || 'Food Item'}</div>
-                            <div style={{ color: '#888', fontSize: 12 }}>
-                              {food.total_calories} cal • {food.total_protein}g protein • {food.total_carbs}g carbs • {food.total_fat}g fat
-                            </div>
-                          </div>
-                          <div style={{ color: '#888', fontSize: 11 }}>
-                            {new Date(food.timestamp).toLocaleString('en-GB', { 
-                              day: '2-digit',
-                              month: 'short',
-                              hour: '2-digit', 
-                              minute: '2-digit' 
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600, margin: 0 }}>Add Food</h3>
+                    <button onClick={() => setShowAddFood(false)}
+                      style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8, color: '#aaa', padding: 8, cursor: 'pointer', fontSize: 16 }}>✕</button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <input type="text" value={customFood.name} onChange={(e) => setCustomFood(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Food name" style={{ width: '100%', padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14 }} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <div>
+                        <label style={{ color: '#aaa', fontSize: 11, display: 'block', marginBottom: 4 }}>Calories</label>
+                        <input type="number" value={customFood.calories} onChange={(e) => setCustomFood(prev => ({ ...prev, calories: e.target.value }))}
+                          placeholder="250" style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14 }} />
+                      </div>
+                      <div>
+                        <label style={{ color: '#aaa', fontSize: 11, display: 'block', marginBottom: 4 }}>Protein (g)</label>
+                        <input type="number" value={customFood.protein} onChange={(e) => setCustomFood(prev => ({ ...prev, protein: e.target.value }))}
+                          placeholder="15" style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14 }} />
+                      </div>
+                      <div>
+                        <label style={{ color: '#aaa', fontSize: 11, display: 'block', marginBottom: 4 }}>Carbs (g)</label>
+                        <input type="number" value={customFood.carbs} onChange={(e) => setCustomFood(prev => ({ ...prev, carbs: e.target.value }))}
+                          placeholder="30" style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14 }} />
+                      </div>
+                      <div>
+                        <label style={{ color: '#aaa', fontSize: 11, display: 'block', marginBottom: 4 }}>Fat (g)</label>
+                        <input type="number" value={customFood.fat} onChange={(e) => setCustomFood(prev => ({ ...prev, fat: e.target.value }))}
+                          placeholder="10" style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 14 }} />
+                      </div>
                     </div>
-                  ) : (
-                    <div style={{ color: '#666', textAlign: 'center', fontSize: 14 }}>
-                      No food logged for {selectedDate === new Date().toISOString().split('T')[0] ? 'today' : 'this date'}
+                    <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                      <button onClick={() => setShowAddFood(false)}
+                        style={{ flex: 1, padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: '#aaa', fontSize: 14, cursor: 'pointer' }}>Cancel</button>
+                      <button onClick={addCustomFood} disabled={!customFood.name}
+                        style={{ flex: 1, padding: 12, borderRadius: 8, border: 'none', background: customFood.name ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255,255,255,0.1)', color: '#fff', fontSize: 14, fontWeight: 600, cursor: customFood.name ? 'pointer' : 'not-allowed' }}>Add Food</button>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
