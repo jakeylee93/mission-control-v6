@@ -121,7 +121,6 @@ export function HealthApp({ onBack }: HealthAppProps) {
       })
 
       if (response.ok) {
-        // Reload data to reflect deletion and wait for it
         await loadDataForDate(selectedDate)
       } else {
         const error = await response.text()
@@ -130,6 +129,35 @@ export function HealthApp({ onBack }: HealthAppProps) {
     } catch (error) {
       console.error('Delete error:', error)
       alert('Failed to delete drink')
+    }
+  }
+
+  async function updateDrinkQuantity(drinkIndex: number, newQuantity: number) {
+    if (newQuantity < 1) {
+      // If quantity goes to 0, delete it
+      await deleteDrink(drinkIndex)
+      return
+    }
+    try {
+      const response = await fetch('/api/lovely/drinks/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: selectedDate,
+          drinkIndex: drinkIndex,
+          updates: { quantity: newQuantity }
+        })
+      })
+
+      if (response.ok) {
+        await loadDataForDate(selectedDate)
+      } else {
+        const error = await response.text()
+        alert(`Failed to update drink: ${error}`)
+      }
+    } catch (error) {
+      console.error('Update error:', error)
+      alert('Failed to update drink')
     }
   }
 
@@ -823,45 +851,94 @@ export function HealthApp({ onBack }: HealthAppProps) {
                 }}>
                   {drinksData?.drinks?.length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {drinksData.drinks.slice(-5).reverse().map((drink: any, idx: number) => {
+                      {drinksData.drinks.slice(-10).reverse().map((drink: any, idx: number) => {
                         const actualIndex = drinksData.drinks.length - 1 - idx
+                        const qty = drink.quantity || 1
                         return (
                           <div key={idx} style={{
                             display: 'flex',
-                            justifyContent: 'space-between',
                             alignItems: 'center',
-                            padding: '8px 12px',
+                            padding: '10px 12px',
                             background: 'rgba(255,255,255,0.05)',
-                            borderRadius: 8
+                            borderRadius: 10,
+                            gap: 10
                           }}>
-                            <div style={{ color: '#fff', flex: 1 }}>
-                              <div style={{ fontWeight: 600, fontSize: 14 }}>{drink.name}</div>
-                              <div style={{ color: '#888', fontSize: 12 }}>
-                                {drink.portion} • {drink.calories} cal • {drink.alcoholUnits} units
+                            {/* Drink info */}
+                            <div style={{ flex: 1 }}>
+                              <div style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>{drink.name}</div>
+                              <div style={{ color: '#888', fontSize: 11 }}>
+                                {drink.portion} • {drink.calories || 0} cal • {drink.alcoholUnits || 0} units
                               </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div style={{ color: '#888', fontSize: 11 }}>
-                                {new Date(drink.timestamp).toLocaleTimeString('en-GB', { 
-                                  hour: '2-digit', 
-                                  minute: '2-digit' 
-                                })}
-                              </div>
+                            
+                            {/* Quantity controls */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <button
-                                onClick={() => deleteDrink(actualIndex)}
+                                onClick={() => updateDrinkQuantity(actualIndex, qty - 1)}
                                 style={{
-                                  background: 'rgba(239,68,68,0.2)',
-                                  border: '1px solid rgba(239,68,68,0.4)',
-                                  borderRadius: 6,
-                                  color: '#ef4444',
-                                  padding: '4px 8px',
-                                  fontSize: 10,
-                                  cursor: 'pointer'
+                                  width: 28, height: 28,
+                                  borderRadius: 7,
+                                  border: '1px solid rgba(255,255,255,0.15)',
+                                  background: 'rgba(255,255,255,0.05)',
+                                  color: '#aaa',
+                                  fontSize: 16,
+                                  cursor: 'pointer',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  padding: 0
                                 }}
                               >
-                                Delete
+                                −
+                              </button>
+                              <span style={{
+                                color: '#fff',
+                                fontSize: 15,
+                                fontWeight: 600,
+                                minWidth: 20,
+                                textAlign: 'center'
+                              }}>
+                                {qty}
+                              </span>
+                              <button
+                                onClick={() => updateDrinkQuantity(actualIndex, qty + 1)}
+                                style={{
+                                  width: 28, height: 28,
+                                  borderRadius: 7,
+                                  border: '1px solid rgba(255,255,255,0.15)',
+                                  background: 'rgba(255,255,255,0.05)',
+                                  color: '#aaa',
+                                  fontSize: 16,
+                                  cursor: 'pointer',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  padding: 0
+                                }}
+                              >
+                                +
                               </button>
                             </div>
+
+                            {/* Time */}
+                            <div style={{ color: '#666', fontSize: 10 }}>
+                              {drink.timestamp ? new Date(drink.timestamp).toLocaleTimeString('en-GB', { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              }) : ''}
+                            </div>
+
+                            {/* Delete */}
+                            <button
+                              onClick={() => deleteDrink(actualIndex)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                color: '#ef4444',
+                                fontSize: 14,
+                                cursor: 'pointer',
+                                padding: '4px',
+                                opacity: 0.6
+                              }}
+                            >
+                              ✕
+                            </button>
                           </div>
                         )
                       })}
