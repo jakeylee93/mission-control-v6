@@ -81,7 +81,8 @@ export function HealthApp({ onBack }: HealthAppProps) {
     fat: 0,
     alcoholUnits: 0
   })
-  
+  const [monthData, setMonthData] = useState<Record<string, { hasFood: boolean; hasDrinks: boolean }>>({})
+
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load today's data
@@ -90,6 +91,25 @@ export function HealthApp({ onBack }: HealthAppProps) {
     loadPersonalFavorites()
     loadFoodCategories()
   }, [selectedDate])
+
+  // Load month summary for calendar indicators
+  useEffect(() => {
+    loadMonthSummary()
+  }, [currentMonth])
+
+  async function loadMonthSummary() {
+    try {
+      const year = currentMonth.getFullYear()
+      const month = String(currentMonth.getMonth() + 1).padStart(2, '0')
+      const res = await fetch(`/api/health/daily?mode=month&month=${year}-${month}`)
+      if (res.ok) {
+        const data = await res.json()
+        setMonthData(data.dates || {})
+      }
+    } catch (error) {
+      console.error('Failed to load month summary:', error)
+    }
+  }
 
   async function loadFoodCategories() {
     try {
@@ -451,7 +471,9 @@ export function HealthApp({ onBack }: HealthAppProps) {
   }
 
   async function loadTodaysData() {
-    loadDataForDate(selectedDate)
+    await loadDataForDate(selectedDate)
+    // Refresh month indicators too
+    loadMonthSummary()
   }
 
 
@@ -624,6 +646,11 @@ export function HealthApp({ onBack }: HealthAppProps) {
               const isSelected = dateStr === selectedDate
               const isToday = dateStr === new Date().toISOString().split('T')[0]
               
+              const dateInfo = monthData[dateStr]
+              const hasFood = dateInfo?.hasFood || false
+              const hasDrinks = dateInfo?.hasDrinks || false
+              const hasData = hasFood || hasDrinks
+
               days.push(
                 <button
                   key={dateStr}
@@ -631,15 +658,23 @@ export function HealthApp({ onBack }: HealthAppProps) {
                   style={{
                     border: 'none',
                     borderRadius: 6,
-                    padding: 8,
-                    background: isSelected ? '#FFD700' : isToday ? 'rgba(255,215,0,0.2)' : 'transparent',
+                    padding: '6px 4px 2px',
+                    background: isSelected ? '#FFD700' : isToday ? 'rgba(255,215,0,0.2)' : hasData && isCurrentMonth ? 'rgba(255,255,255,0.04)' : 'transparent',
                     color: isSelected ? '#000' : isCurrentMonth ? '#fff' : '#666',
                     fontSize: 12,
                     cursor: 'pointer',
-                    fontWeight: isSelected || isToday ? 600 : 400
+                    fontWeight: isSelected || isToday ? 600 : 400,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 2
                   }}
                 >
                   {d.getDate()}
+                  <div style={{ display: 'flex', gap: 2, height: 5 }}>
+                    {hasFood && <div style={{ width: 5, height: 5, borderRadius: '50%', background: isSelected ? '#000' : '#4ecdc4' }} />}
+                    {hasDrinks && <div style={{ width: 5, height: 5, borderRadius: '50%', background: isSelected ? '#333' : '#f093fb' }} />}
+                  </div>
                 </button>
               )
             }
@@ -697,9 +732,9 @@ export function HealthApp({ onBack }: HealthAppProps) {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Add Food & Drinks Button */}
       <div style={{ marginBottom: 20 }}>
-        <button 
+        <button
           onClick={() => setShowFoodAndDrinks(true)}
           style={{
             background: 'linear-gradient(135deg, #667eea 0%, #f093fb 100%)',
@@ -714,13 +749,12 @@ export function HealthApp({ onBack }: HealthAppProps) {
             alignItems: 'center',
             justifyContent: 'center',
             gap: 8,
-            width: '100%',
-            marginBottom: 16
+            width: '100%'
           }}
         >
-          🍽️ Food & Drinks
+          + Add Food & Drinks
         </button>
-        
+
         <input
           ref={fileInputRef}
           type="file"
@@ -728,6 +762,125 @@ export function HealthApp({ onBack }: HealthAppProps) {
           onChange={handleFileSelect}
           style={{ display: 'none' }}
         />
+      </div>
+
+      {/* Daily Food & Drinks Log */}
+      <div style={{
+        background: 'rgba(255,255,255,0.04)',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 20,
+        border: '1px solid rgba(255,255,255,0.08)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 600, margin: 0 }}>
+            {selectedDate === new Date().toISOString().split('T')[0] ? "Today's" : formatDate(selectedDate)} Log
+          </h3>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#888', fontSize: 11 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ecdc4', display: 'inline-block' }} /> food
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: '#888', fontSize: 11 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f093fb', display: 'inline-block' }} /> drinks
+            </span>
+          </div>
+        </div>
+
+        {/* Food Items */}
+        {entries.length > 0 && (
+          <div style={{ marginBottom: entries.length > 0 && drinksData?.drinks?.length > 0 ? 12 : 0 }}>
+            {entries.map((food) => (
+              <div key={food.id} style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '10px 12px',
+                background: 'rgba(78,205,196,0.06)',
+                borderRadius: 10,
+                marginBottom: 6,
+                borderLeft: '3px solid #4ecdc4',
+                gap: 10
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>
+                    {food.foods?.[0]?.name || 'Food Item'}
+                  </div>
+                  <div style={{ color: '#888', fontSize: 11, marginTop: 2 }}>
+                    {food.total_calories} cal · {food.total_protein}g P · {food.total_carbs}g C · {food.total_fat}g F
+                  </div>
+                </div>
+                <div style={{ color: '#666', fontSize: 10 }}>
+                  {new Date(food.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+                <button onClick={() => deleteFood(food.id)} style={{
+                  background: 'none', border: 'none', color: '#ef4444', fontSize: 13, cursor: 'pointer', padding: '4px', opacity: 0.6
+                }}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Drink Items */}
+        {drinksData?.drinks?.length > 0 && (
+          <div>
+            {drinksData.drinks.map((drink: any, idx: number) => {
+              const qty = drink.quantity || 1
+              return (
+                <div key={`drink-${idx}`} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '10px 12px',
+                  background: 'rgba(240,147,251,0.06)',
+                  borderRadius: 10,
+                  marginBottom: 6,
+                  borderLeft: '3px solid #f093fb',
+                  gap: 10
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>
+                      {drink.name}{qty > 1 ? ` ×${qty}` : ''}
+                    </div>
+                    <div style={{ color: '#888', fontSize: 11, marginTop: 2 }}>
+                      {drink.calories || 0} cal · {drink.alcoholUnits || 0} units · {drink.portion || ''}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button onClick={() => updateDrinkQuantity(idx, qty - 1)} style={{
+                      width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'rgba(255,255,255,0.05)', color: '#aaa', fontSize: 14, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                    }}>−</button>
+                    <span style={{ color: '#fff', fontSize: 13, fontWeight: 600, minWidth: 16, textAlign: 'center' }}>{qty}</span>
+                    <button onClick={() => updateDrinkQuantity(idx, qty + 1)} style={{
+                      width: 24, height: 24, borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'rgba(255,255,255,0.05)', color: '#aaa', fontSize: 14, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                    }}>+</button>
+                  </div>
+                  <div style={{ color: '#666', fontSize: 10 }}>
+                    {drink.timestamp ? new Date(drink.timestamp).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}
+                  </div>
+                  <button onClick={() => deleteDrink(idx)} style={{
+                    background: 'none', border: 'none', color: '#ef4444', fontSize: 13, cursor: 'pointer', padding: '4px', opacity: 0.6
+                  }}>✕</button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Empty state */}
+        {entries.length === 0 && (!drinksData?.drinks || drinksData.drinks.length === 0) && (
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            borderRadius: 12,
+            padding: 20,
+            textAlign: 'center',
+            color: '#666',
+            fontSize: 14
+          }}>
+            No food or drinks logged{selectedDate === new Date().toISOString().split('T')[0] ? ' today' : ''} — tap the button above to add
+          </div>
+        )}
       </div>
 
       {/* Food & Drinks Modal */}
