@@ -62,12 +62,67 @@ END
 $$;
 `
 
+const NUTRITION_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS nutrition_entries (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  timestamp timestamptz,
+  image_url text,
+  foods jsonb,
+  total_calories int DEFAULT 0,
+  total_protein numeric DEFAULT 0,
+  total_carbs numeric DEFAULT 0,
+  total_fat numeric DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE nutrition_entries ENABLE ROW LEVEL SECURITY;
+`
+
+const NUTRITION_POLICY_SQL = `
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'nutrition_entries' AND policyname = 'allow_all_nutrition'
+  ) THEN
+    CREATE POLICY allow_all_nutrition ON nutrition_entries FOR ALL USING (true);
+  END IF;
+END $$;
+`
+
+const DRINK_COLLECTION_SQL = `
+CREATE TABLE IF NOT EXISTS drink_collection (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  category text NOT NULL,
+  name text NOT NULL,
+  calories int DEFAULT 0,
+  alcohol_units numeric DEFAULT 0,
+  portion text DEFAULT 'pint',
+  image_url text,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE drink_collection ENABLE ROW LEVEL SECURITY;
+`
+
+const DRINK_COLLECTION_POLICY_SQL = `
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'drink_collection' AND policyname = 'allow_all_drink_collection'
+  ) THEN
+    CREATE POLICY allow_all_drink_collection ON drink_collection FOR ALL USING (true);
+  END IF;
+END $$;
+`
+
 const TABLE_CHECKS: Array<{ table: string; select: string }> = [
   { table: 'lovely_checkins', select: 'id' },
   { table: 'lovely_water', select: 'id' },
   { table: 'lovely_lager', select: 'id' },
   { table: 'chat_messages', select: 'id' },
   { table: 'chat_quick_log', select: 'id' },
+  { table: 'nutrition_entries', select: 'id' },
+  { table: 'drink_collection', select: 'id' },
 ]
 
 const SETUP_SQL = [
@@ -76,6 +131,10 @@ const SETUP_SQL = [
   CHAT_MESSAGES_POLICY_SQL,
   CHAT_QUICK_LOG_SQL,
   CHAT_QUICK_LOG_POLICY_SQL,
+  NUTRITION_TABLE_SQL,
+  NUTRITION_POLICY_SQL,
+  DRINK_COLLECTION_SQL,
+  DRINK_COLLECTION_POLICY_SQL,
 ]
 
 function parseProjectRef(url: string | undefined): string {
