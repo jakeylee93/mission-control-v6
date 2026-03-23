@@ -88,6 +88,7 @@ const PERSONAL: AppDef[] = [
   { icon: I.reading, label: 'Reading', color: '#a855f7', id: 'reading' },
   { icon: I.downtime, label: 'Downtime', color: '#6366f1', id: 'downtime' },
   { icon: I.lovely, label: 'Lovely', color: '#FFD700', id: 'lovely' },
+  { icon: I.memory, label: 'Memory', color: '#ec4899', id: 'memory' },
 ]
 
 const LAB: AppDef[] = [
