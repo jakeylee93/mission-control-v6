@@ -90,6 +90,12 @@ export function HealthApp({ onBack }: HealthAppProps) {
   const [quantityDrink, setQuantityDrink] = useState<CollectionDrink | null>(null)
   const [quantityValue, setQuantityValue] = useState(1)
 
+  // Edit drink state
+  const [editingDrink, setEditingDrink] = useState<CollectionDrink | null>(null)
+
+  // Zero-calorie warning state
+  const [zeroCaloricDrink, setZeroCaloricDrink] = useState<CollectionDrink | null>(null)
+
   // AI identify state
   const [isIdentifying, setIsIdentifying] = useState(false)
 
@@ -168,6 +174,55 @@ export function HealthApp({ onBack }: HealthAppProps) {
       }
     } catch (error) {
       console.error('Remove drink from collection error:', error)
+    }
+  }
+
+  function openEditDrink(drink: CollectionDrink) {
+    setEditingDrink(drink)
+    setNewDrink({
+      name: drink.name,
+      calories: String(drink.calories || ''),
+      alcohol_units: String(drink.alcohol_units || ''),
+      portion: drink.portion || 'pint',
+      image_url: drink.image_url || '',
+    })
+    setShowAddToCollection(true)
+  }
+
+  async function updateDrinkInCollection(drinkId: string, category: string) {
+    if (!newDrink.name) return
+    try {
+      const res = await fetch('/api/health/drinks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: drinkId,
+          category,
+          name: newDrink.name,
+          calories: parseInt(newDrink.calories) || 0,
+          alcohol_units: parseFloat(newDrink.alcohol_units) || 0,
+          portion: newDrink.portion,
+          image_url: newDrink.image_url || null,
+        })
+      })
+      if (res.ok) {
+        setShowAddToCollection(false)
+        setEditingDrink(null)
+        setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint', image_url: '' })
+        await loadDrinkCollection()
+        showToast(`Updated ${newDrink.name}`)
+      }
+    } catch (error) {
+      console.error('Update drink in collection error:', error)
+    }
+  }
+
+  function handleDrinkTap(drink: CollectionDrink) {
+    if (drink.calories === 0 && drink.alcohol_units === 0) {
+      setZeroCaloricDrink(drink)
+    } else {
+      setQuantityDrink(drink)
+      setQuantityValue(1)
     }
   }
 
@@ -837,7 +892,7 @@ export function HealthApp({ onBack }: HealthAppProps) {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                     {(drinkCollection[selectedCategory] || []).map((drink) => (
                       <div key={drink.id} style={{ position: 'relative' }}>
-                        <button onClick={() => { setQuantityDrink(drink); setQuantityValue(1) }} style={{
+                        <button onClick={() => handleDrinkTap(drink)} style={{
                           width: '100%', background: 'rgba(255,255,255,0.05)',
                           border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12,
                           padding: '16px 10px', cursor: 'pointer',
@@ -874,6 +929,12 @@ export function HealthApp({ onBack }: HealthAppProps) {
                           </div>
                           <div style={{ color: '#666', fontSize: 10 }}>{drink.portion}</div>
                         </button>
+                        <button onClick={(e) => { e.stopPropagation(); openEditDrink(drink) }} style={{
+                          position: 'absolute', top: 4, right: 28,
+                          background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 6,
+                          color: '#888', fontSize: 11, cursor: 'pointer', padding: '2px 6px',
+                          lineHeight: 1
+                        }}>✎</button>
                         <button onClick={(e) => { e.stopPropagation(); removeDrinkFromCollection(drink.id) }} style={{
                           position: 'absolute', top: 4, right: 4,
                           background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: 6,
@@ -1106,6 +1167,50 @@ export function HealthApp({ onBack }: HealthAppProps) {
         </div>
       )}
 
+      {/* Zero-Calorie Warning Modal */}
+      {zeroCaloricDrink && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.7)', zIndex: 1003,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+        }}>
+          <div style={{
+            background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+            borderRadius: 20, padding: 24, maxWidth: 320, width: '100%', textAlign: 'center'
+          }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: 12, margin: '0 auto 16px',
+              background: 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 24
+            }}>⚠</div>
+            <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 600, margin: '0 0 8px' }}>No calorie data</h3>
+            <div style={{ color: '#aaa', fontSize: 13, marginBottom: 24, lineHeight: 1.5 }}>
+              <strong style={{ color: '#fff' }}>{zeroCaloricDrink.name}</strong> has no calorie data yet. Would you like to add details first?
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => {
+                const drink = zeroCaloricDrink
+                setZeroCaloricDrink(null)
+                setQuantityDrink(drink)
+                setQuantityValue(1)
+              }} style={{
+                flex: 1, padding: 12, borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)',
+                background: 'transparent', color: '#aaa', fontSize: 13, cursor: 'pointer'
+              }}>Log Anyway</button>
+              <button onClick={() => {
+                const drink = zeroCaloricDrink
+                setZeroCaloricDrink(null)
+                openEditDrink(drink)
+              }} style={{
+                flex: 1, padding: 12, borderRadius: 10, border: 'none',
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+              }}>Edit Details</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Quantity Selector Modal (#8) */}
       {quantityDrink && (
         <div style={{
@@ -1117,12 +1222,12 @@ export function HealthApp({ onBack }: HealthAppProps) {
             background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
             borderRadius: 20, padding: 24, maxWidth: 320, width: '100%', textAlign: 'center'
           }}>
-            <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 600, margin: '0 0 4px' }}>{quantityDrink.name}</h3>
+            <h3 style={{ color: '#FFD700', fontSize: 18, fontWeight: 700, margin: '0 0 6px' }}>{quantityDrink.name}</h3>
             <div style={{ color: '#888', fontSize: 12, marginBottom: 20 }}>
-              {quantityDrink.calories} cal · {quantityDrink.alcohol_units} units · {quantityDrink.portion}
+              {quantityDrink.calories} cal · {quantityDrink.alcohol_units} units per {quantityDrink.portion}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginBottom: 20 }}>
               <button onClick={() => setQuantityValue(Math.max(1, quantityValue - 1))} style={{
                 width: 44, height: 44, borderRadius: 12, border: '1px solid rgba(255,255,255,0.2)',
                 background: 'rgba(255,255,255,0.08)', color: '#fff', fontSize: 22, cursor: 'pointer',
@@ -1136,8 +1241,17 @@ export function HealthApp({ onBack }: HealthAppProps) {
               }}>+</button>
             </div>
 
-            <div style={{ color: '#aaa', fontSize: 12, marginBottom: 16 }}>
-              Total: {quantityDrink.calories * quantityValue} cal · {(quantityDrink.alcohol_units * quantityValue).toFixed(1)} units
+            <div style={{
+              background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 12, marginBottom: 16
+            }}>
+              <div style={{ color: '#fff', fontSize: 14, fontWeight: 600, marginBottom: 2 }}>
+                Total: {quantityDrink.calories * quantityValue} cal · {(quantityDrink.alcohol_units * quantityValue).toFixed(1)} units
+              </div>
+              {quantityDrink.calories === 0 && (
+                <div style={{ color: '#f59e0b', fontSize: 11, marginTop: 6 }}>
+                  No calorie data — tap Edit to add details
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
@@ -1146,10 +1260,10 @@ export function HealthApp({ onBack }: HealthAppProps) {
                 background: 'transparent', color: '#aaa', fontSize: 14, cursor: 'pointer'
               }}>Cancel</button>
               <button onClick={() => logDrinkFromCollection(quantityDrink, quantityValue)} style={{
-                flex: 1, padding: 12, borderRadius: 10, border: 'none',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                flex: 2, padding: 12, borderRadius: 10, border: 'none',
+                background: 'linear-gradient(135deg, #22c55e, #16a34a)',
                 color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer'
-              }}>Add</button>
+              }}>Save {quantityValue} {quantityDrink.name}</button>
             </div>
           </div>
         </div>
@@ -1168,9 +1282,9 @@ export function HealthApp({ onBack }: HealthAppProps) {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 600, margin: 0 }}>
-                Add to {DRINK_CATEGORIES.find(c => c.key === selectedCategory)?.label}
+                {editingDrink ? `Edit ${editingDrink.name}` : `Add to ${DRINK_CATEGORIES.find(c => c.key === selectedCategory)?.label}`}
               </h3>
-              <button onClick={() => { setShowAddToCollection(false); setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint', image_url: '' }) }} style={{
+              <button onClick={() => { setShowAddToCollection(false); setEditingDrink(null); setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint', image_url: '' }) }} style={{
                 background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: 8,
                 color: '#aaa', padding: 8, cursor: 'pointer', fontSize: 16
               }}>✕</button>
@@ -1243,15 +1357,15 @@ export function HealthApp({ onBack }: HealthAppProps) {
               </div>
 
               <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
-                <button onClick={() => { setShowAddToCollection(false); setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint', image_url: '' }) }} style={{
+                <button onClick={() => { setShowAddToCollection(false); setEditingDrink(null); setNewDrink({ name: '', calories: '', alcohol_units: '', portion: 'pint', image_url: '' }) }} style={{
                   flex: 1, padding: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)',
                   background: 'transparent', color: '#aaa', fontSize: 14, cursor: 'pointer'
                 }}>Cancel</button>
-                <button onClick={() => addDrinkToCollection(selectedCategory)} disabled={!newDrink.name} style={{
+                <button onClick={() => editingDrink ? updateDrinkInCollection(editingDrink.id, editingDrink.category) : addDrinkToCollection(selectedCategory)} disabled={!newDrink.name} style={{
                   flex: 1, padding: 12, borderRadius: 8, border: 'none',
                   background: newDrink.name ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255,255,255,0.1)',
                   color: '#fff', fontSize: 14, fontWeight: 600, cursor: newDrink.name ? 'pointer' : 'not-allowed'
-                }}>Save to Collection</button>
+                }}>{editingDrink ? 'Save Changes' : 'Save to Collection'}</button>
               </div>
             </div>
           </div>

@@ -66,6 +66,43 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function PUT(req: NextRequest) {
+  const supabase = createServerSupabaseAdmin()
+
+  try {
+    const body = await req.json()
+    const { id, category, name, calories, alcohol_units, portion, image_url } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 })
+    }
+    if (!name) {
+      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+    }
+
+    const { data, error } = await supabase
+      .from('drink_collection')
+      .update({
+        category,
+        name,
+        calories: calories || 0,
+        alcohol_units: alcohol_units || 0,
+        portion: portion || 'pint',
+        image_url: image_url || null,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    return NextResponse.json({ success: true, drink: data })
+  } catch (error: any) {
+    console.error('Update drink in collection error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   const supabase = createServerSupabaseAdmin()
 
