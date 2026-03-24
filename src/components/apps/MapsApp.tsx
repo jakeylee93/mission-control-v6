@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-type CategoryKey = 'favourites' | 'restaurants' | 'exhibition'
+type CategoryKey = 'favourites' | 'restaurants' | 'pubs' | 'friends' | 'suppliers' | 'exhibition'
 
 interface Place {
   name: string
@@ -24,6 +24,14 @@ const MUTED_COLOR = '#888'
 const PANEL_COLOR = 'rgba(255,255,255,0.04)'
 const BORDER_COLOR = 'rgba(255,255,255,0.08)'
 
+const HOME_ADDRESS = '60 Dukes Avenue, Theydon Bois, Essex CM16 7HF'
+
+function getRouteFromHomeUrl(name: string, address: string) {
+  const origin = encodeURIComponent(HOME_ADDRESS)
+  const destination = encodeURIComponent(`${name} ${address}`)
+  return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`
+}
+
 const CATEGORIES: Category[] = [
   {
     key: 'favourites',
@@ -31,6 +39,27 @@ const CATEGORIES: Category[] = [
     accent: '#FFD700',
     places: [
       { name: 'Home', address: '60 Dukes Avenue, Theydon Bois, Essex CM16 7HF', phone: '01921 812793', note: 'Home' },
+    ],
+  },
+  {
+    key: 'exhibition',
+    title: 'EXHIBITION CENTRES',
+    accent: '#6366f1',
+    places: [
+      { name: 'NAEC Stoneleigh', address: 'Stoneleigh Park, Kenilworth CV8 2LZ', phone: '024 7669 6969', note: 'National Agricultural & Exhibition Centre' },
+      { name: 'ExCeL London', address: 'Royal Victoria Dock, 1 Western Gateway, London E16 1XL', phone: '020 7069 5000' },
+      { name: 'Olympia London', address: 'Hammersmith Road, Kensington, London W14 8UX', phone: '020 7385 1200' },
+      { name: 'NEC Birmingham', address: 'North Avenue, Marston Green, Birmingham B40 1NT', phone: '0121 780 4141' },
+      { name: 'Alexandra Palace', address: 'Alexandra Palace Way, Muswell Hill, London N22 7AY', phone: '020 8365 2121' },
+      { name: 'Manchester Central', address: 'Windmill Street, Manchester M2 3GX', phone: '0161 834 2700' },
+      { name: 'ACC Liverpool', address: "King's Dock, Liverpool L3 4FP", phone: '0151 475 8888' },
+    ],
+  },
+  {
+    key: 'suppliers',
+    title: 'SUPPLIERS',
+    accent: '#10b981',
+    places: [
       { name: 'TM Event Hire', address: 'Unit 16, Griffin Farm, Great Canfield, Essex CM6 1JZ', phone: '07595 979451', note: 'Event equipment suppliers' },
       { name: 'N2 Group', address: 'Unit C, Foxholes Business Park, John Tate Road, Hertford SG13 7DT', phone: '01992 440333', note: 'Print & visual communications' },
     ],
@@ -48,15 +77,16 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
-    key: 'exhibition',
-    title: 'EXHIBITION CENTRES',
-    accent: '#6366f1',
-    places: [
-      { name: 'ExCeL London', address: 'Royal Victoria Dock, 1 Western Gateway, London E16 1XL', phone: '020 7069 5000' },
-      { name: 'Olympia London', address: 'Hammersmith Road, Kensington, London W14 8UX', phone: '020 7385 1200' },
-      { name: 'NEC Birmingham', address: 'North Avenue, Marston Green, Birmingham B40 1NT', phone: '0121 780 4141' },
-      { name: 'Alexandra Palace', address: 'Alexandra Palace Way, Muswell Hill, London N22 7AY', phone: '020 8365 2121' },
-    ],
+    key: 'pubs',
+    title: 'PUBS',
+    accent: '#f59e0b',
+    places: [],
+  },
+  {
+    key: 'friends',
+    title: 'FRIENDS',
+    accent: '#ec4899',
+    places: [],
   },
 ]
 
@@ -141,6 +171,11 @@ export default function MapsApp({ onBack }: { onBack: () => void }) {
               {category.title}
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {category.places.length === 0 && (
+                <div style={{ padding: '16px 14px', borderRadius: 14, border: `1px solid ${BORDER_COLOR}`, background: PANEL_COLOR, color: MUTED_COLOR, fontSize: 13, textAlign: 'center' }}>
+                  No places added yet
+                </div>
+              )}
               {category.places.map((place) => (
                 <button
                   key={`${category.key}-${place.name}`}
@@ -270,41 +305,62 @@ export default function MapsApp({ onBack }: { onBack: () => void }) {
 
             {selected.place.note && <div style={{ fontSize: 13, color: '#bbb', lineHeight: 1.5, marginBottom: 16 }}>{selected.place.note}</div>}
 
-            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-              <button
-                onClick={() => window.open(getPlaceSearchUrl(selected.place.name, selected.place.address), '_blank', 'noopener,noreferrer')}
-                style={{
-                  flex: 1,
-                  border: 'none',
-                  borderRadius: 12,
-                  padding: '12px 14px',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  color: '#fff',
-                  background: selected.accent,
-                  cursor: 'pointer',
-                }}
-              >
-                Navigate
-              </button>
-
-              {selected.place.phone && (
-                <a
-                  href={`tel:${normalizePhone(selected.place.phone)}`}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => window.open(getPlaceSearchUrl(selected.place.name, selected.place.address), '_blank', 'noopener,noreferrer')}
                   style={{
                     flex: 1,
+                    border: 'none',
                     borderRadius: 12,
                     padding: '12px 14px',
                     fontSize: 14,
                     fontWeight: 700,
-                    color: selected.accent,
-                    border: `1px solid ${selected.accent}`,
-                    textDecoration: 'none',
-                    textAlign: 'center',
+                    color: '#fff',
+                    background: selected.accent,
+                    cursor: 'pointer',
                   }}
                 >
-                  Call
-                </a>
+                  Navigate
+                </button>
+
+                {selected.place.phone && (
+                  <a
+                    href={`tel:${normalizePhone(selected.place.phone)}`}
+                    style={{
+                      flex: 1,
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: selected.accent,
+                      border: `1px solid ${selected.accent}`,
+                      textDecoration: 'none',
+                      textAlign: 'center',
+                    }}
+                  >
+                    Call
+                  </a>
+                )}
+              </div>
+
+              {selected.place.name !== 'Home' && (
+                <button
+                  onClick={() => window.open(getRouteFromHomeUrl(selected.place.name, selected.place.address), '_blank', 'noopener,noreferrer')}
+                  style={{
+                    width: '100%',
+                    border: 'none',
+                    borderRadius: 12,
+                    padding: '12px 14px',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: '#fff',
+                    background: 'rgba(255,255,255,0.08)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Route from Home
+                </button>
               )}
             </div>
           </div>
