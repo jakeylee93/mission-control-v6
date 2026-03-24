@@ -16,13 +16,13 @@ type QuickChatMessage = { role: 'user' | 'assistant'; content: string }
 
 interface Agent {
   id: string; name: string; role: string; model: string; provider: string
-  avatar: string; accent: string; monthSpend: string; lastActive: string
+  avatar: string; thumbnail: string; accent: string; monthSpend: string; lastActive: string; weekSummary: string
 }
 
 const AGENTS: Agent[] = [
-  { id: 'marg', name: 'Margarita', role: 'Orchestrator', model: 'Claude Opus', provider: 'Anthropic', avatar: '/images/marg.png', accent: '#FFD700', monthSpend: '£847.20', lastActive: 'Just now' },
-  { id: 'doc', name: 'Doc', role: 'Builder', model: 'Codex', provider: 'OpenAI', avatar: '/images/doc.png', accent: '#60A5FA', monthSpend: '£124.50', lastActive: '2h ago' },
-  { id: 'cindy', name: 'Cindy', role: 'Assistant', model: 'Kimi (Moonshot)', provider: 'Moonshot', avatar: '/images/cindy.png', accent: '#C084FC', monthSpend: '£31.80', lastActive: '5h ago' },
+  { id: 'marg', name: 'Margarita', role: 'Orchestrator', model: 'Claude Opus', provider: 'Anthropic', avatar: '/images/marg-new.png', thumbnail: '/images/marg-new.png', accent: '#FFD700', monthSpend: '£847.20', lastActive: 'Just now', weekSummary: 'Health app, Media List, Maps redesign' },
+  { id: 'doc', name: 'Doc', role: 'Builder', model: 'Codex', provider: 'OpenAI', avatar: '/images/doc.png', thumbnail: '/images/doc.png', accent: '#60A5FA', monthSpend: '£124.50', lastActive: '2h ago', weekSummary: 'Mission Control builds' },
+  { id: 'cindy', name: 'Cindy', role: 'Assistant', model: 'Kimi (Moonshot)', provider: 'Moonshot', avatar: '/images/cindy.png', thumbnail: '/images/cindy.png', accent: '#C084FC', monthSpend: '£31.80', lastActive: '5h ago', weekSummary: 'Calendar & contacts' },
 ]
 
 /* ── SVG Icons ── */
@@ -254,6 +254,26 @@ export default function HomePage() {
   const [quickReply, setQuickReply] = useState('')
   const [quickLoading, setQuickLoading] = useState(false)
   const [quickExpanded, setQuickExpanded] = useState(false)
+  const [selectedAgent, setSelectedAgent] = useState<string>('marg')
+  const [agentDetailOpen, setAgentDetailOpen] = useState(false)
+  const [agentActivity, setAgentActivity] = useState<{ summary: string; days: { date: string; items: string[] }[] } | null>(null)
+  const [activityLoading, setActivityLoading] = useState(false)
+
+  const featuredAgent = AGENTS.find(a => a.id === selectedAgent) || AGENTS[0]
+
+  const fetchAgentActivity = useCallback(async (agentId: string) => {
+    setActivityLoading(true)
+    try {
+      const res = await fetch(`/api/agent-activity?agent=${agentId}`)
+      if (!res.ok) throw new Error('Failed')
+      const data = await res.json()
+      setAgentActivity(data)
+    } catch {
+      setAgentActivity(null)
+    } finally {
+      setActivityLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     void fetch('/api/setup', {
@@ -337,29 +357,181 @@ export default function HomePage() {
           <div style={{ fontSize: 26, fontWeight: 200, fontFamily: 'monospace', letterSpacing: 3, marginTop: 6, opacity: 0.7 }}>{timeFmt}</div>
         </header>
 
-        {/* Agent Cards — smaller on mobile */}
+        {/* Agent Selector — Hero Section */}
         {!activeApp && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
-            {AGENTS.map(a => (
-              <div key={a.id} style={{
-                background: 'rgba(255,255,255,0.04)', border: `1px solid ${a.accent}18`,
-                borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12,
+          <div style={{ marginBottom: 18 }}>
+            {/* Featured Agent Card */}
+            <div
+              onClick={() => {
+                if (!agentDetailOpen) fetchAgentActivity(selectedAgent)
+                setAgentDetailOpen(v => !v)
+              }}
+              style={{
+                background: 'rgba(255,255,255,0.04)',
+                border: `1px solid rgba(255,255,255,0.06)`,
+                borderRadius: 20,
+                padding: '16px 18px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Accent glow */}
+              <div style={{
+                position: 'absolute', top: -40, left: -40, width: 120, height: 120,
+                borderRadius: '50%', background: `${featuredAgent.accent}08`,
+                filter: 'blur(40px)', pointerEvents: 'none',
+              }} />
+
+              {/* Character Thumbnail */}
+              <div style={{
+                width: 100, height: 110, flexShrink: 0,
+                display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+                position: 'relative',
               }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: `${a.accent}15`, border: `1px solid ${a.accent}25`, overflow: 'hidden', flexShrink: 0 }}>
-                  <Image src={a.avatar} alt={a.name} width={44} height={44} style={{ width: 44, height: 44, objectFit: 'cover' }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14 }}>{a.name}</span>
-                    <span style={{ fontSize: 10, color: '#666', background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: 4 }}>{a.role}</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: '#777' }}>{a.model} · <span style={{ color: a.accent, fontWeight: 700 }}>{a.monthSpend}</span></div>
-                </div>
-                <span style={{ fontSize: 10, color: '#555' }}>{a.lastActive}</span>
+                <Image
+                  src={featuredAgent.thumbnail}
+                  alt={featuredAgent.name}
+                  width={100}
+                  height={110}
+                  style={{ objectFit: 'contain', transition: 'opacity 0.3s ease' }}
+                />
               </div>
-            ))}
-            <div style={{ textAlign: 'center', fontSize: 11, color: '#555', marginTop: 2 }}>
-              Total: <span style={{ color: '#6366f1', fontWeight: 700 }}>£1,003.50</span>
+
+              {/* Agent Info */}
+              <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 20, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -0.5 }}>{featuredAgent.name}</span>
+                  <span style={{
+                    fontSize: 10, color: featuredAgent.accent, background: `${featuredAgent.accent}15`,
+                    padding: '2px 8px', borderRadius: 10, fontWeight: 600, letterSpacing: 0.3,
+                  }}>{featuredAgent.role}</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#777', marginBottom: 6 }}>
+                  {featuredAgent.model} · {featuredAgent.provider}
+                </div>
+                <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>
+                  <span style={{ color: '#666' }}>This week:</span>{' '}
+                  <span style={{ color: '#aaa' }}>{featuredAgent.weekSummary}</span>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: featuredAgent.accent, fontFamily: "'Space Grotesk', sans-serif" }}>
+                  {featuredAgent.monthSpend}
+                  <span style={{ fontSize: 10, fontWeight: 400, color: '#555', marginLeft: 4 }}>this month</span>
+                </div>
+              </div>
+
+              {/* Expand indicator */}
+              <div style={{
+                position: 'absolute', bottom: 8, right: 14, fontSize: 10, color: '#444',
+                transition: 'transform 0.3s ease',
+                transform: agentDetailOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Expanded Detail Panel */}
+            <div style={{
+              maxHeight: agentDetailOpen ? 400 : 0,
+              opacity: agentDetailOpen ? 1 : 0,
+              overflow: 'hidden',
+              transition: 'max-height 0.4s ease, opacity 0.3s ease',
+            }}>
+              <div style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderTop: 'none',
+                borderRadius: '0 0 20px 20px',
+                padding: '14px 18px 16px',
+                maxHeight: 340,
+                overflowY: 'auto',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#ccc', fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {featuredAgent.name} — Last 7 Days
+                  </span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setAgentDetailOpen(false) }}
+                    style={{
+                      background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 8,
+                      color: '#666', padding: '4px 10px', fontSize: 11, cursor: 'pointer',
+                    }}
+                  >Close</button>
+                </div>
+
+                {activityLoading && (
+                  <div style={{ color: '#555', fontSize: 12, padding: '16px 0', textAlign: 'center' }}>Loading activity...</div>
+                )}
+
+                {!activityLoading && agentActivity && (
+                  <>
+                    <p style={{ fontSize: 12, color: '#999', lineHeight: 1.5, marginBottom: 14 }}>{agentActivity.summary}</p>
+                    {agentActivity.days.map(day => (
+                      <div key={day.date} style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 4 }}>
+                          {new Date(day.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </div>
+                        {day.items.map((item, i) => (
+                          <div key={i} style={{ fontSize: 11, color: '#888', paddingLeft: 10, marginBottom: 2, position: 'relative' }}>
+                            <span style={{ position: 'absolute', left: 0, color: '#444' }}>·</span>
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {!activityLoading && !agentActivity && (
+                  <div style={{ color: '#555', fontSize: 12, padding: '16px 0', textAlign: 'center' }}>Activity summary coming soon...</div>
+                )}
+              </div>
+            </div>
+
+            {/* Agent Switcher Chips */}
+            <div style={{
+              display: 'flex', justifyContent: 'center', gap: 20, marginTop: 14,
+            }}>
+              {AGENTS.map(a => (
+                <button
+                  key={a.id}
+                  onClick={() => {
+                    setSelectedAgent(a.id)
+                    setAgentDetailOpen(false)
+                    setAgentActivity(null)
+                  }}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  }}
+                >
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 20,
+                    border: selectedAgent === a.id ? `2px solid ${a.accent}` : '2px solid transparent',
+                    padding: 2,
+                    transition: 'all 0.3s ease',
+                    boxShadow: selectedAgent === a.id ? `0 0 12px ${a.accent}30` : 'none',
+                  }}>
+                    <div style={{
+                      width: '100%', height: '100%', borderRadius: '50%',
+                      overflow: 'hidden', background: 'rgba(255,255,255,0.06)',
+                    }}>
+                      <Image src={a.avatar} alt={a.name} width={36} height={36} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: 10, fontWeight: selectedAgent === a.id ? 700 : 500,
+                    color: selectedAgent === a.id ? a.accent : '#555',
+                    transition: 'all 0.3s ease',
+                  }}>{a.name}</span>
+                </button>
+              ))}
             </div>
           </div>
         )}
