@@ -8,6 +8,7 @@ import { HealthApp } from '@/components/HealthApp'
 import { MemoryView } from '@/components/tabs/MemoryView'
 import DocsTab from '@/components/tabs/DocsTab'
 import PlansTab from '@/components/tabs/PlansTab'
+import MediaListApp from '@/components/apps/MediaListApp'
 
 type TabId = 'business' | 'personal' | 'laboratory'
 type ActiveApp = string | null
@@ -278,6 +279,7 @@ export default function HomePage() {
     if (app.id === 'memory') { setActiveApp('memory'); return }
     if (app.id === 'docs') { setActiveApp('docs'); return }
     if (app.id === 'plans') { setActiveApp('plans'); return }
+    if (app.id === 'reading') { setActiveApp('reading'); return }
     // Future: other apps
   }, [])
 
@@ -593,6 +595,19 @@ export default function HomePage() {
               }}>{I.back} Back</button>
             </div>
             <PlansTab />
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'reading' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const,
+          paddingBottom: 80,
+        }}>
+          <div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px' }}>
+            <MediaListApp onBack={() => setActiveApp(null)} />
           </div>
         </div>
       )}
