@@ -24,7 +24,7 @@ const MUTED_COLOR = '#888'
 const PANEL_COLOR = 'rgba(255,255,255,0.04)'
 const BORDER_COLOR = 'rgba(255,255,255,0.08)'
 
-const HOME_ADDRESS = '60 Dukes Avenue, Theydon Bois, Essex CM16 7HF'
+const HOME_ADDRESS = '60 Dukes Avenue, CM16 7HF'
 
 function getRouteFromHomeUrl(name: string, address: string) {
   const origin = encodeURIComponent(HOME_ADDRESS)
@@ -38,7 +38,7 @@ const CATEGORIES: Category[] = [
     title: 'FAVOURITES',
     accent: '#FFD700',
     places: [
-      { name: 'Home', address: '60 Dukes Avenue, Theydon Bois, Essex CM16 7HF', phone: '01921 812793', note: 'Home' },
+      { name: 'Home', address: '60 Dukes Avenue, CM16 7HF', phone: '01921 812793', note: 'Home' },
     ],
   },
   {
@@ -101,7 +101,7 @@ function normalizePhone(phone: string) {
 }
 
 function getPlaceSearchUrl(name: string, address: string) {
-  const query = encodeURIComponent(`${name} ${address}`).replace(/%20/g, '+')
+  const query = encodeURIComponent(address).replace(/%20/g, '+')
   return `https://www.google.com/maps/search/?api=1&query=${query}`
 }
 
