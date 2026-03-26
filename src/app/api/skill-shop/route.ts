@@ -39,11 +39,9 @@ CREATE TABLE IF NOT EXISTS skill_shop (
   display_name text,
   summary text,
   category text,
-  is_installed boolean DEFAULT false,
   is_favorite boolean DEFAULT false,
   marg_rating integer,
   marg_notes text,
-  trust_level text DEFAULT 'unknown',
   source text DEFAULT 'clawhub',
   updated_at timestamptz DEFAULT now(),
   cached_at timestamptz DEFAULT now()
@@ -63,9 +61,42 @@ BEGIN
 END $$;
 `
 
+const SKILL_BUILD_QUEUE_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS skill_build_queue (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug text NOT NULL,
+  display_name text,
+  summary text,
+  user_note text,
+  status text DEFAULT 'pending',
+  created_at timestamptz DEFAULT now(),
+  acknowledged_at timestamptz
+);
+ALTER TABLE skill_build_queue ENABLE ROW LEVEL SECURITY;
+`
+
+const SKILL_BUILD_QUEUE_POLICY_SQL = `
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'skill_build_queue' AND policyname = 'allow_all_skill_build_queue'
+  ) THEN
+    CREATE POLICY allow_all_skill_build_queue ON skill_build_queue FOR ALL USING (true);
+  END IF;
+END $$;
+`
+
+function isLatinText(text: string): boolean {
+  if (!text) return true
+  // Filter out skills where the text has no Latin characters at all
+  const latinChars = text.match(/[a-zA-Z]/g)
+  return latinChars !== null && latinChars.length > 0
+}
+
 function autoCategory(slug: string, summary: string): string {
   const text = (slug + ' ' + summary).toLowerCase()
-  if (/event|hospitality|bar|venue|ticket|booking/.test(text)) return 'recommended'
+  if (/event|hospitality|bar|venue|ticket|booking|catering/.test(text)) return 'recommended'
   if (/business|crm|sales|marketing|revenue|invoice|client/.test(text)) return 'business'
   if (/automat|workflow|trigger|pipeline|zap/.test(text)) return 'automation'
   if (/email|slack|discord|chat|message|telegram|whatsapp/.test(text)) return 'communication'
@@ -85,15 +116,10 @@ interface ClawHubResult {
 
 const SEARCH_TERMS = [
   'automation', 'email', 'business', 'calendar', 'health',
-  'coding', 'social media', 'productivity', 'events', 'CRM',
-  'git', 'deploy', 'messaging', 'scheduling', 'analytics',
+  'scheduling', 'productivity', 'events', 'hospitality', 'CRM',
+  'social media', 'content creation', 'analytics', 'project management',
+  'customer service',
 ]
-
-const INSTALLED_SLUGS = new Set([
-  'coding-agent', 'github', 'gog', 'weather', 'skill-creator', 'healthcheck',
-  'video-frames', 'openai-whisper-api', 'openai-image-gen', 'nano-banana-pro',
-  'gh-issues', 'acp-router', 'node-connect',
-])
 
 // GET: return cached skills from Supabase
 export async function GET(req: NextRequest) {
@@ -102,7 +128,6 @@ export async function GET(req: NextRequest) {
 
   const category = searchParams.get('category')
   const favorites = searchParams.get('favorites') === 'true'
-  const installed = searchParams.get('installed') === 'true'
   const search = searchParams.get('search')
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,7 +135,6 @@ export async function GET(req: NextRequest) {
 
   if (category) query = query.eq('category', category)
   if (favorites) query = query.eq('is_favorite', true)
-  if (installed) query = query.eq('is_installed', true)
   if (search) query = query.or(`display_name.ilike.%${search}%,summary.ilike.%${search}%`)
 
   const { data, error } = await query.limit(300)
@@ -122,14 +146,14 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, skills: data || [] })
 }
 
-// POST: refresh cache by fetching from ClawHub API directly
+// POST: refresh cache by fetching from ClawHub API
 export async function POST() {
   const supabase = createServerSupabaseAdmin()
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const projectRef = parseProjectRef(supabaseUrl)
 
-  // Ensure table exists
+  // Ensure skill_shop table exists
   const { error: tableCheck } = await supabase.from('skill_shop').select('id').limit(1)
   if (tableCheck) {
     if (!serviceRoleKey) {
@@ -149,13 +173,24 @@ export async function POST() {
     }
   }
 
+  // Ensure skill_build_queue table exists
+  const { error: queueTableCheck } = await supabase.from('skill_build_queue').select('id').limit(1)
+  if (queueTableCheck && serviceRoleKey) {
+    try {
+      await runManagementSql(projectRef, serviceRoleKey, SKILL_BUILD_QUEUE_TABLE_SQL)
+      await runManagementSql(projectRef, serviceRoleKey, SKILL_BUILD_QUEUE_POLICY_SQL)
+    } catch {
+      // Queue table creation failure is non-fatal
+    }
+  }
+
   // Fetch skills from ClawHub API for each search term
   const allSkills: ClawHubResult[] = []
 
   for (const term of SEARCH_TERMS) {
     try {
       const res = await fetch(
-        `https://clawhub.ai/api/v1/search?q=${encodeURIComponent(term)}&limit=15`,
+        `https://clawhub.ai/api/v1/search?q=${encodeURIComponent(term)}&limit=20`,
         { cache: 'no-store' }
       )
       if (res.ok) {
@@ -176,19 +211,24 @@ export async function POST() {
     return true
   })
 
-  if (unique.length === 0) {
+  // Filter out Chinese-only (non-Latin) skills
+  const latinOnly = unique.filter(s => {
+    const nameOk = isLatinText(s.displayName || s.slug)
+    const summaryOk = !s.summary || isLatinText(s.summary)
+    return nameOk || summaryOk
+  })
+
+  if (latinOnly.length === 0) {
     return NextResponse.json({ ok: true, count: 0, message: 'No skills found from ClawHub' })
   }
 
-  // Build rows for upsert
+  // Build rows for upsert — preserve favorites and marg data
   const now = new Date().toISOString()
-  const rows = unique.map(skill => ({
+  const rows = latinOnly.map(skill => ({
     slug: skill.slug,
     display_name: skill.displayName || skill.slug,
     summary: skill.summary || null,
     category: autoCategory(skill.slug, skill.summary || ''),
-    is_installed: INSTALLED_SLUGS.has(skill.slug),
-    trust_level: 'looks-ok',
     source: 'clawhub',
     updated_at: skill.updatedAt || now,
     cached_at: now,
@@ -196,7 +236,10 @@ export async function POST() {
 
   const { error: upsertError } = await supabase
     .from('skill_shop')
-    .upsert(rows, { onConflict: 'slug' })
+    .upsert(rows, {
+      onConflict: 'slug',
+      ignoreDuplicates: false,
+    })
 
   if (upsertError) {
     return NextResponse.json({ ok: false, error: upsertError.message })

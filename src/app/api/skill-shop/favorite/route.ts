@@ -3,7 +3,7 @@ import { createServerSupabaseAdmin } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
-// POST { slug, favorite: boolean }: toggle favorite status
+// POST { slug, favorite: boolean }: toggle is_favorite in Supabase
 export async function POST(req: NextRequest) {
   const supabase = createServerSupabaseAdmin()
   const body = await req.json()
