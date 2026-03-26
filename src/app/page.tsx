@@ -8,6 +8,7 @@ import { HealthApp } from '@/components/HealthApp'
 import { MemoryView } from '@/components/tabs/MemoryView'
 import DocsTab from '@/components/tabs/DocsTab'
 import PlansTab from '@/components/tabs/PlansTab'
+import NewsHubApp from '@/components/apps/NewsHubApp'
 import MediaListApp from '@/components/apps/MediaListApp'
 import SkillShopApp from '@/components/apps/SkillShopApp'
 
@@ -38,6 +39,7 @@ const I = {
   alerts: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
   web: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
   messages: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  newspaper: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9h4"/><line x1="10" y1="6" x2="18" y2="6"/><line x1="10" y1="10" x2="18" y2="10"/><line x1="10" y1="14" x2="14" y2="14"/></svg>,
   weather: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
   health: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
   music: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
@@ -80,6 +82,7 @@ const BUSINESS: AppDef[] = [
   { icon: I.alerts, label: 'Alerts', color: '#f43f5e', id: 'alerts' },
   { icon: I.web, label: 'Websites', color: '#6366f1', id: 'websites', href: 'https://anyos.co.uk/portfolio' },
   { icon: I.messages, label: 'Messages', color: '#22c55e', id: 'messages' },
+  { icon: I.newspaper, label: 'News', color: '#f97316', id: 'newshub' },
 ]
 
 const PERSONAL: AppDef[] = [
@@ -302,6 +305,7 @@ export default function HomePage() {
     if (app.id === 'memory') { setActiveApp('memory'); return }
     if (app.id === 'docs') { setActiveApp('docs'); return }
     if (app.id === 'plans') { setActiveApp('plans'); return }
+    if (app.id === 'newshub') { setActiveApp('newshub'); return }
     if (app.id === 'reading') { setActiveApp('reading'); return }
     if (app.id === 'skillshop') { setActiveApp('skillshop'); return }
     // Future: other apps
@@ -626,7 +630,7 @@ export default function HomePage() {
           borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.05)',
           borderBottom: 'none', padding: '20px 12px 110px',
         }}>
-          {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps' || activeApp === 'health' || activeApp === 'memory' || activeApp === 'docs' || activeApp === 'plans') ? null : (
+          {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps' || activeApp === 'health' || activeApp === 'memory' || activeApp === 'docs' || activeApp === 'plans' || activeApp === 'newshub') ? null : (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(5, 1fr)',
@@ -771,6 +775,19 @@ export default function HomePage() {
               }}>{I.back} Back</button>
             </div>
             <PlansTab />
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'newshub' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ maxWidth: 600, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <NewsHubApp onBack={() => setActiveApp(null)} />
           </div>
         </div>
       )}
