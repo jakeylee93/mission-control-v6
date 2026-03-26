@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 export async function POST(req: NextRequest) {
   const supabase = createServerSupabaseAdmin()
   const body = await req.json()
-  const { slug, favorite, display_name, summary, category } = body
+  const { slug, favorite, display_name, summary, category, client_name } = body
 
   if (!slug) {
     return NextResponse.json({ ok: false, error: 'slug is required' }, { status: 400 })
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       ...(display_name ? { display_name } : {}),
       ...(summary ? { summary } : {}),
       ...(category ? { category } : {}),
+      ...(client_name !== undefined ? { client_name: client_name || null } : {}),
       source: 'clawhub',
       cached_at: new Date().toISOString(),
     }, { onConflict: 'slug' })

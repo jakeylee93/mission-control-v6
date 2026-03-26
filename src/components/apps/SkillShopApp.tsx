@@ -11,6 +11,7 @@ interface Skill {
   summary: string | null
   category: string
   is_favorite: boolean
+  client_name: string | null
   marg_rating: number | null
   marg_notes: string | null
   source: string
@@ -36,6 +37,7 @@ interface SearchResult {
   summary: string
   version: string
   updatedAt: string
+  is_favorite?: boolean
 }
 
 type Section = 'discover' | 'saved' | 'queue' | 'search'
@@ -541,10 +543,12 @@ function DetailSheet({
   skill: SkillRowSkill
   queued: boolean
   onClose: () => void
-  onFavorite: (slug: string, val: boolean) => void
+  onFavorite: (slug: string, val: boolean, clientName?: string) => void
   onBuildSubmit: (slug: string, displayName: string, summary: string | null, note: string) => Promise<void>
 }) {
   const [showBuild, setShowBuild] = useState(false)
+  const [showClientInput, setShowClientInput] = useState(false)
+  const [clientInput, setClientInput] = useState('')
 
   const slug = skill.slug
   const name = 'display_name' in skill ? skill.display_name : (skill as SearchResult).displayName
@@ -645,6 +649,66 @@ function DetailSheet({
                 <span style={{ width: 18, height: 18, display: 'flex' }}>{isFav ? Icons.heartFilled : Icons.heart}</span>
                 {isFav ? 'Saved' : 'Save for Later'}
               </button>
+
+              {/* Save for Client */}
+              {!showClientInput ? (
+                <button
+                  onClick={() => setShowClientInput(true)}
+                  style={{
+                    width: '100%', padding: '13px 0',
+                    background: 'rgba(167,139,250,0.1)',
+                    border: '1px solid rgba(167,139,250,0.25)',
+                    borderRadius: 12, color: '#a78bfa',
+                    fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  <span style={{ width: 18, height: 18, display: 'flex' }}>{Icons.briefcase}</span>
+                  Save for Client
+                </button>
+              ) : (
+                <div style={{
+                  background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)',
+                  borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 8,
+                }}>
+                  <input
+                    type="text"
+                    value={clientInput}
+                    onChange={e => setClientInput(e.target.value)}
+                    placeholder="Client name, e.g. Pukka Padel"
+                    autoFocus
+                    style={{
+                      width: '100%', padding: '10px 12px',
+                      background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: 8, color: '#F0EEE8', fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => setShowClientInput(false)}
+                      style={{
+                        flex: 1, padding: '10px 0', background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8,
+                        color: '#888', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >Cancel</button>
+                    <button
+                      onClick={() => {
+                        if (clientInput.trim()) {
+                          onFavorite(slug, true, clientInput.trim())
+                          setShowClientInput(false)
+                          setClientInput('')
+                        }
+                      }}
+                      style={{
+                        flex: 2, padding: '10px 0', background: 'rgba(167,139,250,0.2)',
+                        border: '1px solid rgba(167,139,250,0.35)', borderRadius: 8,
+                        color: '#a78bfa', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >Save for {clientInput.trim() || '...'}</button>
+                  </div>
+                </div>
+              )}
 
               {!showBuild ? (
                 <button
@@ -767,7 +831,7 @@ export default function SkillShopApp({ onBack }: { onBack?: () => void }) {
     setToast(msg)
   }
 
-  async function toggleFavorite(slug: string, val: boolean) {
+  async function toggleFavorite(slug: string, val: boolean, clientName?: string) {
     // Find skill details from either cached skills or search results
     const fromSkills = skills.find(s => s.slug === slug)
     const fromSearch = searchResults.find(s => s.slug === slug)
@@ -777,10 +841,12 @@ export default function SkillShopApp({ onBack }: { onBack?: () => void }) {
 
     setSkills(prev => {
       const exists = prev.some(s => s.slug === slug)
-      if (exists) return prev.map(s => s.slug === slug ? { ...s, is_favorite: val } : s)
+      if (exists) return prev.map(s => s.slug === slug ? { ...s, is_favorite: val, ...(clientName !== undefined ? { client_name: clientName || null } : {}) } : s)
       // Add the search result to local skills state so it appears in Saved tab
-      return [...prev, { slug, display_name: displayName, summary, category, is_favorite: val, source: 'clawhub', marg_rating: null, marg_notes: null, updated_at: new Date().toISOString(), cached_at: new Date().toISOString() } as Skill]
+      return [...prev, { slug, display_name: displayName, summary, category, is_favorite: val, client_name: clientName || null, source: 'clawhub', marg_rating: null, marg_notes: null, updated_at: new Date().toISOString(), cached_at: new Date().toISOString() } as Skill]
     })
+    // Also update searchResults so heart turns red immediately
+    setSearchResults(prev => prev.map(s => s.slug === slug ? { ...s, is_favorite: val } as unknown as SearchResult : s))
     if (selectedSkill && selectedSkill.slug === slug && 'is_favorite' in selectedSkill) {
       setSelectedSkill({ ...(selectedSkill as Skill), is_favorite: val })
     }
@@ -788,11 +854,12 @@ export default function SkillShopApp({ onBack }: { onBack?: () => void }) {
       await fetch('/api/skill-shop/favorite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, favorite: val, display_name: displayName, summary, category }),
+        body: JSON.stringify({ slug, favorite: val, display_name: displayName, summary, category, client_name: clientName || null }),
       })
-      showToast(val ? 'Saved to favorites' : 'Removed from favorites')
+      showToast(val ? 'Saved to favourites' : 'Removed from favourites')
     } catch {
       setSkills(prev => prev.map(s => s.slug === slug ? { ...s, is_favorite: !val } : s))
+      setSearchResults(prev => prev.map(s => s.slug === slug ? { ...s, is_favorite: !val } as unknown as SearchResult : s))
     }
   }
 
@@ -1022,9 +1089,50 @@ export default function SkillShopApp({ onBack }: { onBack?: () => void }) {
                     Browse Discover and tap the heart on skills you like
                   </p>
                 </div>
-              ) : savedSkills.map(skill => (
-                <SkillRow key={skill.slug} skill={skill} queued={queuedSlugs.has(skill.slug)} onFavorite={toggleFavorite} onBuildSubmit={addToQueue} onTap={sk => setSelectedSkill(sk)} />
-              ))}
+              ) : (() => {
+                const mySkills = savedSkills.filter(s => !s.client_name)
+                const clientGroups: Record<string, Skill[]> = {}
+                savedSkills.filter(s => s.client_name).forEach(s => {
+                  const cn = s.client_name!
+                  if (!clientGroups[cn]) clientGroups[cn] = []
+                  clientGroups[cn].push(s)
+                })
+                const clientNames = Object.keys(clientGroups).sort()
+                return (
+                  <>
+                    {/* My Favourites */}
+                    {mySkills.length > 0 && (
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 16px 8px' }}>
+                          <span style={{ color: '#ef4444', width: 16, height: 16, display: 'flex' }}>{Icons.heartFilled}</span>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: '#F0EEE8' }}>My Favourites</span>
+                          <span style={{ fontSize: 11, background: 'rgba(239,68,68,0.15)', color: '#f87171', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>{mySkills.length}</span>
+                        </div>
+                        {mySkills.map(skill => (
+                          <SkillRow key={skill.slug} skill={skill} queued={queuedSlugs.has(skill.slug)} onFavorite={toggleFavorite} onBuildSubmit={addToQueue} onTap={sk => setSelectedSkill(sk)} />
+                        ))}
+                      </div>
+                    )}
+                    {/* Client sections */}
+                    {clientNames.map(cn => (
+                      <div key={cn}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 16px 8px', borderTop: mySkills.length > 0 || clientNames.indexOf(cn) > 0 ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
+                          <span style={{ width: 16, height: 16, display: 'flex', color: '#a78bfa' }}>{Icons.briefcase}</span>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: '#F0EEE8' }}>{cn}</span>
+                          <span style={{ fontSize: 11, background: 'rgba(167,139,250,0.15)', color: '#a78bfa', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>{clientGroups[cn].length}</span>
+                        </div>
+                        {clientGroups[cn].map(skill => (
+                          <SkillRow key={skill.slug} skill={skill} queued={queuedSlugs.has(skill.slug)} onFavorite={toggleFavorite} onBuildSubmit={addToQueue} onTap={sk => setSelectedSkill(sk)} />
+                        ))}
+                      </div>
+                    ))}
+                    {/* Assign to client hint */}
+                    <div style={{ padding: '16px', textAlign: 'center', color: '#555', fontSize: 12 }}>
+                      Tap a skill and use &quot;Save for Client&quot; to organise by client
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           )}
 
