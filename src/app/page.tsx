@@ -9,6 +9,7 @@ import { MemoryView } from '@/components/tabs/MemoryView'
 import DocsTab from '@/components/tabs/DocsTab'
 import PlansTab from '@/components/tabs/PlansTab'
 import MediaListApp from '@/components/apps/MediaListApp'
+import SkillShopApp from '@/components/apps/SkillShopApp'
 
 type TabId = 'business' | 'personal' | 'laboratory'
 type ActiveApp = string | null
@@ -62,6 +63,7 @@ const I = {
   briefcase: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
   user: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
   flask: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8a3 3 0 0 1-2.5 4.5h-11A3 3 0 0 1 4 18l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg>,
+  skillshop: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 20 C7 15 12 11 17 9"/><path d="M17 9 C19 6 22 5 23 3 C23 1 21 1 19 3 C18 5 17 9 17 9"/><path d="M17 9 C19 11 21 14 20 16 C19 18 17 17 16 15 C15 13 17 9 17 9"/></svg>,
 }
 
 interface AppDef { icon: JSX.Element; label: string; color: string; id: string; href?: string }
@@ -105,6 +107,7 @@ const LAB: AppDef[] = [
   { icon: I.automations, label: 'Autos', color: '#06b6d4', id: 'automations' },
   { icon: I.database, label: 'Database', color: '#22c55e', id: 'database' },
   { icon: I.deploy, label: 'Deploy', color: '#3b82f6', id: 'deploy' },
+  { icon: I.skillshop, label: 'Skill Shop', color: '#ef4444', id: 'skillshop' },
 ]
 
 const TABS: Record<TabId, AppDef[]> = { business: BUSINESS, personal: PERSONAL, laboratory: LAB }
@@ -300,6 +303,7 @@ export default function HomePage() {
     if (app.id === 'docs') { setActiveApp('docs'); return }
     if (app.id === 'plans') { setActiveApp('plans'); return }
     if (app.id === 'reading') { setActiveApp('reading'); return }
+    if (app.id === 'skillshop') { setActiveApp('skillshop'); return }
     // Future: other apps
   }, [])
 
@@ -780,6 +784,19 @@ export default function HomePage() {
         }}>
           <div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px' }}>
             <MediaListApp onBack={() => setActiveApp(null)} />
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'skillshop' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const,
+          paddingBottom: 80,
+        }}>
+          <div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px' }}>
+            <SkillShopApp onBack={() => setActiveApp(null)} />
           </div>
         </div>
       )}
