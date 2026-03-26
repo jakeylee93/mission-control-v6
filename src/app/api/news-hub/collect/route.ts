@@ -245,7 +245,9 @@ export async function POST() {
   const rows = unique.map(r => ({
     title: r.title,
     url: r.url,
-    source: r.query,
+    source: (() => {
+      try { return new URL(r.url).hostname.replace(/^www\./, '') } catch { return r.query }
+    })(),
     summary: r.description || null,
     category: r.query.startsWith('industry:')
       ? r.query.slice('industry:'.length)
