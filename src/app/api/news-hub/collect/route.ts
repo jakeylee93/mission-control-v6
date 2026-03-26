@@ -18,6 +18,9 @@ const SEARCH_QUERIES = [
   'AI technology business automation',
   'digital marketing events industry',
   'exhibition trade show UK',
+  'AI technology latest news today',
+  'business automation tools 2026',
+  'UK events industry news',
 ]
 
 function autoCategory(title: string, description: string): string {
@@ -210,6 +213,90 @@ export async function POST() {
     // Table missing or other error — skip silently
   }
 
+  // Step C: Fetch content creators and search for their latest content
+  try {
+    const supabaseCheck = createServerSupabaseAdmin()
+    const { data: creators, error: creatorError } = await supabaseCheck
+      .from('news_creators')
+      .select('name, platform')
+
+    if (!creatorError && creators && creators.length > 0) {
+      for (const creator of creators) {
+        const platform = creator.platform || 'all'
+        let searchQuery: string
+        switch (platform) {
+          case 'youtube':
+            searchQuery = `${creator.name} youtube latest video`
+            break
+          case 'podcast':
+            searchQuery = `${creator.name} podcast latest episode`
+            break
+          case 'twitter':
+          case 'x':
+            searchQuery = `${creator.name} twitter posts`
+            break
+          case 'linkedin':
+            searchQuery = `${creator.name} linkedin article`
+            break
+          case 'reddit':
+            searchQuery = `reddit ${creator.name}`
+            break
+          case 'blog':
+            searchQuery = `site:${creator.name} latest`
+            break
+          default:
+            searchQuery = `${creator.name} latest content`
+        }
+        try {
+          const res = await fetch(
+            `https://api.search.brave.com/res/v1/news/search?q=${encodeURIComponent(searchQuery)}&count=10`,
+            {
+              headers: {
+                'Accept': 'application/json',
+                'Accept-Encoding': 'gzip',
+                'X-Subscription-Token': braveKey,
+              },
+              cache: 'no-store',
+            }
+          )
+          if (!res.ok) continue
+
+          const data = await res.json()
+          const results: BraveNewsResult[] = Array.isArray(data.results) ? data.results : []
+          for (const r of results) {
+            if (r.url && r.title) {
+              // Determine content type from platform and URL
+              let contentType = 'article'
+              if (platform === 'youtube' || r.url.includes('youtube.com') || r.url.includes('youtu.be')) {
+                contentType = 'video'
+              } else if (platform === 'podcast' || r.url.includes('podcast')) {
+                contentType = 'podcast'
+              } else if (platform === 'twitter' || platform === 'x' || r.url.includes('twitter.com') || r.url.includes('x.com')) {
+                contentType = 'social'
+              } else if (platform === 'linkedin' || r.url.includes('linkedin.com')) {
+                contentType = 'social'
+              } else if (platform === 'reddit' || r.url.includes('reddit.com')) {
+                contentType = 'social'
+              }
+              allResults.push({
+                title: r.title,
+                url: r.url,
+                description: r.description || '',
+                thumbnail: r.thumbnail?.src || null,
+                age: r.age || '',
+                query: `creator:${creator.name}:${contentType}`,
+              })
+            }
+          }
+        } catch {
+          // Skip failed creator query
+        }
+      }
+    }
+  } catch {
+    // Table missing or other error — skip silently
+  }
+
   if (allResults.length === 0) {
     return NextResponse.json({ ok: true, count: 0, message: 'No results from Brave Search' })
   }
@@ -251,6 +338,11 @@ export async function POST() {
     summary: r.description || null,
     category: r.query.startsWith('industry:')
       ? r.query.slice('industry:'.length)
+      : r.query.startsWith('creator:')
+      ? (() => {
+          const parts = r.query.split(':')
+          return parts.length >= 3 ? parts[2] : 'article'
+        })()
       : autoCategory(r.title, r.description),
     image_url: r.thumbnail,
     relevance_score: calcRelevance(r.title, r.description),

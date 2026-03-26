@@ -128,6 +128,24 @@ const CATEGORIES = [
   { id: 'business-marketing', label: 'Business & Marketing' },
 ]
 
+const CONTENT_TYPES = [
+  { id: 'all', label: 'All Types' },
+  { id: 'article', label: 'Articles' },
+  { id: 'video', label: 'Videos' },
+  { id: 'podcast', label: 'Podcasts' },
+  { id: 'social', label: 'Social' },
+]
+
+const CREATOR_PLATFORMS = [
+  { id: 'all', label: 'All', color: '#888' },
+  { id: 'youtube', label: 'YouTube', color: '#ef4444' },
+  { id: 'podcast', label: 'Podcast', color: '#8b5cf6' },
+  { id: 'twitter', label: 'X/Twitter', color: '#000000' },
+  { id: 'linkedin', label: 'LinkedIn', color: '#0a66c2' },
+  { id: 'reddit', label: 'Reddit', color: '#ff4500' },
+  { id: 'blog', label: 'Blog', color: '#22c55e' },
+]
+
 const CAT_COLORS: Record<string, string> = {
   'technology': '#6366f1',
   'events-hospitality': '#f97316',
@@ -320,6 +338,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [loading, setLoading] = useState(false)
   const [collecting, setCollecting] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('all')
+  const [contentTypeFilter, setContentTypeFilter] = useState('all')
   const [toast, setToast] = useState<string | null>(null)
   const [favIds, setFavIds] = useState<Set<string>>(new Set())
   const [favMap, setFavMap] = useState<Record<string, string>>({}) // article_id -> favorite.id
@@ -355,6 +374,12 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [showAddIndustry, setShowAddIndustry] = useState(false)
   const [newIndustryName, setNewIndustryName] = useState('')
 
+  // Creators state
+  const [creators, setCreators] = useState<{ id: string; name: string; platform: string }[]>([])
+  const [showAddCreator, setShowAddCreator] = useState(false)
+  const [newCreatorName, setNewCreatorName] = useState('')
+  const [newCreatorPlatform, setNewCreatorPlatform] = useState('all')
+
   const showToast = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2800)
@@ -374,10 +399,11 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
       .catch(() => {})
   }, [])
 
-  // Load sources and industries
+  // Load sources, industries and creators
   useEffect(() => {
     fetch('/api/news-hub/sources').then(r => r.json()).then(d => setSources(d.sources || [])).catch(() => {})
     fetch('/api/news-hub/industries').then(r => r.json()).then(d => setIndustries(d.industries || [])).catch(() => {})
+    fetch('/api/news-hub/creators').then(r => r.json()).then(d => setCreators(d.creators || [])).catch(() => {})
   }, [])
 
   const loadArticles = useCallback(async () => {
@@ -511,6 +537,23 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
           setFavMap(prev => ({ ...prev, [article.id]: d.favorite.id }))
           setFavorites(prev => [...prev, { ...d.favorite, news_articles: article }])
           showToast('Saved to favourites')
+          // Cross-link videos and podcasts to media list
+          if (article.category === 'video' || article.category === 'podcast') {
+            try {
+              await fetch('/api/reading', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  title: article.title,
+                  url: article.url,
+                  category: article.category === 'video' ? 'video' : 'podcast',
+                  notes: `From News Hub: ${article.source || 'Unknown'}`,
+                }),
+              })
+            } catch {
+              // Ignore errors - this is a bonus feature
+            }
+          }
         } else {
           showToast(d.error || 'Could not save')
         }
@@ -607,7 +650,11 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
 
   /* ─── Filtered data ─── */
   const trendingArticles = articles.filter(a => a.is_trending)
-  const feedArticles = articles
+  const feedArticles = articles.filter(a => {
+    const categoryMatch = categoryFilter === 'all' || a.category === categoryFilter || (categoryFilter !== 'all' && !CATEGORIES.find(c => c.id === categoryFilter) && a.category?.toLowerCase().replace(/\s+/g, '-') === categoryFilter)
+    const typeMatch = contentTypeFilter === 'all' || a.category === contentTypeFilter || (contentTypeFilter === 'video' && a.category === 'video') || (contentTypeFilter === 'podcast' && a.category === 'podcast') || (contentTypeFilter === 'social' && a.category === 'social') || (contentTypeFilter === 'article' && !['video', 'podcast', 'social'].includes(a.category || ''))
+    return categoryMatch && typeMatch
+  })
 
   const groupedFavs = favorites.reduce((acc, fav) => {
     if (!fav.news_articles) return acc
@@ -752,7 +799,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
             </div>
 
             {/* Category pills */}
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, marginBottom: 16, paddingBottom: 4 }}>
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, marginBottom: 12, paddingBottom: 4 }}>
               {[
                 ...CATEGORIES,
                 ...industries.map(ind => ({ id: ind.name.toLowerCase().replace(/\s+/g, '-'), label: ind.name })),
@@ -762,6 +809,22 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                   flexShrink: 0, border: 'none',
                 }}>
                   {c.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Content type pills */}
+            <div style={{ display: 'flex', gap: 8, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, marginBottom: 16, paddingBottom: 4 }}>
+              {CONTENT_TYPES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setContentTypeFilter(t.id)}
+                  style={{
+                    ...chipStyle(contentTypeFilter === t.id, t.id === 'video' ? '#ef4444' : t.id === 'podcast' ? '#8b5cf6' : t.id === 'social' ? '#0ea5e9' : undefined),
+                    flexShrink: 0, border: 'none', fontSize: 12,
+                  }}
+                >
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -1367,6 +1430,83 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                   </div>
                 ))}
                 {industries.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No industries added yet.</div>}
+              </div>
+            </div>
+
+            {/* ── Content Creators ── */}
+            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', padding: '14px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>
+                  Content Creators <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({creators.length})</span>
+                </span>
+                <button
+                  onClick={() => setShowAddCreator(!showAddCreator)}
+                  style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6, padding: '4px 10px', color: '#a5b4fc', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                >+</button>
+              </div>
+
+              {showAddCreator && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12, padding: '12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
+                  <input
+                    type="text"
+                    placeholder="e.g. Lex Fridman"
+                    value={newCreatorName}
+                    onChange={(e) => setNewCreatorName(e.target.value)}
+                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#f0eee8', fontSize: 13 }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {CREATOR_PLATFORMS.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => setNewCreatorPlatform(p.id)}
+                        style={{
+                          padding: '6px 10px', borderRadius: 12, fontSize: 11, fontWeight: 500,
+                          background: newCreatorPlatform === p.id ? p.color + '25' : 'rgba(255,255,255,0.05)',
+                          border: '1px solid ' + (newCreatorPlatform === p.id ? p.color : 'rgba(255,255,255,0.1)'),
+                          color: newCreatorPlatform === p.id ? p.color : '#888',
+                          cursor: 'pointer'
+                        }}
+                      >{p.label}</button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!newCreatorName.trim()) return
+                      await fetch('/api/news-hub/creators', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newCreatorName.trim(), platform: newCreatorPlatform }) })
+                      setNewCreatorName('')
+                      setShowAddCreator(false)
+                      fetch('/api/news-hub/creators').then(r => r.json()).then(d => setCreators(d.creators || [])).catch(() => {})
+                    }}
+                    style={{ background: '#6366f1', border: 'none', borderRadius: 8, padding: '8px', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  >Add Creator</button>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {creators.map((c) => (
+                  <div key={c.id} style={{
+                    background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{c.name}</span>
+                      <span style={{
+                        fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                        background: (CREATOR_PLATFORMS.find(p => p.id === c.platform)?.color || '#888') + '20',
+                        color: CREATOR_PLATFORMS.find(p => p.id === c.platform)?.color || '#888',
+                      }}>{CREATOR_PLATFORMS.find(p => p.id === c.platform)?.label || c.platform}</span>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await fetch('/api/news-hub/creators', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: c.id }) })
+                        fetch('/api/news-hub/creators').then(r => r.json()).then(d => setCreators(d.creators || [])).catch(() => {})
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px', lineHeight: 1 }}
+                    >×</button>
+                  </div>
+                ))}
+                {creators.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No creators added yet.</div>}
               </div>
             </div>
           </div>
