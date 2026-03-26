@@ -63,8 +63,8 @@ BEGIN
 END $$;
 `
 
-function autoCategory(skill: Record<string, unknown>): string {
-  const text = ((skill.summary || skill.description || skill.display_name || skill.name || '') as string).toLowerCase()
+function autoCategory(slug: string, summary: string): string {
+  const text = (slug + ' ' + summary).toLowerCase()
   if (/event|hospitality|bar|venue|ticket|booking/.test(text)) return 'recommended'
   if (/business|crm|sales|marketing|revenue|invoice|client/.test(text)) return 'business'
   if (/automat|workflow|trigger|pipeline|zap/.test(text)) return 'automation'
@@ -74,28 +74,26 @@ function autoCategory(skill: Record<string, unknown>): string {
   return 'other'
 }
 
-function autoTrust(skill: Record<string, unknown>): string {
-  const src = ((skill.source || '') as string).toLowerCase()
-  if (src === 'bundled') return 'verified'
-  if (src === 'clawhub') return 'looks-ok'
-  return 'unknown'
+interface ClawHubResult {
+  score: number
+  slug: string
+  displayName: string
+  summary: string
+  version: string
+  updatedAt: string
 }
 
-function parseCliOutput(raw: string): unknown[] {
-  const lines = raw.split('\n').filter(l => !l.includes('plugins.') && l.trim())
-  const json = lines.join('\n').trim()
-  if (!json) return []
-  try {
-    const parsed = JSON.parse(json)
-    if (Array.isArray(parsed)) return parsed
-    if (parsed && Array.isArray(parsed.skills)) return parsed.skills
-    if (parsed && Array.isArray(parsed.data)) return parsed.data
-    if (parsed && Array.isArray(parsed.results)) return parsed.results
-    return []
-  } catch {
-    return []
-  }
-}
+const SEARCH_TERMS = [
+  'automation', 'email', 'business', 'calendar', 'health',
+  'coding', 'social media', 'productivity', 'events', 'CRM',
+  'git', 'deploy', 'messaging', 'scheduling', 'analytics',
+]
+
+const INSTALLED_SLUGS = new Set([
+  'coding-agent', 'github', 'gog', 'weather', 'skill-creator', 'healthcheck',
+  'video-frames', 'openai-whisper-api', 'openai-image-gen', 'nano-banana-pro',
+  'gh-issues', 'acp-router', 'node-connect',
+])
 
 // GET: return cached skills from Supabase
 export async function GET(req: NextRequest) {
@@ -124,9 +122,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ ok: true, skills: data || [] })
 }
 
-// POST: setup table if needed, run CLI searches, cache results
+// POST: refresh cache by fetching from ClawHub API directly
 export async function POST() {
-  const { execSync } = require('child_process')
   const supabase = createServerSupabaseAdmin()
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -136,109 +133,74 @@ export async function POST() {
   const { error: tableCheck } = await supabase.from('skill_shop').select('id').limit(1)
   if (tableCheck) {
     if (!serviceRoleKey) {
-      return NextResponse.json({ ok: false, error: 'SUPABASE_SERVICE_ROLE_KEY not set, cannot create table' }, { status: 500 })
+      return NextResponse.json(
+        { ok: false, error: 'SUPABASE_SERVICE_ROLE_KEY not set, cannot create table' },
+        { status: 500 }
+      )
     }
     try {
       await runManagementSql(projectRef, serviceRoleKey, SKILL_SHOP_TABLE_SQL)
       await runManagementSql(projectRef, serviceRoleKey, SKILL_SHOP_POLICY_SQL)
     } catch (err) {
-      return NextResponse.json({ ok: false, error: `Table creation failed: ${err instanceof Error ? err.message : err}` }, { status: 500 })
+      return NextResponse.json(
+        { ok: false, error: `Table creation failed: ${err instanceof Error ? err.message : err}` },
+        { status: 500 }
+      )
     }
   }
 
-  // Get installed skills first
-  const installedSlugs = new Set<string>()
-  try {
-    const raw = execSync('openclaw skills list --json 2>/dev/null', {
-      encoding: 'utf-8',
-      timeout: 15000,
-    }) as string
-    const list = parseCliOutput(raw) as Record<string, unknown>[]
-    list.forEach(s => {
-      const slug = (s.slug || s.name || '') as string
-      if (slug) installedSlugs.add(slug.toLowerCase())
-    })
-  } catch {
-    // CLI not available or no skills installed
-  }
-
-  // Search for skills across multiple categories
-  const SEARCH_TERMS = [
-    'automation', 'email', 'business', 'calendar', 'health',
-    'coding', 'social media', 'productivity', 'events', 'CRM',
-    'git', 'deploy', 'messaging', 'scheduling', 'analytics',
-  ]
-
-  const allSkills: Record<string, unknown>[] = []
+  // Fetch skills from ClawHub API for each search term
+  const allSkills: ClawHubResult[] = []
 
   for (const term of SEARCH_TERMS) {
     try {
-      const raw = execSync(`openclaw skills search "${term}" --json --limit 20 2>/dev/null`, {
-        encoding: 'utf-8',
-        timeout: 15000,
-      }) as string
-      const results = parseCliOutput(raw) as Record<string, unknown>[]
-      allSkills.push(...results)
+      const res = await fetch(
+        `https://clawhub.ai/api/v1/search?q=${encodeURIComponent(term)}&limit=15`,
+        { cache: 'no-store' }
+      )
+      if (res.ok) {
+        const data = await res.json()
+        const results: ClawHubResult[] = Array.isArray(data.results) ? data.results : []
+        allSkills.push(...results)
+      }
     } catch {
-      // Search term returned no results
+      // Term search failed, continue
     }
   }
-
-  // Also get full list
-  try {
-    const raw = execSync('openclaw skills list --json --all 2>/dev/null', {
-      encoding: 'utf-8',
-      timeout: 15000,
-    }) as string
-    const results = parseCliOutput(raw) as Record<string, unknown>[]
-    allSkills.push(...results)
-  } catch {}
 
   // Deduplicate by slug
   const seen = new Set<string>()
   const unique = allSkills.filter(s => {
-    const slug = ((s.slug || s.name || '') as string).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-    if (!slug || seen.has(slug)) return false
-    seen.add(slug)
+    if (!s.slug || seen.has(s.slug)) return false
+    seen.add(s.slug)
     return true
   })
 
   if (unique.length === 0) {
-    return NextResponse.json({ ok: true, count: 0, installed: installedSlugs.size, message: 'No skills found from CLI' })
+    return NextResponse.json({ ok: true, count: 0, message: 'No skills found from ClawHub' })
   }
 
   // Build rows for upsert
-  const rows = unique.map(skill => {
-    const rawSlug = ((skill.slug || skill.name || '') as string)
-    const slug = rawSlug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
-    const src = ((skill.source || 'clawhub') as string).toLowerCase()
-    return {
-      slug,
-      display_name: (skill.display_name || skill.name || slug) as string,
-      summary: (skill.summary || skill.description || null) as string | null,
-      category: (skill.category || autoCategory(skill)) as string,
-      is_installed: installedSlugs.has(slug),
-      trust_level: autoTrust(skill),
-      source: src === 'bundled' ? 'bundled' : src === 'custom' ? 'custom' : 'clawhub',
-      updated_at: new Date().toISOString(),
-      cached_at: new Date().toISOString(),
-    }
-  }).filter(r => r.slug)
+  const now = new Date().toISOString()
+  const rows = unique.map(skill => ({
+    slug: skill.slug,
+    display_name: skill.displayName || skill.slug,
+    summary: skill.summary || null,
+    category: autoCategory(skill.slug, skill.summary || ''),
+    is_installed: INSTALLED_SLUGS.has(skill.slug),
+    trust_level: 'looks-ok',
+    source: 'clawhub',
+    updated_at: skill.updatedAt || now,
+    cached_at: now,
+  }))
 
-  // Update installed status for already-cached skills
-  if (installedSlugs.size > 0) {
-    // Mark installed
-    await supabase.from('skill_shop').update({ is_installed: true }).in('slug', Array.from(installedSlugs))
-    // Mark not installed (except ones we just found)
-    const newSlugs = rows.map(r => r.slug)
-    const allKnownSlugs = Array.from(new Set(Array.from(installedSlugs).concat(newSlugs)))
-    await supabase.from('skill_shop').update({ is_installed: false }).not('slug', 'in', `(${allKnownSlugs.map(s => `"${s}"`).join(',')})`)
-  }
+  const { error: upsertError } = await supabase
+    .from('skill_shop')
+    .upsert(rows, { onConflict: 'slug' })
 
-  const { error: upsertError } = await supabase.from('skill_shop').upsert(rows, { onConflict: 'slug' })
   if (upsertError) {
     return NextResponse.json({ ok: false, error: upsertError.message })
   }
 
-  return NextResponse.json({ ok: true, count: rows.length, installed: installedSlugs.size })
+  return NextResponse.json({ ok: true, count: rows.length })
 }
