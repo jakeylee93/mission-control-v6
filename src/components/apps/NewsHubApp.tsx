@@ -641,7 +641,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   ]
 
   return (
-    <div style={{ minHeight: '100vh', paddingBottom: 40, paddingTop: 52 }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
         @keyframes nhSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes nhShimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
@@ -730,7 +730,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
       </div>
 
       {/* Content area */}
-      <div style={{ padding: '0 16px', paddingTop: 104 }}>
+      <div style={{ padding: '0 16px', paddingTop: 104, flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const, paddingBottom: 40 }}>
 
         {/* ── NEWS FEED TAB ── */}
         {tab === 'feed' && (
