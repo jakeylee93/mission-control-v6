@@ -768,7 +768,19 @@ export default function SkillShopApp({ onBack }: { onBack?: () => void }) {
   }
 
   async function toggleFavorite(slug: string, val: boolean) {
-    setSkills(prev => prev.map(s => s.slug === slug ? { ...s, is_favorite: val } : s))
+    // Find skill details from either cached skills or search results
+    const fromSkills = skills.find(s => s.slug === slug)
+    const fromSearch = searchResults.find(s => s.slug === slug)
+    const displayName = fromSkills?.display_name || fromSearch?.displayName || slug
+    const summary = fromSkills?.summary || fromSearch?.summary || null
+    const category = fromSkills?.category || 'other'
+
+    setSkills(prev => {
+      const exists = prev.some(s => s.slug === slug)
+      if (exists) return prev.map(s => s.slug === slug ? { ...s, is_favorite: val } : s)
+      // Add the search result to local skills state so it appears in Saved tab
+      return [...prev, { slug, display_name: displayName, summary, category, is_favorite: val, source: 'clawhub', marg_rating: null, marg_notes: null, updated_at: new Date().toISOString(), cached_at: new Date().toISOString() } as Skill]
+    })
     if (selectedSkill && selectedSkill.slug === slug && 'is_favorite' in selectedSkill) {
       setSelectedSkill({ ...(selectedSkill as Skill), is_favorite: val })
     }
@@ -776,7 +788,7 @@ export default function SkillShopApp({ onBack }: { onBack?: () => void }) {
       await fetch('/api/skill-shop/favorite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, favorite: val }),
+        body: JSON.stringify({ slug, favorite: val, display_name: displayName, summary, category }),
       })
       showToast(val ? 'Saved to favorites' : 'Removed from favorites')
     } catch {
@@ -828,7 +840,7 @@ export default function SkillShopApp({ onBack }: { onBack?: () => void }) {
     })
   }
 
-  const recommended = skills.filter(s => s.category === 'recommended')
+  const recommended = [...skills].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 20)
   const recent = [...skills].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 10)
   const savedSkills = skills.filter(s => s.is_favorite)
   const pendingCount = queueItems.filter(q => q.status === 'pending').length
@@ -924,13 +936,13 @@ export default function SkillShopApp({ onBack }: { onBack?: () => void }) {
               <div style={{ padding: '20px 16px 8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <span style={{ color: '#6366f1', width: 16, height: 16, display: 'flex' }}>{Icons.target}</span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: '#F0EEE8' }}>Recommended for You</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#F0EEE8' }}>Trending</span>
                   <span style={{ fontSize: 11, background: 'rgba(99,102,241,0.15)', color: '#818cf8', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
                     {recommended.length}
                   </span>
                 </div>
                 <p style={{ fontSize: 11, color: '#666', margin: '0 0 14px' }}>
-                  Skills matched to your events, hospitality, and business needs
+                  Popular skills being used across the community
                 </p>
 
                 {loading ? (
