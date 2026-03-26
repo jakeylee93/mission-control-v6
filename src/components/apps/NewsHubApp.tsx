@@ -143,15 +143,24 @@ function catLabel(cat: string | null): string {
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return ''
-  const diff = Date.now() - new Date(dateStr).getTime()
+  const now = Date.now()
+  const then = new Date(dateStr).getTime()
+  const diff = now - then
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return mins + 'm ago'
   const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
+  if (hrs < 24) return hrs + 'h ago'
   const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d ago`
-  return `${Math.floor(days / 7)}w ago`
+  if (days < 7) return days + 'd ago'
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+function getFavicon(url: string, size: number = 20): string {
+  try {
+    const domain = new URL(url).hostname
+    return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=' + size
+  } catch { return '' }
 }
 
 /* ─── Shimmer skeleton ─── */
@@ -240,8 +249,16 @@ function ArticleCard({
             {article.title}
           </div>
           <div style={{ fontSize: 11, color: '#666', display: 'flex', gap: 8, alignItems: 'center' }}>
-            {article.source && <span>{article.source.length > 30 ? article.source.slice(0, 30) + '…' : article.source}</span>}
-            {article.published_at && <span>{timeAgo(article.published_at)}</span>}
+            {article.source && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {getFavicon(article.url) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={getFavicon(article.url, 18)} width={18} height={18} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />
+                )}
+                {article.source.length > 30 ? article.source.slice(0, 30) + '…' : article.source}
+              </span>
+            )}
+            <span>{timeAgo(article.published_at || article.collected_at)}</span>
           </div>
         </div>
         <button
@@ -329,6 +346,15 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   // Settings collecting state
   const [collectingFor, setCollectingFor] = useState<string | null>(null)
 
+  // Sources & Industries state
+  const [sources, setSources] = useState<{ id: string; name: string; url: string }[]>([])
+  const [industries, setIndustries] = useState<{ id: string; name: string }[]>([])
+  const [showAddSource, setShowAddSource] = useState(false)
+  const [newSourceName, setNewSourceName] = useState('')
+  const [newSourceUrl, setNewSourceUrl] = useState('')
+  const [showAddIndustry, setShowAddIndustry] = useState(false)
+  const [newIndustryName, setNewIndustryName] = useState('')
+
   const showToast = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(null), 2800)
@@ -346,6 +372,12 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
         }
       })
       .catch(() => {})
+  }, [])
+
+  // Load sources and industries
+  useEffect(() => {
+    fetch('/api/news-hub/sources').then(r => r.json()).then(d => setSources(d.sources || [])).catch(() => {})
+    fetch('/api/news-hub/industries').then(r => r.json()).then(d => setIndustries(d.industries || [])).catch(() => {})
   }, [])
 
   const loadArticles = useCallback(async () => {
@@ -721,9 +753,12 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
 
             {/* Category pills */}
             <div style={{ display: 'flex', gap: 8, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, marginBottom: 16, paddingBottom: 4 }}>
-              {CATEGORIES.map(c => (
+              {[
+                ...CATEGORIES,
+                ...industries.map(ind => ({ id: ind.name.toLowerCase().replace(/\s+/g, '-'), label: ind.name })),
+              ].map(c => (
                 <button key={c.id} onClick={() => setCategoryFilter(c.id)} style={{
-                  ...chipStyle(categoryFilter === c.id, c.id !== 'all' ? CAT_COLORS[c.id] : undefined),
+                  ...chipStyle(categoryFilter === c.id, c.id !== 'all' ? (CAT_COLORS[c.id] || '#8b5cf6') : undefined),
                   flexShrink: 0, border: 'none',
                 }}>
                   {c.label}
@@ -1215,6 +1250,124 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                   <span style={{ fontSize: 13, color: '#ccc' }}>{c.label}</span>
                 </div>
               ))}
+            </div>
+
+            {/* ── News Sources ── */}
+            <div style={{ marginTop: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
+                  News Sources <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({sources.length})</span>
+                </h3>
+                <button onClick={() => setShowAddSource(v => !v)} style={{
+                  background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)',
+                  borderRadius: 8, padding: '5px 10px', color: '#a5b4fc', fontSize: 18, fontWeight: 300,
+                  cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>+</button>
+              </div>
+
+              {showAddSource && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' as const }}>
+                  <input
+                    value={newSourceName} onChange={e => setNewSourceName(e.target.value)}
+                    placeholder="Source name"
+                    style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '7px 10px', color: '#f0eee8', fontSize: 13, outline: 'none' }}
+                  />
+                  <input
+                    value={newSourceUrl} onChange={e => setNewSourceUrl(e.target.value)}
+                    placeholder="URL (https://...)"
+                    style={{ flex: 2, minWidth: 160, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '7px 10px', color: '#f0eee8', fontSize: 13, outline: 'none' }}
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!newSourceName.trim() || !newSourceUrl.trim()) return
+                      await fetch('/api/news-hub/sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newSourceName.trim(), url: newSourceUrl.trim() }) })
+                      setNewSourceName(''); setNewSourceUrl(''); setShowAddSource(false)
+                      fetch('/api/news-hub/sources').then(r => r.json()).then(d => setSources(d.sources || [])).catch(() => {})
+                    }}
+                    style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 8, padding: '7px 14px', color: '#a5b4fc', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  >Add</button>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {sources.map(s => (
+                  <div key={s.id} style={{
+                    background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                    {getFavicon(s.url) && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={getFavicon(s.url, 18)} width={18} height={18} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{s.name}</div>
+                      <div style={{ fontSize: 11, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{s.url}</div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await fetch('/api/news-hub/sources', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) })
+                        fetch('/api/news-hub/sources').then(r => r.json()).then(d => setSources(d.sources || [])).catch(() => {})
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px', flexShrink: 0, lineHeight: 1 }}
+                    >×</button>
+                  </div>
+                ))}
+                {sources.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No sources added yet.</div>}
+              </div>
+            </div>
+
+            {/* ── Industries ── */}
+            <div style={{ marginTop: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
+                  Industries <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({industries.length})</span>
+                </h3>
+                <button onClick={() => setShowAddIndustry(v => !v)} style={{
+                  background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)',
+                  borderRadius: 8, padding: '5px 10px', color: '#a5b4fc', fontSize: 18, fontWeight: 300,
+                  cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>+</button>
+              </div>
+
+              {showAddIndustry && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  <input
+                    value={newIndustryName} onChange={e => setNewIndustryName(e.target.value)}
+                    placeholder="Industry name"
+                    style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '7px 10px', color: '#f0eee8', fontSize: 13, outline: 'none' }}
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!newIndustryName.trim()) return
+                      await fetch('/api/news-hub/industries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newIndustryName.trim() }) })
+                      setNewIndustryName(''); setShowAddIndustry(false)
+                      fetch('/api/news-hub/industries').then(r => r.json()).then(d => setIndustries(d.industries || [])).catch(() => {})
+                    }}
+                    style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 8, padding: '7px 14px', color: '#a5b4fc', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  >Add</button>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {industries.map(ind => (
+                  <div key={ind.id} style={{
+                    background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{ind.name}</span>
+                    <button
+                      onClick={async () => {
+                        await fetch('/api/news-hub/industries', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ind.id }) })
+                        fetch('/api/news-hub/industries').then(r => r.json()).then(d => setIndustries(d.industries || [])).catch(() => {})
+                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px', lineHeight: 1 }}
+                    >×</button>
+                  </div>
+                ))}
+                {industries.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No industries added yet.</div>}
+              </div>
             </div>
           </div>
         )}

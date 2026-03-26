@@ -115,6 +115,101 @@ export async function POST() {
     }
   }
 
+  // Step A: Fetch custom industries and search for each
+  try {
+    const supabaseCheck = createServerSupabaseAdmin()
+    const { data: industries, error: indError } = await supabaseCheck
+      .from('news_industries')
+      .select('name')
+
+    if (!indError && industries && industries.length > 0) {
+      for (const industry of industries) {
+        const industryQuery = `${industry.name} news`
+        try {
+          const res = await fetch(
+            `https://api.search.brave.com/res/v1/news/search?q=${encodeURIComponent(industryQuery)}&count=10`,
+            {
+              headers: {
+                'Accept': 'application/json',
+                'Accept-Encoding': 'gzip',
+                'X-Subscription-Token': braveKey,
+              },
+              cache: 'no-store',
+            }
+          )
+          if (!res.ok) continue
+
+          const data = await res.json()
+          const results: BraveNewsResult[] = Array.isArray(data.results) ? data.results : []
+          for (const r of results) {
+            if (r.url && r.title) {
+              allResults.push({
+                title: r.title,
+                url: r.url,
+                description: r.description || '',
+                thumbnail: r.thumbnail?.src || null,
+                age: r.age || '',
+                query: `industry:${industry.name}`,
+              })
+            }
+          }
+        } catch {
+          // Skip failed industry query
+        }
+      }
+    }
+  } catch {
+    // Table missing or other error — skip silently
+  }
+
+  // Step B: Fetch custom sources and search each domain
+  try {
+    const supabaseCheck = createServerSupabaseAdmin()
+    const { data: sources, error: srcError } = await supabaseCheck
+      .from('news_sources')
+      .select('name, url')
+
+    if (!srcError && sources && sources.length > 0) {
+      for (const source of sources) {
+        try {
+          const domain = new URL(source.url).hostname.replace(/^www\./, '')
+          const siteQuery = `site:${domain} news`
+          const res = await fetch(
+            `https://api.search.brave.com/res/v1/news/search?q=${encodeURIComponent(siteQuery)}&count=10`,
+            {
+              headers: {
+                'Accept': 'application/json',
+                'Accept-Encoding': 'gzip',
+                'X-Subscription-Token': braveKey,
+              },
+              cache: 'no-store',
+            }
+          )
+          if (!res.ok) continue
+
+          const data = await res.json()
+          const results: BraveNewsResult[] = Array.isArray(data.results) ? data.results : []
+          for (const r of results) {
+            if (r.url && r.title) {
+              allResults.push({
+                title: r.title,
+                url: r.url,
+                description: r.description || '',
+                thumbnail: r.thumbnail?.src || null,
+                age: r.age || '',
+                query: `source:${source.name}`,
+              })
+            }
+          }
+        } catch {
+          // Skip failed source query
+        }
+      }
+    }
+  } catch {
+    // Table missing or other error — skip silently
+  }
+
   if (allResults.length === 0) {
     return NextResponse.json({ ok: true, count: 0, message: 'No results from Brave Search' })
   }
@@ -152,7 +247,9 @@ export async function POST() {
     url: r.url,
     source: r.query,
     summary: r.description || null,
-    category: autoCategory(r.title, r.description),
+    category: r.query.startsWith('industry:')
+      ? r.query.slice('industry:'.length)
+      : autoCategory(r.title, r.description),
     image_url: r.thumbnail,
     relevance_score: calcRelevance(r.title, r.description),
     is_trending: isTrending(r.title, r.description),
