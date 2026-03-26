@@ -115,6 +115,61 @@ BEGIN
 END $$;
 `
 
+const SKILL_SHOP_SQL = `
+CREATE TABLE IF NOT EXISTS skill_shop (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug text NOT NULL UNIQUE,
+  display_name text,
+  summary text,
+  category text,
+  is_favorite boolean DEFAULT false,
+  marg_rating integer,
+  marg_notes text,
+  source text DEFAULT 'clawhub',
+  updated_at timestamptz DEFAULT now(),
+  cached_at timestamptz DEFAULT now()
+);
+ALTER TABLE skill_shop ENABLE ROW LEVEL SECURITY;
+`
+
+const SKILL_SHOP_POLICY_SQL = `
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'skill_shop' AND policyname = 'allow_all_skill_shop'
+  ) THEN
+    CREATE POLICY allow_all_skill_shop ON skill_shop FOR ALL USING (true);
+  END IF;
+END $$;
+`
+
+const SKILL_BUILD_QUEUE_SQL = `
+CREATE TABLE IF NOT EXISTS skill_build_queue (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug text NOT NULL,
+  display_name text,
+  summary text,
+  user_note text,
+  status text DEFAULT 'pending',
+  created_at timestamptz DEFAULT now(),
+  acknowledged_at timestamptz
+);
+ALTER TABLE skill_build_queue ENABLE ROW LEVEL SECURITY;
+`
+
+const SKILL_BUILD_QUEUE_POLICY_SQL = `
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'skill_build_queue' AND policyname = 'allow_all_skill_build_queue'
+  ) THEN
+    CREATE POLICY allow_all_skill_build_queue ON skill_build_queue FOR ALL USING (true);
+  END IF;
+END $$;
+`
+
 const TABLE_CHECKS: Array<{ table: string; select: string }> = [
   { table: 'lovely_checkins', select: 'id' },
   { table: 'lovely_water', select: 'id' },
@@ -123,6 +178,8 @@ const TABLE_CHECKS: Array<{ table: string; select: string }> = [
   { table: 'chat_quick_log', select: 'id' },
   { table: 'nutrition_entries', select: 'id' },
   { table: 'drink_collection', select: 'id' },
+  { table: 'skill_shop', select: 'id' },
+  { table: 'skill_build_queue', select: 'id' },
 ]
 
 const SETUP_SQL = [
@@ -135,6 +192,10 @@ const SETUP_SQL = [
   NUTRITION_POLICY_SQL,
   DRINK_COLLECTION_SQL,
   DRINK_COLLECTION_POLICY_SQL,
+  SKILL_SHOP_SQL,
+  SKILL_SHOP_POLICY_SQL,
+  SKILL_BUILD_QUEUE_SQL,
+  SKILL_BUILD_QUEUE_POLICY_SQL,
 ]
 
 function parseProjectRef(url: string | undefined): string {

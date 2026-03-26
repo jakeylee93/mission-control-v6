@@ -3,90 +3,6 @@ import { createServerSupabaseAdmin } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
-const DEFAULT_PROJECT_REF = 'nrdlpdsoeksdybrshvst'
-
-function parseProjectRef(url: string | undefined): string {
-  if (!url) return DEFAULT_PROJECT_REF
-  try {
-    const host = new URL(url).host
-    return host.split('.')[0] || DEFAULT_PROJECT_REF
-  } catch {
-    return DEFAULT_PROJECT_REF
-  }
-}
-
-async function runManagementSql(projectRef: string, accessToken: string, query: string) {
-  const response = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ query }),
-    cache: 'no-store',
-  })
-  if (!response.ok) {
-    const bodyText = await response.text()
-    throw new Error(`Supabase Management API error (${response.status}): ${bodyText}`)
-  }
-  return await response.json()
-}
-
-const SKILL_SHOP_TABLE_SQL = `
-CREATE TABLE IF NOT EXISTS skill_shop (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug text NOT NULL UNIQUE,
-  display_name text,
-  summary text,
-  category text,
-  is_favorite boolean DEFAULT false,
-  marg_rating integer,
-  marg_notes text,
-  source text DEFAULT 'clawhub',
-  updated_at timestamptz DEFAULT now(),
-  cached_at timestamptz DEFAULT now()
-);
-ALTER TABLE skill_shop ENABLE ROW LEVEL SECURITY;
-`
-
-const SKILL_SHOP_POLICY_SQL = `
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'skill_shop' AND policyname = 'allow_all_skill_shop'
-  ) THEN
-    CREATE POLICY allow_all_skill_shop ON skill_shop FOR ALL USING (true);
-  END IF;
-END $$;
-`
-
-const SKILL_BUILD_QUEUE_TABLE_SQL = `
-CREATE TABLE IF NOT EXISTS skill_build_queue (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug text NOT NULL,
-  display_name text,
-  summary text,
-  user_note text,
-  status text DEFAULT 'pending',
-  created_at timestamptz DEFAULT now(),
-  acknowledged_at timestamptz
-);
-ALTER TABLE skill_build_queue ENABLE ROW LEVEL SECURITY;
-`
-
-const SKILL_BUILD_QUEUE_POLICY_SQL = `
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname = 'public' AND tablename = 'skill_build_queue' AND policyname = 'allow_all_skill_build_queue'
-  ) THEN
-    CREATE POLICY allow_all_skill_build_queue ON skill_build_queue FOR ALL USING (true);
-  END IF;
-END $$;
-`
-
 function isLatinText(text: string): boolean {
   if (!text) return true
   // Filter out skills where the text has no Latin characters at all
@@ -147,42 +63,9 @@ export async function GET(req: NextRequest) {
 }
 
 // POST: refresh cache by fetching from ClawHub API
+// Tables are created by /api/setup on app load — no table creation here
 export async function POST() {
   const supabase = createServerSupabaseAdmin()
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const projectRef = parseProjectRef(supabaseUrl)
-
-  // Ensure skill_shop table exists
-  const { error: tableCheck } = await supabase.from('skill_shop').select('id').limit(1)
-  if (tableCheck) {
-    if (!serviceRoleKey) {
-      return NextResponse.json(
-        { ok: false, error: 'SUPABASE_SERVICE_ROLE_KEY not set, cannot create table' },
-        { status: 500 }
-      )
-    }
-    try {
-      await runManagementSql(projectRef, serviceRoleKey, SKILL_SHOP_TABLE_SQL)
-      await runManagementSql(projectRef, serviceRoleKey, SKILL_SHOP_POLICY_SQL)
-    } catch (err) {
-      return NextResponse.json(
-        { ok: false, error: `Table creation failed: ${err instanceof Error ? err.message : err}` },
-        { status: 500 }
-      )
-    }
-  }
-
-  // Ensure skill_build_queue table exists
-  const { error: queueTableCheck } = await supabase.from('skill_build_queue').select('id').limit(1)
-  if (queueTableCheck && serviceRoleKey) {
-    try {
-      await runManagementSql(projectRef, serviceRoleKey, SKILL_BUILD_QUEUE_TABLE_SQL)
-      await runManagementSql(projectRef, serviceRoleKey, SKILL_BUILD_QUEUE_POLICY_SQL)
-    } catch {
-      // Queue table creation failure is non-fatal
-    }
-  }
 
   // Fetch skills from ClawHub API for each search term
   const allSkills: ClawHubResult[] = []
