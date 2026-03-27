@@ -43,6 +43,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'article_id and business required' }, { status: 400 })
   }
 
+  // Check if already favourited
+  const { data: existing } = await supabase
+    .from('news_favorites')
+    .select('id')
+    .eq('article_id', article_id)
+    .eq('business', business)
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    return NextResponse.json({ ok: true, favorite: existing[0], already_exists: true })
+  }
+
   const { data, error } = await supabase
     .from('news_favorites')
     .insert({ article_id, business, is_archived: false })
