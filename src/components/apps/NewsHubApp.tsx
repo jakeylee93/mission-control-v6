@@ -289,6 +289,8 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [collecting, setCollecting] = useState(false)
   const [expandedArticle, setExpandedArticle] = useState<string | null>(null)
   const [summarizing, setSummarizing] = useState<string | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [contentTypeFilter, setContentTypeFilter] = useState('all')
 
   // Favourites
   const [favorites, setFavorites] = useState<Favorite[]>([])
@@ -650,6 +652,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
     { id: 'feed', label: 'Feed', icon: I.mail },
     { id: 'favourites', label: 'Favs', icon: I.heart(true) },
+    { id: 'archived', label: 'Archive', icon: I.archive },
     { id: 'campaigns', label: 'Campaigns', icon: I.folder },
     { id: 'subscribers', label: 'Lists', icon: I.users },
     { id: 'brands', label: 'Brands', icon: I.building },
@@ -767,10 +770,32 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
               </div>
             )}
 
+            {/* Category filter pills */}
+            {articles.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 10, paddingBottom: 4 }}>
+                {['all', 'technology', 'events-hospitality', 'business-marketing'].map(c => (
+                  <button key={c} onClick={() => setCategoryFilter(c)} style={{ ...chip(categoryFilter === c, c === 'technology' ? '#6366f1' : c === 'events-hospitality' ? '#f97316' : c === 'business-marketing' ? '#22c55e' : undefined), flexShrink: 0 }}>
+                    {c === 'all' ? 'All' : c === 'technology' ? 'Tech' : c === 'events-hospitality' ? 'Events' : 'Marketing'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Content type pills */}
+            {articles.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 14, paddingBottom: 4 }}>
+                {[{ id: 'all', label: 'All Types' }, { id: 'article', label: 'Articles' }, { id: 'video', label: 'Videos' }, { id: 'podcast', label: 'Podcasts' }, { id: 'social', label: 'Social' }].map(t => (
+                  <button key={t.id} onClick={() => setContentTypeFilter(t.id)} style={{ ...chip(contentTypeFilter === t.id, t.id === 'video' ? '#ef4444' : t.id === 'podcast' ? '#8b5cf6' : t.id === 'social' ? '#0ea5e9' : undefined), flexShrink: 0, fontSize: 11 }}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {sources.length === 0 && !loading && (
               <div style={{ ...cardS, textAlign: 'center', padding: '30px 20px', marginBottom: 16 }}>
                 <p style={{ fontSize: 14, color: '#888', margin: '0 0 8px' }}>No sources for {activeBrand?.name || 'this brand'}.</p>
-                <button onClick={() => setTab('brands')} style={btnSmall}>Add Sources →</button>
+                <button onClick={() => setTab('settings')} style={btnSmall}>Add Sources →</button>
               </div>
             )}
 
@@ -781,8 +806,37 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                 <p style={{ fontSize: 14, margin: '0 0 12px' }}>No articles yet. Hit Refresh to collect from your sources.</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {articles.map(article => (
+              <>
+                {/* Trending section */}
+                {articles.filter(a => a.is_trending).length > 0 && categoryFilter === 'all' && contentTypeFilter === 'all' && (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Trending</span>
+                      <div style={{ flex: 1, height: 1, background: 'rgba(249,115,22,0.2)' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
+                      {articles.filter(a => a.is_trending).slice(0, 6).map(article => (
+                        <div key={article.id} onClick={() => window.open(article.url, '_blank')} style={{
+                          minWidth: 180, maxWidth: 180, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
+                          background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)',
+                          cursor: 'pointer', padding: 12,
+                        }}>
+                          {article.image_url && <div style={{ height: 70, borderRadius: 8, marginBottom: 8, backgroundImage: `url(${article.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />}
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#f0eee8', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{article.title}</div>
+                          <div style={{ fontSize: 10, color: '#888', marginTop: 4 }}>{timeAgo(article.published_at)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Filtered articles */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {articles.filter(a => {
+                  const catMatch = categoryFilter === 'all' || a.category === categoryFilter
+                  const typeMatch = contentTypeFilter === 'all' || (contentTypeFilter === 'article' && !['video', 'podcast', 'social'].includes(a.category || '')) || a.category === contentTypeFilter
+                  return catMatch && typeMatch
+                }).map(article => (
                   <ArticleCard
                     key={article.id}
                     article={article}
@@ -793,7 +847,8 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                     onToggleExpand={() => setExpandedArticle(expandedArticle === article.id ? null : article.id)}
                   />
                 ))}
-              </div>
+                </div>
+              </>
             )}
           </div>
         )}
