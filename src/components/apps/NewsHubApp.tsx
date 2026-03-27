@@ -43,7 +43,7 @@ interface SubList {
   id: string; name: string; brand_id: string; description?: string
 }
 
-type Tab = 'feed' | 'favourites' | 'archived' | 'campaigns' | 'templates' | 'subscribers' | 'brands' | 'settings'
+type Tab = 'feed' | 'favourites' | 'archived' | 'campaigns' | 'subscribers' | 'brands' | 'settings'
 
 /* ─── SVG Icons ─── */
 const I = {
@@ -351,6 +351,8 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
 
   // Templates
   const [templates, setTemplates] = useState<Template[]>([])
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
+  const [editTemplateName, setEditTemplateName] = useState('')
 
   // Subscribers
   const [subLists, setSubLists] = useState<SubList[]>([])
@@ -444,8 +446,8 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (tab === 'favourites') loadFavs()
     if (tab === 'archived') loadArchivedFavs()
-    if (tab === 'campaigns') { loadCampaigns(); loadSubLists() }
-    if (tab === 'templates') loadTemplates()
+    if (tab === 'campaigns') { loadCampaigns(); loadSubLists(); loadTemplates() }
+    // templates loaded as part of campaigns tab
     if (tab === 'subscribers') loadSubLists()
     if (tab === 'settings') { loadSources(); loadIndustries(); loadCreators(); loadLinks() }
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -965,6 +967,62 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                     ))}
                   </div>
                 )}
+
+                {/* Templates section */}
+                <div style={{ marginTop: 28 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Templates {activeBrand ? `• ${activeBrand.name}` : ''}</h3>
+                    <button onClick={async () => {
+                      if (!activeBrand) return
+                      await fetch('/api/news-hub/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New Template', brand_id: activeBrand.id }) })
+                      await loadTemplates()
+                      showToast('Template created')
+                    }} style={btnSmall}>{I.plus} New Template</button>
+                  </div>
+
+                  {templates.length === 0 ? (
+                    <div style={{ fontSize: 13, color: '#555', padding: '12px 0' }}>No templates yet. Create one to reuse across campaigns.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {templates.map(t => (
+                        <div key={t.id} style={cardS}>
+                          {editingTemplate?.id === t.id ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              <input value={editTemplateName} onChange={e => setEditTemplateName(e.target.value)} placeholder="Template name" style={{ ...inputS, fontWeight: 600 }} />
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button onClick={async () => {
+                                  await fetch('/api/news-hub/templates', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, name: editTemplateName }) })
+                                  setEditingTemplate(null)
+                                  await loadTemplates()
+                                  showToast('Template renamed')
+                                }} style={{ ...btnSmall, background: 'rgba(34,197,94,0.2)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>Save</button>
+                                <button onClick={() => setEditingTemplate(null)} style={{ ...btnSmall }}>Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{t.name}</div>
+                                <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{(t.sections || []).length} sections</div>
+                              </div>
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button onClick={() => {
+                                  setBuildTitle(''); setBuildSections(t.sections || []); setBuildSubject(''); setBuildStep('edit'); setEditCampaign(null)
+                                }} style={btnSmall}>Use</button>
+                                <button onClick={() => { setEditingTemplate(t); setEditTemplateName(t.name) }} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4 }}>{I.edit}</button>
+                                <button onClick={async () => {
+                                  await fetch('/api/news-hub/templates', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) })
+                                  await loadTemplates()
+                                  showToast('Deleted')
+                                }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}>{I.trash}</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             )}
 
