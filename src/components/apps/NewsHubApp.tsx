@@ -301,6 +301,13 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [newBrandName, setNewBrandName] = useState('')
   const [newBrandColor, setNewBrandColor] = useState('#6366f1')
   const [newBrandIsClient, setNewBrandIsClient] = useState(false)
+  const [newBrandLogo, setNewBrandLogo] = useState('')
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null)
+  const [editBrandName, setEditBrandName] = useState('')
+  const [editBrandColor, setEditBrandColor] = useState('')
+  const [editBrandLogo, setEditBrandLogo] = useState('')
+  const [editBrandTone, setEditBrandTone] = useState('')
+  const [editBrandIsClient, setEditBrandIsClient] = useState(false)
 
   // Source form
   const [showAddSource, setShowAddSource] = useState(false)
@@ -493,10 +500,24 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
 
   const handleAddBrand = async () => {
     if (!newBrandName.trim()) return
-    await fetch('/api/news-hub/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newBrandName, color: newBrandColor, is_client: newBrandIsClient }) })
-    setNewBrandName(''); setNewBrandColor('#6366f1'); setNewBrandIsClient(false); setShowAddBrand(false)
+    await fetch('/api/news-hub/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newBrandName, color: newBrandColor, is_client: newBrandIsClient, logo_url: newBrandLogo || null }) })
+    setNewBrandName(''); setNewBrandColor('#6366f1'); setNewBrandIsClient(false); setNewBrandLogo(''); setShowAddBrand(false)
     await loadBrands()
     showToast('Brand added')
+  }
+
+  const startEditBrand = (b: Brand) => {
+    setEditingBrand(b); setEditBrandName(b.name); setEditBrandColor(b.color)
+    setEditBrandLogo(b.logo_url || ''); setEditBrandTone(b.tone || 'professional')
+    setEditBrandIsClient(b.is_client || false)
+  }
+
+  const handleSaveEditBrand = async () => {
+    if (!editingBrand) return
+    await fetch('/api/news-hub/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingBrand.id, name: editBrandName, color: editBrandColor, logo_url: editBrandLogo || null, tone: editBrandTone, is_client: editBrandIsClient }) })
+    setEditingBrand(null)
+    await loadBrands()
+    showToast('Brand updated')
   }
 
   const handleAddSource = async () => {
@@ -1084,11 +1105,63 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                     Client business
                   </label>
                 </div>
+                <div style={{ marginBottom: 8 }}>
+                  <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>Logo</label>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input value={newBrandLogo} onChange={e => setNewBrandLogo(e.target.value)} placeholder="Logo URL (or upload)" style={{ ...inputS, flex: 1 }} />
+                    <label style={{ ...btnSmall, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', margin: 0 }}>
+                      {I.image} Upload
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                        const file = e.target.files?.[0]; if (!file) return
+                        const reader = new FileReader()
+                        reader.onload = () => setNewBrandLogo(reader.result as string)
+                        reader.readAsDataURL(file)
+                      }} />
+                    </label>
+                  </div>
+                  {newBrandLogo && <img src={newBrandLogo} alt="Logo preview" style={{ height: 40, marginTop: 8, borderRadius: 6 }} />}
+                </div>
                 <button onClick={handleAddBrand} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px' }}>Add Brand</button>
               </div>
             )}
 
             {/* Brand list */}
+            {/* Edit brand modal */}
+            {editingBrand && (
+              <div style={{ ...cardS, marginBottom: 20, borderLeft: `3px solid ${editBrandColor}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Edit: {editingBrand.name}</h3>
+                  <button onClick={() => setEditingBrand(null)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 16 }}>×</button>
+                </div>
+                <input value={editBrandName} onChange={e => setEditBrandName(e.target.value)} placeholder="Brand name" style={{ ...inputS, marginBottom: 8 }} />
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                  <input type="color" value={editBrandColor} onChange={e => setEditBrandColor(e.target.value)} style={{ width: 40, height: 36, border: 'none', borderRadius: 6, cursor: 'pointer', background: 'transparent' }} />
+                  <input value={editBrandTone} onChange={e => setEditBrandTone(e.target.value)} placeholder="Tone (e.g. professional, friendly)" style={{ ...inputS, flex: 1 }} />
+                </div>
+                <label style={{ fontSize: 12, color: '#888', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 8 }}>
+                  <input type="checkbox" checked={editBrandIsClient} onChange={e => setEditBrandIsClient(e.target.checked)} />
+                  Client business
+                </label>
+                <div style={{ marginBottom: 8 }}>
+                  <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>Logo</label>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input value={editBrandLogo} onChange={e => setEditBrandLogo(e.target.value)} placeholder="Logo URL (or upload)" style={{ ...inputS, flex: 1 }} />
+                    <label style={{ ...btnSmall, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', margin: 0 }}>
+                      {I.image} Upload
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                        const file = e.target.files?.[0]; if (!file) return
+                        const reader = new FileReader()
+                        reader.onload = () => setEditBrandLogo(reader.result as string)
+                        reader.readAsDataURL(file)
+                      }} />
+                    </label>
+                  </div>
+                  {editBrandLogo && <img src={editBrandLogo} alt="Logo" style={{ height: 40, marginTop: 8, borderRadius: 6 }} />}
+                </div>
+                <button onClick={handleSaveEditBrand} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px', background: 'rgba(34,197,94,0.2)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.3)' }}>Save Changes</button>
+              </div>
+            )}
+
             {myBrands.length > 0 && (
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 11, color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>My Businesses</div>
@@ -1100,10 +1173,13 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ width: 12, height: 12, borderRadius: '50%', background: b.color }} />
+                        {b.logo_url ? <img src={b.logo_url} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'contain' }} /> : <span style={{ width: 12, height: 12, borderRadius: '50%', background: b.color }} />}
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{b.name}</span>
                       </div>
-                      {activeBrand?.id === b.id && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(34,197,94,0.2)', color: '#4ade80', fontWeight: 700 }}>ACTIVE</span>}
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {activeBrand?.id === b.id && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(34,197,94,0.2)', color: '#4ade80', fontWeight: 700 }}>ACTIVE</span>}
+                        <button onClick={(e) => { e.stopPropagation(); startEditBrand(b) }} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4 }}>{I.edit}</button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1121,10 +1197,13 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ width: 12, height: 12, borderRadius: '50%', background: b.color }} />
+                        {b.logo_url ? <img src={b.logo_url} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'contain' }} /> : <span style={{ width: 12, height: 12, borderRadius: '50%', background: b.color }} />}
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{b.name}</span>
                       </div>
-                      {activeBrand?.id === b.id && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(34,197,94,0.2)', color: '#4ade80', fontWeight: 700 }}>ACTIVE</span>}
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {activeBrand?.id === b.id && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(34,197,94,0.2)', color: '#4ade80', fontWeight: 700 }}>ACTIVE</span>}
+                        <button onClick={(e) => { e.stopPropagation(); startEditBrand(b) }} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', padding: 4 }}>{I.edit}</button>
+                      </div>
                     </div>
                   </div>
                 ))}
