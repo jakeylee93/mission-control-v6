@@ -12,16 +12,7 @@ interface BraveNewsResult {
   meta_url?: { hostname?: string }
 }
 
-const SEARCH_QUERIES = [
-  'events industry UK hospitality 2026',
-  'bar catering mobile events UK',
-  'AI technology business automation',
-  'digital marketing events industry',
-  'exhibition trade show UK',
-  'AI technology latest news today',
-  'business automation tools 2026',
-  'UK events industry news',
-]
+// No hardcoded queries — we ONLY collect from user's custom sources, industries, and creators
 
 function autoCategory(title: string, description: string): string {
   const text = (title + ' ' + description).toLowerCase()
@@ -82,223 +73,79 @@ export async function POST() {
   }
 
   const supabase = createServerSupabaseAdmin()
-  const allResults: Array<{ title: string; url: string; description: string; thumbnail: string | null; age: string; query: string }> = []
+  const allResults: Array<{ title: string; url: string; description: string; thumbnail: string | null; age: string; query: string; brand_id?: string | null }> = []
 
-  for (const query of SEARCH_QUERIES) {
+  // Helper to search Brave
+  async function braveSearch(query: string, brandId?: string | null) {
     try {
       const res = await fetch(
         `https://api.search.brave.com/res/v1/news/search?q=${encodeURIComponent(query)}&count=10`,
         {
-          headers: {
-            'Accept': 'application/json',
-            'Accept-Encoding': 'gzip',
-            'X-Subscription-Token': braveKey,
-          },
+          headers: { 'Accept': 'application/json', 'Accept-Encoding': 'gzip', 'X-Subscription-Token': braveKey! },
           cache: 'no-store',
         }
       )
-      if (!res.ok) continue
-
+      if (!res.ok) return
       const data = await res.json()
       const results: BraveNewsResult[] = Array.isArray(data.results) ? data.results : []
       for (const r of results) {
         if (r.url && r.title) {
           allResults.push({
-            title: r.title,
-            url: r.url,
-            description: r.description || '',
-            thumbnail: r.thumbnail?.src || null,
-            age: r.age || '',
-            query,
+            title: r.title, url: r.url, description: r.description || '',
+            thumbnail: r.thumbnail?.src || null, age: r.age || '', query, brand_id: brandId || null,
           })
         }
       }
-    } catch {
-      // Skip failed query
-    }
+    } catch { /* skip */ }
   }
 
-  // Step A: Fetch custom industries and search for each
+  // ONLY collect from user's custom sources, industries, and creators
+  // Step A: Custom sources (per-brand)
   try {
-    const supabaseCheck = createServerSupabaseAdmin()
-    const { data: industries, error: indError } = await supabaseCheck
-      .from('news_industries')
-      .select('name')
-
-    if (!indError && industries && industries.length > 0) {
-      for (const industry of industries) {
-        const industryQuery = `${industry.name} news`
-        try {
-          const res = await fetch(
-            `https://api.search.brave.com/res/v1/news/search?q=${encodeURIComponent(industryQuery)}&count=10`,
-            {
-              headers: {
-                'Accept': 'application/json',
-                'Accept-Encoding': 'gzip',
-                'X-Subscription-Token': braveKey,
-              },
-              cache: 'no-store',
-            }
-          )
-          if (!res.ok) continue
-
-          const data = await res.json()
-          const results: BraveNewsResult[] = Array.isArray(data.results) ? data.results : []
-          for (const r of results) {
-            if (r.url && r.title) {
-              allResults.push({
-                title: r.title,
-                url: r.url,
-                description: r.description || '',
-                thumbnail: r.thumbnail?.src || null,
-                age: r.age || '',
-                query: `industry:${industry.name}`,
-              })
-            }
-          }
-        } catch {
-          // Skip failed industry query
-        }
-      }
-    }
-  } catch {
-    // Table missing or other error — skip silently
-  }
-
-  // Step B: Fetch custom sources and search each domain
-  try {
-    const supabaseCheck = createServerSupabaseAdmin()
-    const { data: sources, error: srcError } = await supabaseCheck
-      .from('news_sources')
-      .select('name, url')
-
-    if (!srcError && sources && sources.length > 0) {
+    const { data: sources } = await supabase.from('news_sources').select('name, url, brand_id')
+    if (sources && sources.length > 0) {
       for (const source of sources) {
         try {
           const domain = new URL(source.url).hostname.replace(/^www\./, '')
-          const siteQuery = `site:${domain} news`
-          const res = await fetch(
-            `https://api.search.brave.com/res/v1/news/search?q=${encodeURIComponent(siteQuery)}&count=10`,
-            {
-              headers: {
-                'Accept': 'application/json',
-                'Accept-Encoding': 'gzip',
-                'X-Subscription-Token': braveKey,
-              },
-              cache: 'no-store',
-            }
-          )
-          if (!res.ok) continue
-
-          const data = await res.json()
-          const results: BraveNewsResult[] = Array.isArray(data.results) ? data.results : []
-          for (const r of results) {
-            if (r.url && r.title) {
-              allResults.push({
-                title: r.title,
-                url: r.url,
-                description: r.description || '',
-                thumbnail: r.thumbnail?.src || null,
-                age: r.age || '',
-                query: `source:${source.name}`,
-              })
-            }
-          }
-        } catch {
-          // Skip failed source query
-        }
+          await braveSearch(`site:${domain} news`, source.brand_id)
+        } catch { /* skip */ }
       }
     }
-  } catch {
-    // Table missing or other error — skip silently
-  }
+  } catch { /* table missing */ }
 
-  // Step C: Fetch content creators and search for their latest content
+  // Step B: Custom industries (per-brand)
   try {
-    const supabaseCheck = createServerSupabaseAdmin()
-    const { data: creators, error: creatorError } = await supabaseCheck
-      .from('news_creators')
-      .select('name, platform')
+    const { data: industries } = await supabase.from('news_industries').select('name, brand_id')
+    if (industries && industries.length > 0) {
+      for (const ind of industries) {
+        await braveSearch(`${ind.name} news`, ind.brand_id)
+      }
+    }
+  } catch { /* table missing */ }
 
-    if (!creatorError && creators && creators.length > 0) {
+  // Step C: Content creators (per-brand)
+  try {
+    const { data: creators } = await supabase.from('news_creators').select('name, platform, brand_id')
+    if (creators && creators.length > 0) {
       for (const creator of creators) {
         const platform = creator.platform || 'all'
         let searchQuery: string
         switch (platform) {
-          case 'youtube':
-            searchQuery = `${creator.name} youtube latest video`
-            break
-          case 'podcast':
-            searchQuery = `${creator.name} podcast latest episode`
-            break
-          case 'twitter':
-          case 'x':
-            searchQuery = `${creator.name} twitter posts`
-            break
-          case 'linkedin':
-            searchQuery = `${creator.name} linkedin article`
-            break
-          case 'reddit':
-            searchQuery = `reddit ${creator.name}`
-            break
-          case 'blog':
-            searchQuery = `site:${creator.name} latest`
-            break
-          default:
-            searchQuery = `${creator.name} latest content`
+          case 'youtube': searchQuery = `${creator.name} youtube latest video`; break
+          case 'podcast': searchQuery = `${creator.name} podcast latest episode`; break
+          case 'twitter': case 'x': searchQuery = `${creator.name} twitter posts`; break
+          case 'linkedin': searchQuery = `${creator.name} linkedin article`; break
+          case 'reddit': searchQuery = `reddit ${creator.name}`; break
+          case 'blog': searchQuery = `site:${creator.name} latest`; break
+          default: searchQuery = `${creator.name} latest content`
         }
-        try {
-          const res = await fetch(
-            `https://api.search.brave.com/res/v1/news/search?q=${encodeURIComponent(searchQuery)}&count=10`,
-            {
-              headers: {
-                'Accept': 'application/json',
-                'Accept-Encoding': 'gzip',
-                'X-Subscription-Token': braveKey,
-              },
-              cache: 'no-store',
-            }
-          )
-          if (!res.ok) continue
-
-          const data = await res.json()
-          const results: BraveNewsResult[] = Array.isArray(data.results) ? data.results : []
-          for (const r of results) {
-            if (r.url && r.title) {
-              // Determine content type from platform and URL
-              let contentType = 'article'
-              if (platform === 'youtube' || r.url.includes('youtube.com') || r.url.includes('youtu.be')) {
-                contentType = 'video'
-              } else if (platform === 'podcast' || r.url.includes('podcast')) {
-                contentType = 'podcast'
-              } else if (platform === 'twitter' || platform === 'x' || r.url.includes('twitter.com') || r.url.includes('x.com')) {
-                contentType = 'social'
-              } else if (platform === 'linkedin' || r.url.includes('linkedin.com')) {
-                contentType = 'social'
-              } else if (platform === 'reddit' || r.url.includes('reddit.com')) {
-                contentType = 'social'
-              }
-              allResults.push({
-                title: r.title,
-                url: r.url,
-                description: r.description || '',
-                thumbnail: r.thumbnail?.src || null,
-                age: r.age || '',
-                query: `creator:${creator.name}:${contentType}`,
-              })
-            }
-          }
-        } catch {
-          // Skip failed creator query
-        }
+        await braveSearch(searchQuery, creator.brand_id)
       }
     }
-  } catch {
-    // Table missing or other error — skip silently
-  }
+  } catch { /* table missing */ }
 
   if (allResults.length === 0) {
-    return NextResponse.json({ ok: true, count: 0, message: 'No results from Brave Search' })
+    return NextResponse.json({ ok: true, count: 0, message: 'No results — add some sources in Settings first' })
   }
 
   // Detect trending: count topic occurrences
@@ -349,7 +196,7 @@ export async function POST() {
     is_trending: isTrending(r.title, r.description),
     published_at: parseAge(r.age),
     collected_at: now,
-    business: null,
+    business: r.brand_id || null,
   }))
 
   const { error: upsertError } = await supabase

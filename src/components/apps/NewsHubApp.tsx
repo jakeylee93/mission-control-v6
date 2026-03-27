@@ -1,753 +1,615 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 /* ─── Types ─── */
 interface Article {
-  id: string
-  title: string
-  url: string
-  source: string | null
-  summary: string | null
-  category: string | null
-  image_url: string | null
-  relevance_score: number
-  is_trending: boolean
-  published_at: string | null
-  collected_at: string
-  business: string | null
+  id: string; title: string; url: string; source: string | null; summary: string | null
+  category: string | null; image_url: string | null; relevance_score: number
+  is_trending: boolean; published_at: string | null; collected_at: string; business: string | null
 }
 
-interface Favorite {
-  id: string
-  article_id: string
-  business: string
-  saved_at: string
-  news_articles: Article | null
+interface Brand {
+  id: string; name: string; color: string; logo_url?: string | null
+  tone?: string; is_client?: boolean; primary_color?: string; secondary_color?: string
 }
 
-interface NewsLink {
-  id: string
-  url: string
-  title: string | null
-  notes: string | null
-  source_platform: string | null
-  category: string | null
-  business: string
-  added_at: string
+interface NewsSource {
+  id: string; name: string; url: string; label?: string; source_type?: string; brand_id?: string | null
 }
 
-interface Newsletter {
-  id: string
-  title: string
-  business: string
-  articles: Article[]
-  html_content: string | null
-  status: string
-  created_at: string
-  sent_at: string | null
+interface Section {
+  type: string; heading: string; body: string; image_url?: string | null
+  cta_text?: string | null; cta_url?: string | null
 }
 
-interface Business {
-  id: string
-  name: string
-  color: string
+interface Campaign {
+  id: string; title: string; brand_id: string; folder: string; status: string
+  sections: Section[]; subject_line: string; html_content?: string | null
+  list_id?: string | null; scheduled_at?: string | null; created_at: string; sent_at?: string | null
 }
 
-type Tab = 'feed' | 'favourites' | 'addlink' | 'newsletter' | 'settings'
+interface Template {
+  id: string; name: string; brand_id: string; sections: Section[]
+  header_image?: string | null; primary_color?: string; secondary_color?: string
+}
+
+interface SubList {
+  id: string; name: string; brand_id: string; description?: string
+}
+
+type Tab = 'feed' | 'campaigns' | 'templates' | 'subscribers' | 'brands'
 
 /* ─── SVG Icons ─── */
-const NhIcons = {
-  newspaper: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9h4"/>
-      <line x1="10" y1="6" x2="18" y2="6"/>
-      <line x1="10" y1="10" x2="18" y2="10"/>
-      <line x1="10" y1="14" x2="14" y2="14"/>
-    </svg>
-  ),
-  back: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 18 9 12 15 6"/>
-    </svg>
-  ),
-  refresh: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23 4 23 10 17 10"/>
-      <polyline points="1 20 1 14 7 14"/>
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-    </svg>
-  ),
-  heart: (filled: boolean) => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill={filled ? '#ef4444' : 'none'} stroke={filled ? '#ef4444' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-    </svg>
-  ),
-  link: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-    </svg>
-  ),
-  check: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12"/>
-    </svg>
-  ),
-  copy: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="9" y="9" width="13" height="13" rx="2"/>
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-    </svg>
-  ),
-  collect: (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="8 17 12 21 16 17"/>
-      <line x1="12" y1="12" x2="12" y2="21"/>
-      <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
-    </svg>
-  ),
-  newsletter: (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-      <polyline points="22,6 12,13 2,6"/>
-    </svg>
-  ),
-  chevronDown: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="6 9 12 15 18 9"/>
-    </svg>
-  ),
+const I = {
+  newspaper: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9h4"/><line x1="10" y1="6" x2="18" y2="6"/><line x1="10" y1="10" x2="18" y2="10"/><line x1="10" y1="14" x2="14" y2="14"/></svg>,
+  back: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
+  refresh: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+  heart: (f: boolean) => <svg width="16" height="16" viewBox="0 0 24 24" fill={f ? '#ef4444' : 'none'} stroke={f ? '#ef4444' : 'currentColor'} strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  mail: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+  plus: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  trash: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+  edit: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  sparkle: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>,
+  send: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+  image: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+  up: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>,
+  down: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>,
+  folder: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+  users: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  chevDown: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>,
+  building: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/><path d="M9 18h6"/></svg>,
 }
 
-/* ─── Category config ─── */
-const CATEGORIES = [
-  { id: 'all', label: 'All' },
-  { id: 'technology', label: 'Technology' },
-  { id: 'events-hospitality', label: 'Events & Hospitality' },
-  { id: 'business-marketing', label: 'Business & Marketing' },
-]
-
-const CONTENT_TYPES = [
-  { id: 'all', label: 'All Types' },
-  { id: 'article', label: 'Articles' },
-  { id: 'video', label: 'Videos' },
-  { id: 'podcast', label: 'Podcasts' },
-  { id: 'social', label: 'Social' },
-]
-
-const CREATOR_PLATFORMS = [
-  { id: 'all', label: 'All', color: '#888' },
-  { id: 'youtube', label: 'YouTube', color: '#ef4444' },
-  { id: 'podcast', label: 'Podcast', color: '#8b5cf6' },
-  { id: 'twitter', label: 'X/Twitter', color: '#000000' },
-  { id: 'linkedin', label: 'LinkedIn', color: '#0a66c2' },
-  { id: 'reddit', label: 'Reddit', color: '#ff4500' },
-  { id: 'blog', label: 'Blog', color: '#22c55e' },
-]
-
-const CAT_COLORS: Record<string, string> = {
-  'technology': '#6366f1',
-  'events-hospitality': '#f97316',
-  'business-marketing': '#22c55e',
-}
-
-function catLabel(cat: string | null): string {
-  if (cat === 'events-hospitality') return 'Events'
-  if (cat === 'business-marketing') return 'Marketing'
-  if (cat === 'technology') return 'Tech'
-  return cat || 'Other'
-}
-
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return ''
-  const now = Date.now()
-  const then = new Date(dateStr).getTime()
-  const diff = now - then
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return mins + 'm ago'
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return hrs + 'h ago'
-  const days = Math.floor(hrs / 24)
+/* ─── Utils ─── */
+function timeAgo(d: string | null): string {
+  if (!d) return ''
+  const diff = Date.now() - new Date(d).getTime()
+  const m = Math.floor(diff / 60000)
+  if (m < 1) return 'Just now'
+  if (m < 60) return m + 'm ago'
+  const h = Math.floor(m / 60)
+  if (h < 24) return h + 'h ago'
+  const days = Math.floor(h / 24)
   if (days < 7) return days + 'd ago'
-  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
-function getFavicon(url: string, size: number = 20): string {
-  try {
-    const domain = new URL(url).hostname
-    return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=' + size
-  } catch { return '' }
+function getFavicon(url: string): string {
+  try { return 'https://www.google.com/s2/favicons?domain=' + new URL(url).hostname + '&sz=20' }
+  catch { return '' }
 }
 
-/* ─── Shimmer skeleton ─── */
-function NhSkeleton() {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {[0, 1, 2, 3].map(i => (
-        <div key={i} style={{
-          background: 'rgba(255,255,255,0.04)',
-          borderRadius: 14,
-          padding: '14px 14px',
-          display: 'flex',
-          gap: 12,
-          overflow: 'hidden',
-          position: 'relative',
-        }}>
-          <div style={{ width: 60, height: 60, borderRadius: 10, background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ height: 14, borderRadius: 6, background: 'rgba(255,255,255,0.06)', width: '80%' }} />
-            <div style={{ height: 12, borderRadius: 6, background: 'rgba(255,255,255,0.04)', width: '50%' }} />
-            <div style={{ height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.04)', width: '100%', marginTop: 4 }} />
-          </div>
-          <style>{`@keyframes nhShimmer{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}`}</style>
-          <div style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.03) 50%, transparent 100%)',
-            animation: 'nhShimmer 1.8s infinite',
-          }} />
-        </div>
-      ))}
-    </div>
-  )
+/* ─── Shared styles ─── */
+const inputS: React.CSSProperties = {
+  width: '100%', padding: '10px 14px', borderRadius: 10,
+  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+  color: '#f0eee8', fontSize: 14, outline: 'none', boxSizing: 'border-box',
 }
 
-/* ─── Article Card ─── */
-function ArticleCard({
-  article,
-  isFaved,
-  onToggleFav,
-}: {
-  article: Article
-  isFaved: boolean
-  onToggleFav: (article: Article) => void
-}) {
-  const catColor = CAT_COLORS[article.category || ''] || '#6366f1'
+const chip = (active: boolean, color?: string): React.CSSProperties => ({
+  padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+  background: active ? (color || '#6366f1') + '30' : 'rgba(255,255,255,0.06)',
+  color: active ? (color || '#a5b4fc') : '#888', border: 'none', cursor: 'pointer',
+})
 
-  return (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      borderRadius: 14,
-      padding: '12px 14px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 0,
-      border: '1px solid rgba(255,255,255,0.06)',
-      cursor: 'pointer',
-      transition: 'background 0.15s',
-      overflow: 'hidden',
-    }}
-      onClick={() => window.open(article.url, '_blank')}
-    >
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        {article.image_url && (
-          <div style={{
-            width: 60, height: 60, borderRadius: 10, flexShrink: 0,
-            backgroundImage: `url(${article.image_url})`,
-            backgroundSize: 'cover', backgroundPosition: 'center',
-            background: `url(${article.image_url}) center/cover, rgba(99,102,241,0.15)`,
-          }} />
-        )}
-        {!article.image_url && (
-          <div style={{
-            width: 60, height: 60, borderRadius: 10, flexShrink: 0,
-            background: `rgba(${catColor === '#6366f1' ? '99,102,241' : catColor === '#f97316' ? '249,115,22' : '34,197,94'},0.15)`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {NhIcons.newspaper}
-          </div>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: 14, fontWeight: 600, color: '#f0eee8', lineHeight: 1.4,
-            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden',
-            marginBottom: 4,
-          }}>
-            {article.title}
-          </div>
-          <div style={{ fontSize: 11, color: '#666', display: 'flex', gap: 8, alignItems: 'center' }}>
-            {article.source && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {getFavicon(article.url) && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={getFavicon(article.url, 18)} width={18} height={18} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />
-                )}
-                {article.source.length > 30 ? article.source.slice(0, 30) + '…' : article.source}
-              </span>
-            )}
-            <span>{timeAgo(article.published_at || article.collected_at)}</span>
-          </div>
-        </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleFav(article) }}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
-            flexShrink: 0, marginTop: -2,
-          }}
-        >
-          {NhIcons.heart(isFaved)}
-        </button>
-      </div>
+const cardS: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '14px 16px',
+  border: '1px solid rgba(255,255,255,0.06)',
+}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-        <span style={{
-          fontSize: 10, fontWeight: 600, color: catColor,
-          background: `${catColor}20`, padding: '2px 8px', borderRadius: 20,
-          textTransform: 'uppercase' as const, letterSpacing: '0.5px',
-        }}>
-          {catLabel(article.category)}
-        </span>
-        <div style={{ flex: 1, height: 3, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-          <div style={{
-            height: '100%', borderRadius: 3,
-            background: catColor,
-            width: `${article.relevance_score}%`,
-            transition: 'width 0.3s',
-          }} />
-        </div>
-      </div>
-    </div>
-  )
+const btnPrimary = (enabled: boolean): React.CSSProperties => ({
+  width: '100%', padding: '12px', borderRadius: 12, border: 'none',
+  background: enabled ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.2)',
+  color: enabled ? '#fff' : '#666', fontSize: 14, fontWeight: 700,
+  cursor: enabled ? 'pointer' : 'not-allowed',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+})
+
+const btnSmall: React.CSSProperties = {
+  background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)',
+  borderRadius: 8, padding: '5px 10px', color: '#a5b4fc', fontSize: 12, fontWeight: 600, cursor: 'pointer',
 }
 
 /* ─── Toast ─── */
-function NhToast({ msg }: { msg: string }) {
+function Toast({ msg }: { msg: string }) {
+  return <div style={{
+    position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
+    background: 'rgba(30,27,75,0.97)', color: '#e0e7ff', padding: '10px 20px',
+    borderRadius: 24, fontSize: 13, fontWeight: 600, zIndex: 9999,
+    boxShadow: '0 4px 20px rgba(0,0,0,0.4)', border: '1px solid rgba(99,102,241,0.3)',
+  }}>{msg}</div>
+}
+
+/* ─── Section Editor ─── */
+function SectionEditor({ sections, onChange, brandColor, brandName }: {
+  sections: Section[]; onChange: (s: Section[]) => void; brandColor: string; brandName: string
+}) {
+  const [enhancingIdx, setEnhancingIdx] = useState<number | null>(null)
+
+  const move = (i: number, dir: -1 | 1) => {
+    const arr = [...sections]; const j = i + dir
+    if (j < 0 || j >= arr.length) return
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    onChange(arr)
+  }
+
+  const update = (i: number, field: keyof Section, value: string | null) => {
+    const arr = [...sections]
+    arr[i] = { ...arr[i], [field]: value }
+    onChange(arr)
+  }
+
+  const remove = (i: number) => onChange(sections.filter((_, idx) => idx !== i))
+
+  const addSection = () => onChange([...sections, { type: 'text', heading: 'New Section', body: 'Edit this content...', image_url: null, cta_text: null, cta_url: null }])
+
+  const enhanceSection = async (i: number) => {
+    setEnhancingIdx(i)
+    try {
+      const res = await fetch('/api/news-hub/ai-draft', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'enhance', section_text: sections[i].body, brand_name: brandName }),
+      })
+      const d = await res.json()
+      if (d.ok) update(i, 'body', d.enhanced_text)
+    } catch { /* ignore */ }
+    setEnhancingIdx(null)
+  }
+
+  const SECTION_TYPES = ['hero', 'text', 'image', 'offer', 'cta', 'divider']
+
   return (
-    <div style={{
-      position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(30,27,75,0.97)', color: '#e0e7ff',
-      padding: '10px 20px', borderRadius: 24, fontSize: 13, fontWeight: 600,
-      zIndex: 9999, whiteSpace: 'nowrap' as const, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-      border: '1px solid rgba(99,102,241,0.3)',
-    }}>
-      {msg}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {sections.map((sec, i) => (
+        <div key={i} style={{
+          ...cardS, position: 'relative',
+          borderLeft: `3px solid ${sec.type === 'hero' ? brandColor : sec.type === 'offer' ? '#f59e0b' : 'rgba(255,255,255,0.1)'}`,
+        }}>
+          {/* Controls row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <select value={sec.type} onChange={e => update(i, 'type', e.target.value)} style={{
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 6, padding: '3px 8px', color: '#a5b4fc', fontSize: 11, outline: 'none',
+            }}>
+              {SECTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <div style={{ flex: 1 }} />
+            <button onClick={() => move(i, -1)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 2 }}>{I.up}</button>
+            <button onClick={() => move(i, 1)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 2 }}>{I.down}</button>
+            <button onClick={() => enhanceSection(i)} disabled={enhancingIdx === i} style={{ ...btnSmall, padding: '3px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, opacity: enhancingIdx === i ? 0.5 : 1 }}>
+              {I.sparkle} {enhancingIdx === i ? '...' : 'Enhance'}
+            </button>
+            <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 2 }}>{I.trash}</button>
+          </div>
+
+          {sec.type !== 'divider' && (
+            <>
+              <input value={sec.heading} onChange={e => update(i, 'heading', e.target.value)}
+                placeholder="Section heading" style={{ ...inputS, marginBottom: 8, fontSize: 15, fontWeight: 700 }} />
+              <textarea value={sec.body} onChange={e => update(i, 'body', e.target.value)}
+                rows={3} placeholder="Section content..."
+                style={{ ...inputS, resize: 'vertical' as const, marginBottom: 8 }} />
+            </>
+          )}
+
+          {/* Image upload */}
+          {(sec.type === 'hero' || sec.type === 'image') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <input value={sec.image_url || ''} onChange={e => update(i, 'image_url', e.target.value || null)}
+                placeholder="Image URL" style={{ ...inputS, flex: 1, fontSize: 12 }} />
+              <label style={{ ...btnSmall, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', margin: 0 }}>
+                {I.image} Upload
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = () => {
+                    update(i, 'image_url', reader.result as string)
+                  }
+                  reader.readAsDataURL(file)
+                }} />
+              </label>
+            </div>
+          )}
+
+          {sec.image_url && (
+            <div style={{
+              height: 80, borderRadius: 8, marginBottom: 8,
+              backgroundImage: `url(${sec.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center',
+              border: '1px solid rgba(255,255,255,0.1)',
+            }} />
+          )}
+
+          {/* CTA */}
+          {(sec.type === 'offer' || sec.type === 'cta') && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input value={sec.cta_text || ''} onChange={e => update(i, 'cta_text', e.target.value || null)}
+                placeholder="Button text" style={{ ...inputS, flex: 1, fontSize: 12 }} />
+              <input value={sec.cta_url || ''} onChange={e => update(i, 'cta_url', e.target.value || null)}
+                placeholder="Button URL" style={{ ...inputS, flex: 2, fontSize: 12 }} />
+            </div>
+          )}
+        </div>
+      ))}
+
+      <button onClick={addSection} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        {I.plus} Add Section
+      </button>
     </div>
   )
 }
 
-/* ─── Main Component ─── */
+/* ─── HTML Builder ─── */
+function buildHtml(brand: Brand, sections: Section[], subjectLine: string): string {
+  const date = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const brandColor = brand.primary_color || brand.color || '#6366f1'
+
+  const sectionsHtml = sections.map(s => {
+    if (s.type === 'divider') return '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">'
+
+    let html = '<div style="margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid #f3f4f6;">'
+
+    if (s.image_url) {
+      html += `<img src="${s.image_url}" alt="${s.heading}" style="width:100%;height:auto;border-radius:12px;margin-bottom:16px;display:block;" />`
+    }
+
+    if (s.type === 'hero') {
+      html += `<h1 style="margin:0 0 12px;font-size:26px;font-weight:800;color:#111827;line-height:1.3;">${s.heading}</h1>`
+    } else {
+      html += `<h2 style="margin:0 0 10px;font-size:18px;font-weight:700;color:#111827;line-height:1.4;">${s.heading}</h2>`
+    }
+
+    html += `<p style="margin:0 0 14px;color:#4b5563;font-size:15px;line-height:1.6;">${s.body}</p>`
+
+    if (s.cta_text) {
+      html += `<a href="${s.cta_url || '#'}" style="display:inline-block;background:${brandColor};color:#fff;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">${s.cta_text}</a>`
+    }
+
+    html += '</div>'
+    return html
+  }).join('')
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${subjectLine}</title></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+<div style="max-width:640px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;margin-top:24px;margin-bottom:24px;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+<div style="background:linear-gradient(135deg,${brandColor} 0%,${brandColor}cc 100%);padding:40px 32px;text-align:center;">
+${brand.logo_url ? `<img src="${brand.logo_url}" alt="${brand.name}" style="max-height:48px;margin-bottom:12px;">` : ''}
+<h1 style="margin:0 0 6px;color:#fff;font-size:28px;font-weight:800;">${brand.name}</h1>
+<p style="margin:0;color:rgba(255,255,255,0.7);font-size:14px;">${subjectLine} &bull; ${date}</p>
+</div>
+<div style="padding:40px 32px;">${sectionsHtml}</div>
+<div style="background:#f3f4f6;padding:24px 32px;text-align:center;border-top:1px solid #e5e7eb;">
+<p style="margin:0 0 6px;color:#6b7280;font-size:13px;">You're receiving this from ${brand.name}.</p>
+<p style="margin:0;color:#9ca3af;font-size:12px;">Powered by Mission Control &bull; ${date}</p>
+</div></div></body></html>`
+}
+
+
+/* ═══════ MAIN COMPONENT ═══════ */
 export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<Tab>('feed')
+  const [brands, setBrands] = useState<Brand[]>([])
+  const [activeBrand, setActiveBrand] = useState<Brand | null>(null)
+  const [showBrandPicker, setShowBrandPicker] = useState(false)
+
+  // Feed
   const [articles, setArticles] = useState<Article[]>([])
-  const [favorites, setFavorites] = useState<Favorite[]>([])
-  const [links, setLinks] = useState<NewsLink[]>([])
-  const [newsletters, setNewsletters] = useState<Newsletter[]>([])
-  const [businesses, setBusinesses] = useState<Business[]>([])
-  const [activeBusiness, setActiveBusiness] = useState<Business | null>(null)
+  const [favIds, setFavIds] = useState<Set<string>>(new Set())
+  const [favMap, setFavMap] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
   const [collecting, setCollecting] = useState(false)
-  const [categoryFilter, setCategoryFilter] = useState('all')
-  const [contentTypeFilter, setContentTypeFilter] = useState('all')
+
+  // Sources
+  const [sources, setSources] = useState<NewsSource[]>([])
+
+  // Campaigns
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [editCampaign, setEditCampaign] = useState<Campaign | null>(null)
+  const [campaignFolder, setCampaignFolder] = useState('all')
+
+  // Templates
+  const [templates, setTemplates] = useState<Template[]>([])
+
+  // Subscribers
+  const [subLists, setSubLists] = useState<SubList[]>([])
+
+  // Campaign builder
+  const [buildTitle, setBuildTitle] = useState('')
+  const [buildSections, setBuildSections] = useState<Section[]>([])
+  const [buildSubject, setBuildSubject] = useState('')
+  const [buildListId, setBuildListId] = useState('')
+  const [buildStep, setBuildStep] = useState<'new' | 'edit' | 'preview' | 'list'>('list')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState('')
+
+  // Toast
   const [toast, setToast] = useState<string | null>(null)
-  const [favIds, setFavIds] = useState<Set<string>>(new Set())
-  const [favMap, setFavMap] = useState<Record<string, string>>({}) // article_id -> favorite.id
-  const [showBizPicker, setShowBizPicker] = useState(false)
-  const [firstLoad, setFirstLoad] = useState(true)
+  const showToast = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), 2800) }, [])
 
-  // Newsletter builder state
-  const [selectedArticleIds, setSelectedArticleIds] = useState<Set<string>>(new Set())
-  const [nlTitle, setNlTitle] = useState('')
-  const [nlHtml, setNlHtml] = useState<string | null>(null)
-  const [nlLoading, setNlLoading] = useState(false)
-  const [nlStep, setNlStep] = useState<'select' | 'preview'>('select')
-  const [copied, setCopied] = useState(false)
+  // Brands & settings form
+  const [showAddBrand, setShowAddBrand] = useState(false)
+  const [newBrandName, setNewBrandName] = useState('')
+  const [newBrandColor, setNewBrandColor] = useState('#6366f1')
+  const [newBrandIsClient, setNewBrandIsClient] = useState(false)
 
-  // Add link form state
-  const [linkUrl, setLinkUrl] = useState('')
-  const [linkTitle, setLinkTitle] = useState('')
-  const [linkNotes, setLinkNotes] = useState('')
-  const [linkPlatform, setLinkPlatform] = useState('website')
-  const [linkCategory, setLinkCategory] = useState('technology')
-  const [linkBusiness, setLinkBusiness] = useState('')
-  const [linkSubmitting, setLinkSubmitting] = useState(false)
-
-  // Settings collecting state
-  const [collectingFor, setCollectingFor] = useState<string | null>(null)
-
-  // Sources & Industries state
-  const [sources, setSources] = useState<{ id: string; name: string; url: string }[]>([])
-  const [industries, setIndustries] = useState<{ id: string; name: string }[]>([])
+  // Source form
   const [showAddSource, setShowAddSource] = useState(false)
-  const [newSourceName, setNewSourceName] = useState('')
-  const [newSourceUrl, setNewSourceUrl] = useState('')
-  const [showAddIndustry, setShowAddIndustry] = useState(false)
-  const [newIndustryName, setNewIndustryName] = useState('')
+  const [newSrcName, setNewSrcName] = useState('')
+  const [newSrcUrl, setNewSrcUrl] = useState('')
+  const [newSrcLabel, setNewSrcLabel] = useState('')
+  const [newSrcType, setNewSrcType] = useState('website')
 
-  // Creators state
-  const [creators, setCreators] = useState<{ id: string; name: string; platform: string }[]>([])
-  const [showAddCreator, setShowAddCreator] = useState(false)
-  const [newCreatorName, setNewCreatorName] = useState('')
-  const [newCreatorPlatform, setNewCreatorPlatform] = useState('all')
+  // Sub list form
+  const [showAddList, setShowAddList] = useState(false)
+  const [newListName, setNewListName] = useState('')
 
-  const showToast = useCallback((msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 2800)
-  }, [])
+  // Test email
+  const [testEmail, setTestEmail] = useState('')
+  const [sending, setSending] = useState(false)
 
-  // Load businesses
-  useEffect(() => {
-    fetch('/api/news-hub/settings')
-      .then(r => r.json())
-      .then(d => {
-        if (d.businesses) {
-          setBusinesses(d.businesses)
-          setActiveBusiness(d.businesses[0])
-          setLinkBusiness(d.businesses[0]?.id || '')
-        }
-      })
-      .catch(() => {})
-  }, [])
-
-  // Load sources, industries and creators
-  useEffect(() => {
-    fetch('/api/news-hub/sources').then(r => r.json()).then(d => setSources(d.sources || [])).catch(() => {})
-    fetch('/api/news-hub/industries').then(r => r.json()).then(d => setIndustries(d.industries || [])).catch(() => {})
-    fetch('/api/news-hub/creators').then(r => r.json()).then(d => setCreators(d.creators || [])).catch(() => {})
-  }, [])
+  /* ─── Data loading ─── */
+  const loadBrands = useCallback(async () => {
+    const r = await fetch('/api/news-hub/settings').then(r => r.json()).catch(() => ({ businesses: [] }))
+    setBrands(r.businesses || [])
+    if (!activeBrand && r.businesses?.length) setActiveBrand(r.businesses[0])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadArticles = useCallback(async () => {
     setLoading(true)
-    try {
-      const params = new URLSearchParams({ limit: '80' })
-      if (categoryFilter !== 'all') params.set('category', categoryFilter)
-      const res = await fetch(`/api/news-hub?${params}`)
-      const d = await res.json()
-      setArticles(d.articles || [])
-    } catch {
-      setArticles([])
-    } finally {
-      setLoading(false)
-    }
-  }, [categoryFilter])
+    const params = new URLSearchParams({ limit: '80' })
+    if (activeBrand) params.set('business', activeBrand.id)
+    const r = await fetch(`/api/news-hub?${params}`).then(r => r.json()).catch(() => ({ articles: [] }))
+    setArticles(r.articles || [])
+    setLoading(false)
+  }, [activeBrand])
 
-  const loadFavorites = useCallback(async () => {
-    try {
-      const res = await fetch('/api/news-hub/favorites')
-      const d = await res.json()
-      const favs: Favorite[] = d.favorites || []
-      setFavorites(favs)
-      const ids = new Set(favs.map(f => f.article_id))
-      setFavIds(ids)
-      const map: Record<string, string> = {}
-      favs.forEach(f => { map[f.article_id] = f.id })
-      setFavMap(map)
-    } catch {
-      setFavorites([])
-    }
+  const loadFavs = useCallback(async () => {
+    const r = await fetch('/api/news-hub/favorites').then(r => r.json()).catch(() => ({ favorites: [] }))
+    const favs = r.favorites || []
+    setFavIds(new Set(favs.map((f: { article_id: string }) => f.article_id)))
+    const map: Record<string, string> = {}
+    favs.forEach((f: { article_id: string; id: string }) => { map[f.article_id] = f.id })
+    setFavMap(map)
   }, [])
 
-  const loadLinks = useCallback(async () => {
-    try {
-      const res = await fetch('/api/news-hub/links')
-      const d = await res.json()
-      setLinks(d.links || [])
-    } catch {
-      setLinks([])
-    }
-  }, [])
+  const loadSources = useCallback(async () => {
+    const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/sources${params}`).then(r => r.json()).catch(() => ({ sources: [] }))
+    setSources(r.sources || [])
+  }, [activeBrand])
 
-  const loadNewsletters = useCallback(async () => {
-    try {
-      const params = activeBusiness ? `?business=${activeBusiness.id}` : ''
-      const res = await fetch(`/api/news-hub/newsletter${params}`)
-      const d = await res.json()
-      setNewsletters(d.newsletters || [])
-    } catch {
-      setNewsletters([])
-    }
-  }, [activeBusiness])
+  const loadCampaigns = useCallback(async () => {
+    const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/campaigns${params}`).then(r => r.json()).catch(() => ({ campaigns: [] }))
+    setCampaigns(r.campaigns || [])
+  }, [activeBrand])
 
-  // Initial load
+  const loadTemplates = useCallback(async () => {
+    const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/templates${params}`).then(r => r.json()).catch(() => ({ templates: [] }))
+    setTemplates(r.templates || [])
+  }, [activeBrand])
+
+  const loadSubLists = useCallback(async () => {
+    const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/subscribers${params}`).then(r => r.json()).catch(() => ({ lists: [] }))
+    setSubLists(r.lists || [])
+  }, [activeBrand])
+
+  useEffect(() => { loadBrands() }, [loadBrands])
+  useEffect(() => { if (activeBrand) { loadArticles(); loadSources(); loadFavs() } }, [activeBrand]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    loadArticles()
-    loadFavorites()
-    loadLinks()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    if (tab === 'campaigns') { loadCampaigns(); loadSubLists() }
+    if (tab === 'templates') loadTemplates()
+    if (tab === 'subscribers') loadSubLists()
+  }, [tab, activeBrand]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (tab === 'newsletter') loadNewsletters()
-  }, [tab, loadNewsletters])
-
-  // Auto-collect on first load if no articles
-  useEffect(() => {
-    if (!firstLoad) return
-    if (!loading && articles.length === 0) {
-      setFirstLoad(false)
-      handleCollect()
-    } else if (!loading && articles.length > 0) {
-      setFirstLoad(false)
-    }
-  }, [loading, articles.length]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Reload when category changes
-  useEffect(() => {
-    if (!firstLoad) loadArticles()
-  }, [categoryFilter]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleCollect = useCallback(async () => {
+  /* ─── Handlers ─── */
+  const handleCollect = async () => {
     if (collecting) return
     setCollecting(true)
-    try {
-      const res = await fetch('/api/news-hub/collect', { method: 'POST' })
-      const d = await res.json()
-      if (d.ok) {
-        showToast(d.count > 0 ? `Collected ${d.count} articles` : 'No new articles found')
-        await loadArticles()
-      } else {
-        showToast(d.error || 'Collection failed')
-      }
-    } catch {
-      showToast('Collection failed')
-    } finally {
-      setCollecting(false)
-    }
-  }, [collecting, loadArticles, showToast])
-
-  const handleToggleFav = useCallback(async (article: Article) => {
-    if (favIds.has(article.id)) {
-      // Remove
-      const favId = favMap[article.id]
-      if (!favId) return
-      try {
-        await fetch('/api/news-hub/favorites', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: favId }),
-        })
-        setFavIds(prev => { const s = new Set(prev); s.delete(article.id); return s })
-        setFavMap(prev => { const m = { ...prev }; delete m[article.id]; return m })
-        setFavorites(prev => prev.filter(f => f.id !== favId))
-        showToast('Removed from favourites')
-      } catch {
-        showToast('Failed to remove')
-      }
-    } else {
-      // Add
-      const biz = activeBusiness?.id || 'barpeople'
-      try {
-        const res = await fetch('/api/news-hub/favorites', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ article_id: article.id, business: biz }),
-        })
-        const d = await res.json()
-        if (d.ok && d.favorite) {
-          setFavIds(prev => { const next = new Set(Array.from(prev)); next.add(article.id); return next })
-          setFavMap(prev => ({ ...prev, [article.id]: d.favorite.id }))
-          setFavorites(prev => [...prev, { ...d.favorite, news_articles: article }])
-          showToast('Saved to favourites')
-          // Cross-link videos and podcasts to media list
-          if (article.category === 'video' || article.category === 'podcast') {
-            try {
-              await fetch('/api/reading', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  title: article.title,
-                  url: article.url,
-                  category: article.category === 'video' ? 'video' : 'podcast',
-                  notes: `From News Hub: ${article.source || 'Unknown'}`,
-                }),
-              })
-            } catch {
-              // Ignore errors - this is a bonus feature
-            }
-          }
-        } else {
-          showToast(d.error || 'Could not save')
-        }
-      } catch {
-        showToast('Failed to save')
-      }
-    }
-  }, [favIds, favMap, activeBusiness, showToast])
-
-  const handleAddLink = useCallback(async () => {
-    if (!linkUrl.trim() || !linkBusiness) return
-    setLinkSubmitting(true)
-    try {
-      const res = await fetch('/api/news-hub/links', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: linkUrl.trim(),
-          title: linkTitle.trim() || null,
-          notes: linkNotes.trim() || null,
-          source_platform: linkPlatform,
-          category: linkCategory,
-          business: linkBusiness,
-        }),
-      })
-      const d = await res.json()
-      if (d.ok) {
-        showToast('Link added')
-        setLinkUrl('')
-        setLinkTitle('')
-        setLinkNotes('')
-        await loadLinks()
-      } else {
-        showToast(d.error || 'Failed to add link')
-      }
-    } catch {
-      showToast('Failed to add link')
-    } finally {
-      setLinkSubmitting(false)
-    }
-  }, [linkUrl, linkTitle, linkNotes, linkPlatform, linkCategory, linkBusiness, loadLinks, showToast])
-
-  const handleGenerateNewsletter = useCallback(async () => {
-    if (!nlTitle.trim() || selectedArticleIds.size === 0 || !activeBusiness) return
-    setNlLoading(true)
-    try {
-      const res = await fetch('/api/news-hub/newsletter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: nlTitle,
-          business: activeBusiness.id,
-          article_ids: Array.from(selectedArticleIds),
-        }),
-      })
-      const d = await res.json()
-      if (d.ok || d.html) {
-        setNlHtml(d.html)
-        setNlStep('preview')
-        showToast('Newsletter generated')
-        await loadNewsletters()
-      } else {
-        showToast(d.error || 'Failed to generate')
-      }
-    } catch {
-      showToast('Failed to generate')
-    } finally {
-      setNlLoading(false)
-    }
-  }, [nlTitle, selectedArticleIds, activeBusiness, loadNewsletters, showToast])
-
-  const handleCopyHtml = useCallback(() => {
-    if (!nlHtml) return
-    navigator.clipboard.writeText(nlHtml).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-      showToast('HTML copied')
-    })
-  }, [nlHtml, showToast])
-
-  const handleCollectForBusiness = useCallback(async (bizId: string) => {
-    setCollectingFor(bizId)
-    try {
-      const res = await fetch('/api/news-hub/collect', { method: 'POST' })
-      const d = await res.json()
-      showToast(d.ok ? `Collected ${d.count || 0} articles` : (d.error || 'Failed'))
-      await loadArticles()
-    } catch {
-      showToast('Collection failed')
-    } finally {
-      setCollectingFor(null)
-    }
-  }, [loadArticles, showToast])
-
-  /* ─── Filtered data ─── */
-  const trendingArticles = articles.filter(a => a.is_trending)
-  const feedArticles = articles.filter(a => {
-    const categoryMatch = categoryFilter === 'all' || a.category === categoryFilter || (categoryFilter !== 'all' && !CATEGORIES.find(c => c.id === categoryFilter) && a.category?.toLowerCase().replace(/\s+/g, '-') === categoryFilter)
-    const typeMatch = contentTypeFilter === 'all' || a.category === contentTypeFilter || (contentTypeFilter === 'video' && a.category === 'video') || (contentTypeFilter === 'podcast' && a.category === 'podcast') || (contentTypeFilter === 'social' && a.category === 'social') || (contentTypeFilter === 'article' && !['video', 'podcast', 'social'].includes(a.category || ''))
-    return categoryMatch && typeMatch
-  })
-
-  const groupedFavs = favorites.reduce((acc, fav) => {
-    if (!fav.news_articles) return acc
-    const biz = fav.business || 'other'
-    if (!acc[biz]) acc[biz] = []
-    acc[biz].push(fav)
-    return acc
-  }, {} as Record<string, Favorite[]>)
-
-  /* ─── Styles ─── */
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 14px', borderRadius: 10,
-    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-    color: '#f0eee8', fontSize: 14, outline: 'none', boxSizing: 'border-box' as const,
+    const r = await fetch('/api/news-hub/collect', { method: 'POST' }).then(r => r.json()).catch(() => ({ ok: false }))
+    showToast(r.ok ? `Collected ${r.count || 0} articles` : (r.error || 'Failed'))
+    await loadArticles()
+    setCollecting(false)
   }
 
-  const chipStyle = (active: boolean, color?: string): React.CSSProperties => ({
-    padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600,
-    background: active ? (color || 'rgba(99,102,241,0.3)') : 'rgba(255,255,255,0.06)',
-    color: active ? (color ? '#fff' : '#a5b4fc') : '#888',
-    border: active ? `1px solid ${color || '#6366f1'}` : '1px solid rgba(255,255,255,0.08)',
-    cursor: 'pointer',
-  })
+  const handleToggleFav = async (article: Article) => {
+    if (favIds.has(article.id)) {
+      const fId = favMap[article.id]; if (!fId) return
+      await fetch('/api/news-hub/favorites', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: fId }) })
+      setFavIds(p => { const s = new Set(p); s.delete(article.id); return s })
+      setFavMap(p => { const m = { ...p }; delete m[article.id]; return m })
+      showToast('Removed')
+    } else {
+      const r = await fetch('/api/news-hub/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ article_id: article.id, business: activeBrand?.id || 'default' }) }).then(r => r.json())
+      if (r.ok && r.favorite) {
+        setFavIds(p => { const s = new Set(Array.from(p)); s.add(article.id); return s })
+        setFavMap(p => ({ ...p, [article.id]: r.favorite.id }))
+        showToast('Saved')
+      }
+    }
+  }
 
-  const TABS_CONFIG: { id: Tab; label: string }[] = [
-    { id: 'feed', label: 'News Feed' },
-    { id: 'favourites', label: 'Favourites' },
-    { id: 'addlink', label: 'Add Link' },
-    { id: 'newsletter', label: 'Newsletter' },
-    { id: 'settings', label: 'Settings' },
+  const handleAiDraft = async () => {
+    if (!buildTitle.trim() || !activeBrand) return
+    setAiLoading(true)
+    const r = await fetch('/api/news-hub/ai-draft', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'draft', title: buildTitle, brand_name: activeBrand.name, brand_tone: activeBrand.tone }),
+    }).then(r => r.json()).catch(() => ({ ok: false }))
+    if (r.ok !== false && r.sections) {
+      setBuildSections(r.sections)
+      setBuildSubject(r.subject_line || buildTitle)
+      setBuildStep('edit')
+      showToast('Draft generated')
+    } else {
+      showToast(r.error || 'AI draft failed')
+    }
+    setAiLoading(false)
+  }
+
+  const handleEnhanceAll = async () => {
+    if (!activeBrand || buildSections.length === 0) return
+    setAiLoading(true)
+    const r = await fetch('/api/news-hub/ai-draft', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'enhance_all', sections: buildSections, brand_name: activeBrand.name, brand_tone: activeBrand.tone }),
+    }).then(r => r.json()).catch(() => ({ ok: false }))
+    if (r.ok !== false && r.sections) {
+      setBuildSections(r.sections)
+      showToast('Enhanced')
+    }
+    setAiLoading(false)
+  }
+
+  const handlePreview = () => {
+    if (!activeBrand) return
+    const html = buildHtml(activeBrand, buildSections, buildSubject || buildTitle)
+    setPreviewHtml(html)
+    setBuildStep('preview')
+  }
+
+  const handleSaveCampaign = async () => {
+    if (!activeBrand) return
+    const html = buildHtml(activeBrand, buildSections, buildSubject || buildTitle)
+
+    if (editCampaign) {
+      await fetch('/api/news-hub/campaigns', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editCampaign.id, title: buildTitle, sections: buildSections, subject_line: buildSubject, html_content: html, list_id: buildListId || null }),
+      })
+      showToast('Campaign updated')
+    } else {
+      await fetch('/api/news-hub/campaigns', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: buildTitle, brand_id: activeBrand.id, folder: campaignFolder === 'all' ? 'newsletters' : campaignFolder, sections: buildSections, subject_line: buildSubject, html_content: html, list_id: buildListId || null }),
+      })
+      showToast('Campaign saved')
+    }
+    await loadCampaigns()
+    setBuildStep('list')
+    setEditCampaign(null)
+  }
+
+  const handleTestSend = async () => {
+    if (!testEmail.trim() || !activeBrand) return
+    setSending(true)
+    const html = previewHtml || buildHtml(activeBrand, buildSections, buildSubject || buildTitle)
+    const r = await fetch('/api/news-hub/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ test_email: testEmail, html_content: html, subject_line: buildSubject || buildTitle }),
+    }).then(r => r.json()).catch(() => ({ ok: false }))
+    showToast(r.ok ? 'Test email sent!' : (r.error || 'Send failed'))
+    setSending(false)
+  }
+
+  const handleAddBrand = async () => {
+    if (!newBrandName.trim()) return
+    await fetch('/api/news-hub/settings', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newBrandName, color: newBrandColor, is_client: newBrandIsClient }),
+    })
+    setNewBrandName(''); setNewBrandColor('#6366f1'); setNewBrandIsClient(false); setShowAddBrand(false)
+    await loadBrands()
+    showToast('Brand added')
+  }
+
+  const handleAddSource = async () => {
+    if (!newSrcName.trim() || !newSrcUrl.trim()) return
+    await fetch('/api/news-hub/sources', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newSrcName, url: newSrcUrl, label: newSrcLabel || newSrcName, source_type: newSrcType, brand_id: activeBrand?.id }),
+    })
+    setNewSrcName(''); setNewSrcUrl(''); setNewSrcLabel(''); setShowAddSource(false)
+    await loadSources()
+    showToast('Source added')
+  }
+
+  const handleAddList = async () => {
+    if (!newListName.trim() || !activeBrand) return
+    await fetch('/api/news-hub/subscribers', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'create_list', name: newListName, brand_id: activeBrand.id }),
+    })
+    setNewListName(''); setShowAddList(false)
+    await loadSubLists()
+    showToast('List created')
+  }
+
+  const CAMPAIGN_FOLDERS = ['all', 'newsletters', 'promotions', 'birthdays', 'christmas', 'seasonal']
+
+  const myBrands = brands.filter(b => !b.is_client)
+  const clientBrands = brands.filter(b => b.is_client)
+
+  const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
+    { id: 'feed', label: 'News', icon: I.newspaper },
+    { id: 'campaigns', label: 'Campaigns', icon: I.mail },
+    { id: 'templates', label: 'Templates', icon: I.folder },
+    { id: 'subscribers', label: 'Lists', icon: I.users },
+    { id: 'brands', label: 'Brands', icon: I.building },
   ]
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <style>{`
         @keyframes nhSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes nhShimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
-        @keyframes nhFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-        .nh-card-hover:hover { background: rgba(255,255,255,0.07) !important; }
-        .nh-btn-hover:hover { opacity: 0.85; }
+        @keyframes nhFadeIn { from { opacity:0;transform:translateY(6px)} to {opacity:1;transform:translateY(0)} }
+        .nh-card:hover { background: rgba(255,255,255,0.07) !important; }
       `}</style>
 
-      {/* Header */}
+      {/* ═══ HEADER ═══ */}
       <div style={{
         position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100,
         background: 'rgba(10,8,18,0.95)', backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
-        padding: '0 16px',
-        maxWidth: 500, margin: '0 auto',
-        width: '100%',
+        padding: '0 16px', maxWidth: 500, margin: '0 auto', width: '100%',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
-          <button onClick={onBack} style={{
-            background: 'none', border: 'none', color: '#aaa', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, padding: '4px 0',
-          }}>
-            {NhIcons.back}
-          </button>
+          <button onClick={onBack} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px 0' }}>{I.back}</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#6366f1' }}>{NhIcons.newspaper}</span>
-            <span style={{ fontSize: 17, fontWeight: 700, color: '#f0eee8' }}>News Hub</span>
+            <span style={{ color: '#6366f1' }}>{I.mail}</span>
+            <span style={{ fontSize: 17, fontWeight: 700, color: '#f0eee8' }}>News & Mail</span>
           </div>
-          {/* Business selector */}
+          {/* Brand selector */}
           <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setShowBizPicker(p => !p)}
-              style={{
-                background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 20, padding: '5px 10px', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#ccc',
-              }}
-            >
-              {activeBusiness && (
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: activeBusiness.color, display: 'inline-block' }} />
-              )}
-              <span>{activeBusiness?.name.split(' ')[0] || 'All'}</span>
-              {NhIcons.chevronDown}
+            <button onClick={() => setShowBrandPicker(p => !p)} style={{
+              background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 20, padding: '5px 10px', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#ccc',
+            }}>
+              {activeBrand && <span style={{ width: 8, height: 8, borderRadius: '50%', background: activeBrand.color }} />}
+              <span>{activeBrand?.name.split(' ')[0] || 'All'}</span>
+              {I.chevDown}
             </button>
-            {showBizPicker && (
+            {showBrandPicker && (
               <div style={{
                 position: 'absolute', top: '110%', right: 0, zIndex: 500,
                 background: 'rgba(20,17,35,0.98)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 12, overflow: 'hidden', minWidth: 160,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                borderRadius: 12, overflow: 'hidden', minWidth: 180, boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
               }}>
-                {businesses.map(b => (
-                  <button key={b.id} onClick={() => { setActiveBusiness(b); setShowBizPicker(false) }} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 16px',
-                    background: activeBusiness?.id === b.id ? 'rgba(99,102,241,0.15)' : 'none',
-                    border: 'none', cursor: 'pointer', color: '#f0eee8', fontSize: 14,
+                {myBrands.length > 0 && <div style={{ padding: '8px 16px', fontSize: 10, color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>My Businesses</div>}
+                {myBrands.map(b => (
+                  <button key={b.id} onClick={() => { setActiveBrand(b); setShowBrandPicker(false) }} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 16px',
+                    background: activeBrand?.id === b.id ? 'rgba(99,102,241,0.15)' : 'none',
+                    border: 'none', cursor: 'pointer', color: '#f0eee8', fontSize: 13,
                     borderBottom: '1px solid rgba(255,255,255,0.06)',
                   }}>
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: b.color, display: 'inline-block' }} />
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: b.color }} />
+                    {b.name}
+                  </button>
+                ))}
+                {clientBrands.length > 0 && <div style={{ padding: '8px 16px', fontSize: 10, color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Clients</div>}
+                {clientBrands.map(b => (
+                  <button key={b.id} onClick={() => { setActiveBrand(b); setShowBrandPicker(false) }} style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 16px',
+                    background: activeBrand?.id === b.id ? 'rgba(99,102,241,0.15)' : 'none',
+                    border: 'none', cursor: 'pointer', color: '#f0eee8', fontSize: 13,
+                    borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: b.color }} />
                     {b.name}
                   </button>
                 ))}
@@ -757,764 +619,521 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
         </div>
 
         {/* Tab bar */}
-        <div style={{
-          display: 'flex', gap: 0, overflowX: 'auto' as const, scrollbarWidth: 'none' as const,
-          borderTop: '1px solid rgba(255,255,255,0.04)',
-          msOverflowStyle: 'none',
-        }}>
-          {TABS_CONFIG.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '10px 14px', fontSize: 13, fontWeight: tab === t.id ? 700 : 400,
-              color: tab === t.id ? '#a5b4fc' : '#666', whiteSpace: 'nowrap' as const,
+        <div style={{ display: 'flex', gap: 0, overflowX: 'auto', scrollbarWidth: 'none', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => { setTab(t.id); if (t.id === 'campaigns') setBuildStep('list') }} style={{
+              background: 'none', border: 'none', cursor: 'pointer', flex: 1,
+              padding: '10px 8px', fontSize: 11, fontWeight: tab === t.id ? 700 : 400,
+              color: tab === t.id ? '#a5b4fc' : '#666', whiteSpace: 'nowrap',
               borderBottom: tab === t.id ? '2px solid #6366f1' : '2px solid transparent',
-              transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
             }}>
-              {t.label}
+              {t.icon} {t.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Content area */}
-      <div style={{ padding: '0 16px', paddingTop: 104, flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as const, paddingBottom: 40 }}>
+      {/* ═══ CONTENT ═══ */}
+      <div style={{ padding: '0 16px', paddingTop: 108, flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 40 }}>
 
-        {/* ── NEWS FEED TAB ── */}
+        {/* ═══ NEWS FEED ═══ */}
         {tab === 'feed' && (
           <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
-            {/* Controls row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-              <span style={{ fontSize: 12, color: '#666' }}>{articles.length} articles</span>
+              <span style={{ fontSize: 12, color: '#666' }}>
+                {articles.length} articles {activeBrand ? `• ${activeBrand.name}` : ''}
+              </span>
               <button onClick={handleCollect} disabled={collecting} style={{
-                background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
-                borderRadius: 20, padding: '6px 14px', color: '#a5b4fc', fontSize: 13, fontWeight: 600,
-                cursor: collecting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                opacity: collecting ? 0.7 : 1,
+                ...btnSmall, display: 'flex', alignItems: 'center', gap: 6, opacity: collecting ? 0.7 : 1,
               }}>
-                <span style={collecting ? { animation: 'nhSpin 1s linear infinite', display: 'inline-flex' } : {}}>
-                  {NhIcons.refresh}
-                </span>
+                <span style={collecting ? { animation: 'nhSpin 1s linear infinite', display: 'inline-flex' } : {}}>{I.refresh}</span>
                 {collecting ? 'Collecting…' : 'Refresh'}
               </button>
             </div>
 
-            {/* Category pills */}
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, marginBottom: 12, paddingBottom: 4 }}>
-              {[
-                ...CATEGORIES,
-                ...industries.map(ind => ({ id: ind.name.toLowerCase().replace(/\s+/g, '-'), label: ind.name })),
-              ].map(c => (
-                <button key={c.id} onClick={() => setCategoryFilter(c.id)} style={{
-                  ...chipStyle(categoryFilter === c.id, c.id !== 'all' ? (CAT_COLORS[c.id] || '#8b5cf6') : undefined),
-                  flexShrink: 0, border: 'none',
-                }}>
-                  {c.label}
-                </button>
-              ))}
-            </div>
+            {/* Sources for this brand */}
+            {sources.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 14, paddingBottom: 4 }}>
+                {sources.map(s => (
+                  <span key={s.id} style={{
+                    ...chip(false), display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                  }}>
+                    {getFavicon(s.url) && <img src={getFavicon(s.url)} width={14} height={14} alt="" style={{ borderRadius: 2 }} />}
+                    {s.label || s.name}
+                  </span>
+                ))}
+              </div>
+            )}
 
-            {/* Content type pills */}
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, marginBottom: 16, paddingBottom: 4 }}>
-              {CONTENT_TYPES.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setContentTypeFilter(t.id)}
-                  style={{
-                    ...chipStyle(contentTypeFilter === t.id, t.id === 'video' ? '#ef4444' : t.id === 'podcast' ? '#8b5cf6' : t.id === 'social' ? '#0ea5e9' : undefined),
-                    flexShrink: 0, border: 'none', fontSize: 12,
-                  }}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            {sources.length === 0 && !loading && (
+              <div style={{ ...cardS, textAlign: 'center', padding: '30px 20px', marginBottom: 16 }}>
+                <p style={{ fontSize: 14, color: '#888', margin: 0 }}>No sources configured for this brand.</p>
+                <button onClick={() => setTab('brands')} style={{ ...btnSmall, marginTop: 12 }}>Add Sources →</button>
+              </div>
+            )}
 
             {loading ? (
-              <NhSkeleton />
+              <div style={{ textAlign: 'center', padding: '40px', color: '#555' }}>Loading...</div>
             ) : articles.length === 0 ? (
-              <div style={{ textAlign: 'center' as const, padding: '60px 20px', color: '#555' }}>
-                <div style={{ marginBottom: 12, color: '#444' }}>{NhIcons.newspaper}</div>
-                <p style={{ fontSize: 15, margin: 0 }}>No articles yet. Tap Refresh to collect the latest news.</p>
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#555' }}>
+                <p style={{ fontSize: 14, margin: 0 }}>No articles yet. Add sources in Brands tab and hit Refresh.</p>
               </div>
             ) : (
-              <>
-                {/* Trending section */}
-                {trendingArticles.length > 0 && (
-                  <div style={{ marginBottom: 20 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#f97316', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Trending</span>
-                      <div style={{ flex: 1, height: 1, background: 'rgba(249,115,22,0.2)' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {articles.map(article => (
+                  <div key={article.id} className="nh-card" onClick={() => window.open(article.url, '_blank')} style={{
+                    ...cardS, cursor: 'pointer', transition: 'background 0.15s', display: 'flex', gap: 12, alignItems: 'flex-start',
+                  }}>
+                    {article.image_url && (
+                      <div style={{ width: 56, height: 56, borderRadius: 10, flexShrink: 0, backgroundImage: `url(${article.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden', marginBottom: 4 }}>{article.title}</div>
+                      <div style={{ fontSize: 11, color: '#666', display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {article.source && <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {getFavicon(article.url) && <img src={getFavicon(article.url)} width={14} height={14} alt="" style={{ borderRadius: 2 }} />}
+                          {article.source.length > 25 ? article.source.slice(0, 25) + '…' : article.source}
+                        </span>}
+                        <span>{timeAgo(article.published_at || article.collected_at)}</span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 12, overflowX: 'auto' as const, scrollbarWidth: 'none' as const, paddingBottom: 4 }}>
-                      {trendingArticles.slice(0, 8).map(article => (
-                        <div key={article.id} onClick={() => window.open(article.url, '_blank')} style={{
-                          minWidth: 200, maxWidth: 200, borderRadius: 14, overflow: 'hidden',
-                          background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)',
-                          cursor: 'pointer', flexShrink: 0, padding: '12px',
-                          animation: 'nhFadeIn 0.3s ease',
-                        }}>
-                          {article.image_url && (
-                            <div style={{
-                              height: 80, borderRadius: 8, marginBottom: 8,
-                              backgroundImage: `url(${article.image_url})`,
-                              backgroundSize: 'cover', backgroundPosition: 'center',
-                            }} />
-                          )}
-                          <div style={{ fontSize: 12, fontWeight: 700, color: '#f0eee8', lineHeight: 1.4, marginBottom: 6,
-                            display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden',
-                          }}>
-                            {article.title}
+                    <button onClick={(e) => { e.stopPropagation(); handleToggleFav(article) }} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, flexShrink: 0 }}>
+                      {I.heart(favIds.has(article.id))}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ CAMPAIGNS ═══ */}
+        {tab === 'campaigns' && (
+          <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
+            {buildStep === 'list' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Campaigns</h3>
+                  <button onClick={() => { setBuildStep('new'); setBuildTitle(''); setBuildSections([]); setBuildSubject(''); setEditCampaign(null) }} style={btnSmall}>
+                    {I.plus} New
+                  </button>
+                </div>
+
+                {/* Folder pills */}
+                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 16, paddingBottom: 4 }}>
+                  {CAMPAIGN_FOLDERS.map(f => (
+                    <button key={f} onClick={() => setCampaignFolder(f)} style={{ ...chip(campaignFolder === f), textTransform: 'capitalize', flexShrink: 0 }}>{f}</button>
+                  ))}
+                </div>
+
+                {campaigns.filter(c => campaignFolder === 'all' || c.folder === campaignFolder).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#555' }}>
+                    <p style={{ fontSize: 14, margin: '0 0 12px' }}>No campaigns yet. Create your first one!</p>
+                    <button onClick={() => setBuildStep('new')} style={btnSmall}>Create Campaign</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {campaigns.filter(c => campaignFolder === 'all' || c.folder === campaignFolder).map(c => (
+                      <div key={c.id} className="nh-card" style={{ ...cardS, cursor: 'pointer' }} onClick={() => {
+                        setEditCampaign(c); setBuildTitle(c.title); setBuildSections(c.sections || [])
+                        setBuildSubject(c.subject_line); setBuildListId(c.list_id || ''); setBuildStep('edit')
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{c.title}</div>
+                            <div style={{ fontSize: 11, color: '#666', marginTop: 3, display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <span style={{ textTransform: 'capitalize' }}>{c.folder}</span>
+                              <span>{timeAgo(c.created_at)}</span>
+                            </div>
                           </div>
-                          <div style={{ fontSize: 10, color: '#888' }}>{timeAgo(article.published_at)}</div>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, textTransform: 'uppercase',
+                            background: c.status === 'sent' ? 'rgba(34,197,94,0.2)' : c.status === 'scheduled' ? 'rgba(245,158,11,0.2)' : 'rgba(99,102,241,0.15)',
+                            color: c.status === 'sent' ? '#4ade80' : c.status === 'scheduled' ? '#f59e0b' : '#a5b4fc',
+                          }}>{c.status}</span>
                         </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {buildStep === 'new' && (
+              <>
+                <button onClick={() => setBuildStep('list')} style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {I.back} Back to campaigns
+                </button>
+
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: '0 0 16px' }}>New Campaign</h3>
+
+                <input value={buildTitle} onChange={e => setBuildTitle(e.target.value)}
+                  placeholder="Give it a title e.g. 'March Industry News'" style={{ ...inputS, marginBottom: 12, fontSize: 15, fontWeight: 600 }} />
+
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  <button onClick={handleAiDraft} disabled={!buildTitle.trim() || aiLoading} style={{ ...btnPrimary(!!buildTitle.trim() && !aiLoading), flex: 1 }}>
+                    {I.sparkle} {aiLoading ? 'Generating...' : 'AI Draft'}
+                  </button>
+                  <button onClick={() => {
+                    setBuildSections([
+                      { type: 'hero', heading: buildTitle || 'Newsletter', body: 'Write your intro here...', image_url: null, cta_text: null, cta_url: null },
+                      { type: 'text', heading: 'Section 1', body: 'Your content...', image_url: null, cta_text: null, cta_url: null },
+                    ])
+                    setBuildSubject(buildTitle)
+                    setBuildStep('edit')
+                  }} style={{ ...btnSmall, padding: '12px 16px' }}>
+                    {I.edit} Manual
+                  </button>
+                </div>
+
+                {/* Use template */}
+                {templates.length > 0 && (
+                  <div style={{ marginTop: 8 }}>
+                    <p style={{ fontSize: 12, color: '#888', margin: '0 0 8px' }}>Or start from a template:</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {templates.map(t => (
+                        <button key={t.id} onClick={() => {
+                          setBuildSections(t.sections || []); setBuildSubject(buildTitle); setBuildStep('edit')
+                        }} style={{ ...cardS, cursor: 'pointer', textAlign: 'left', width: '100%' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{t.name}</div>
+                          <div style={{ fontSize: 11, color: '#666' }}>{(t.sections || []).length} sections</div>
+                        </button>
                       ))}
                     </div>
                   </div>
                 )}
-
-                {/* All articles */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {feedArticles.map(article => (
-                    <ArticleCard
-                      key={article.id}
-                      article={article}
-                      isFaved={favIds.has(article.id)}
-                      onToggleFav={handleToggleFav}
-                    />
-                  ))}
-                </div>
               </>
             )}
-          </div>
-        )}
 
-        {/* ── FAVOURITES TAB ── */}
-        {tab === 'favourites' && (
-          <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
-            {favorites.length === 0 ? (
-              <div style={{ textAlign: 'center' as const, padding: '60px 20px', color: '#555' }}>
-                <div style={{ marginBottom: 12, color: '#444' }}>{NhIcons.heart(false)}</div>
-                <p style={{ fontSize: 15, margin: 0 }}>No saved articles. Tap the heart on articles you want to keep.</p>
-              </div>
-            ) : (
+            {buildStep === 'edit' && (
               <>
-                {Object.entries(groupedFavs).map(([bizId, bizFavs]) => {
-                  const biz = businesses.find(b => b.id === bizId)
-                  return (
-                    <div key={bizId} style={{ marginBottom: 24 }}>
-                      {biz && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: biz.color, display: 'inline-block' }} />
-                          <span style={{ fontSize: 13, fontWeight: 700, color: '#aaa', textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>{biz.name}</span>
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {bizFavs.map(fav => fav.news_articles && (
-                          <ArticleCard
-                            key={fav.id}
-                            article={fav.news_articles}
-                            isFaved={true}
-                            onToggleFav={handleToggleFav}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
+                <button onClick={() => setBuildStep(editCampaign ? 'list' : 'new')} style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {I.back} Back
+                </button>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
+                    {editCampaign ? 'Edit Campaign' : 'Build Campaign'}
+                  </h3>
+                  <button onClick={handleEnhanceAll} disabled={aiLoading} style={{ ...btnSmall, display: 'flex', alignItems: 'center', gap: 4, opacity: aiLoading ? 0.5 : 1 }}>
+                    {I.sparkle} Enhance All
+                  </button>
+                </div>
+
+                <input value={buildSubject} onChange={e => setBuildSubject(e.target.value)}
+                  placeholder="Subject line" style={{ ...inputS, marginBottom: 12 }} />
+
+                {/* Subscriber list selector */}
+                {subLists.length > 0 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Send to list:</label>
+                    <select value={buildListId} onChange={e => setBuildListId(e.target.value)} style={{
+                      ...inputS, cursor: 'pointer',
+                    }}>
+                      <option value="">No list selected</option>
+                      {subLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                <SectionEditor
+                  sections={buildSections}
+                  onChange={setBuildSections}
+                  brandColor={activeBrand?.color || '#6366f1'}
+                  brandName={activeBrand?.name || 'Business'}
+                />
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                  <button onClick={handlePreview} style={{ ...btnPrimary(buildSections.length > 0), flex: 1 }}>
+                    Preview
+                  </button>
+                  <button onClick={handleSaveCampaign} style={{ ...btnSmall, padding: '12px 16px' }}>
+                    Save Draft
+                  </button>
+                </div>
+              </>
+            )}
+
+            {buildStep === 'preview' && (
+              <>
+                <button onClick={() => setBuildStep('edit')} style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {I.back} Back to editor
+                </button>
+
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: '0 0 16px' }}>Preview</h3>
+
+                <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', marginBottom: 16, border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <iframe srcDoc={previewHtml} style={{ width: '100%', minHeight: 400, border: 'none', display: 'block' }} title="Preview" />
+                </div>
+
+                {/* Test send */}
+                <div style={{ ...cardS, marginBottom: 12 }}>
+                  <p style={{ fontSize: 12, color: '#888', margin: '0 0 8px' }}>Send a test email:</p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input value={testEmail} onChange={e => setTestEmail(e.target.value)}
+                      placeholder="your@email.com" style={{ ...inputS, flex: 1 }} />
+                    <button onClick={handleTestSend} disabled={!testEmail.trim() || sending} style={{ ...btnSmall, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {I.send} {sending ? '...' : 'Test'}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => {
+                    navigator.clipboard.writeText(previewHtml)
+                    showToast('HTML copied')
+                  }} style={{ ...btnSmall, flex: 1, textAlign: 'center', padding: '10px' }}>
+                    Copy HTML
+                  </button>
+                  <button onClick={handleSaveCampaign} style={{ ...btnPrimary(true), flex: 1 }}>
+                    Save Campaign
+                  </button>
+                </div>
               </>
             )}
           </div>
         )}
 
-        {/* ── ADD LINK TAB ── */}
-        {tab === 'addlink' && (
+        {/* ═══ TEMPLATES ═══ */}
+        {tab === 'templates' && (
           <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
-            <div style={{ marginBottom: 24 }}>
-              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: '0 0 16px' }}>Add a Link</h3>
-
-              {/* URL */}
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>URL *</label>
-                <input
-                  value={linkUrl}
-                  onChange={e => setLinkUrl(e.target.value)}
-                  placeholder="https://..."
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* Title */}
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Title</label>
-                <input
-                  value={linkTitle}
-                  onChange={e => setLinkTitle(e.target.value)}
-                  placeholder="Article title"
-                  style={inputStyle}
-                />
-              </div>
-
-              {/* Notes */}
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Notes</label>
-                <textarea
-                  value={linkNotes}
-                  onChange={e => setLinkNotes(e.target.value)}
-                  placeholder="Why is this interesting..."
-                  rows={3}
-                  style={{ ...inputStyle, resize: 'vertical' as const }}
-                />
-              </div>
-
-              {/* Platform */}
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Platform</label>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-                  {['linkedin', 'instagram', 'website', 'other'].map(p => (
-                    <button key={p} onClick={() => setLinkPlatform(p)} style={{
-                      ...chipStyle(linkPlatform === p),
-                      border: 'none', textTransform: 'capitalize' as const,
-                    }}>
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Category */}
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Category</label>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-                  {[
-                    { id: 'technology', label: 'Technology' },
-                    { id: 'events-hospitality', label: 'Events & Hospitality' },
-                    { id: 'business-marketing', label: 'Business & Marketing' },
-                  ].map(c => (
-                    <button key={c.id} onClick={() => setLinkCategory(c.id)} style={{
-                      ...chipStyle(linkCategory === c.id, CAT_COLORS[c.id]),
-                      border: 'none',
-                    }}>
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Business */}
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 8 }}>Business</label>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-                  {businesses.map(b => (
-                    <button key={b.id} onClick={() => setLinkBusiness(b.id)} style={{
-                      ...chipStyle(linkBusiness === b.id, b.color),
-                      border: 'none',
-                    }}>
-                      {b.name.split(' ')[0]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button onClick={handleAddLink} disabled={!linkUrl.trim() || linkSubmitting} style={{
-                width: '100%', padding: '12px', borderRadius: 12, border: 'none',
-                background: linkUrl.trim() ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.2)',
-                color: linkUrl.trim() ? '#fff' : '#666', fontSize: 15, fontWeight: 700,
-                cursor: linkUrl.trim() ? 'pointer' : 'not-allowed',
-              }}>
-                {linkSubmitting ? 'Adding…' : 'Add Link'}
-              </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
+                Templates {activeBrand ? `• ${activeBrand.name}` : ''}
+              </h3>
+              <button onClick={async () => {
+                if (!activeBrand) return
+                await fetch('/api/news-hub/templates', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ name: 'New Template', brand_id: activeBrand.id }),
+                })
+                await loadTemplates()
+                showToast('Template created')
+              }} style={btnSmall}>{I.plus} New</button>
             </div>
 
-            {/* Previous links */}
-            {links.length > 0 && (
-              <div>
-                <h3 style={{ fontSize: 13, fontWeight: 700, color: '#888', textTransform: 'uppercase' as const, letterSpacing: '0.5px', margin: '0 0 12px' }}>
-                  Saved Links ({links.length})
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {links.map(link => (
-                    <div key={link.id} onClick={() => window.open(link.url, '_blank')} style={{
-                      background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '12px 14px',
-                      cursor: 'pointer', border: '1px solid rgba(255,255,255,0.06)',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8', marginBottom: 4,
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                            {link.title || link.url}
-                          </div>
-                          <div style={{ fontSize: 11, color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                            {link.url}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
-                          {link.source_platform && (
-                            <span style={{
-                              fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                              background: 'rgba(99,102,241,0.15)', color: '#a5b4fc',
-                              textTransform: 'capitalize' as const,
-                            }}>
-                              {link.source_platform}
-                            </span>
-                          )}
-                          <span style={{ color: '#666' }}>{NhIcons.link}</span>
-                        </div>
+            {templates.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#555' }}>
+                <p style={{ fontSize: 14, margin: 0 }}>No templates yet. Create one to reuse across campaigns.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {templates.map(t => (
+                  <div key={t.id} style={{ ...cardS }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{t.name}</div>
+                        <div style={{ fontSize: 11, color: '#666', marginTop: 3 }}>{(t.sections || []).length} sections</div>
                       </div>
-                      <div style={{ fontSize: 10, color: '#555', marginTop: 6 }}>{timeAgo(link.added_at)}</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => {
+                          setBuildTitle(''); setBuildSections(t.sections || []); setBuildSubject(''); setTab('campaigns'); setBuildStep('edit'); setEditCampaign(null)
+                        }} style={btnSmall}>Use</button>
+                        <button onClick={async () => {
+                          await fetch('/api/news-hub/templates', {
+                            method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id: t.id }),
+                          })
+                          await loadTemplates()
+                          showToast('Deleted')
+                        }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}>{I.trash}</button>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {/* ── NEWSLETTER TAB ── */}
-        {tab === 'newsletter' && (
+        {/* ═══ SUBSCRIBERS ═══ */}
+        {tab === 'subscribers' && (
           <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
-            {nlStep === 'select' ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Build Newsletter</h3>
-                  {selectedArticleIds.size > 0 && (
-                    <span style={{
-                      background: 'rgba(99,102,241,0.3)', color: '#a5b4fc',
-                      fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                    }}>
-                      {selectedArticleIds.size} selected
-                    </span>
-                  )}
-                </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
+                Subscriber Lists {activeBrand ? `• ${activeBrand.name}` : ''}
+              </h3>
+              <button onClick={() => setShowAddList(p => !p)} style={btnSmall}>{I.plus} New List</button>
+            </div>
 
-                {/* Title input */}
-                <div style={{ marginBottom: 14 }}>
-                  <input
-                    value={nlTitle}
-                    onChange={e => setNlTitle(e.target.value)}
-                    placeholder="Newsletter title e.g. 'Weekly Roundup — March 2026'"
-                    style={inputStyle}
-                  />
-                </div>
+            {showAddList && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input value={newListName} onChange={e => setNewListName(e.target.value)}
+                  placeholder="List name (e.g. Corporate, Weddings)" style={{ ...inputS, flex: 1 }} />
+                <button onClick={handleAddList} style={btnSmall}>Add</button>
+              </div>
+            )}
 
-                {/* Article selection */}
-                <p style={{ fontSize: 12, color: '#888', margin: '0 0 12px' }}>Select articles to include:</p>
-                {articles.length === 0 && links.length === 0 ? (
-                  <div style={{ textAlign: 'center' as const, padding: '40px 20px', color: '#555' }}>
-                    <p style={{ fontSize: 14, margin: 0 }}>No articles yet. Go to News Feed and collect some.</p>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
-                    {[...articles, ...links.map(l => ({
-                      id: l.id, title: l.title || l.url, url: l.url, source: l.source_platform,
-                      summary: l.notes, category: l.category, image_url: null,
-                      relevance_score: 50, is_trending: false, published_at: l.added_at,
-                      collected_at: l.added_at, business: l.business,
-                    }) as Article)].map(article => (
-                      <div key={article.id} onClick={() => {
-                        setSelectedArticleIds(prev => {
-                          const s = new Set(prev)
-                          if (s.has(article.id)) s.delete(article.id)
-                          else s.add(article.id)
-                          return s
+            {subLists.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#555' }}>
+                <p style={{ fontSize: 14, margin: 0 }}>No subscriber lists yet. Create one to start managing contacts.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {subLists.map(l => (
+                  <div key={l.id} style={{ ...cardS }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{l.name}</div>
+                        <div style={{ fontSize: 11, color: '#666', marginTop: 3 }}>{l.description || 'No description'}</div>
+                      </div>
+                      <button onClick={async () => {
+                        await fetch('/api/news-hub/subscribers', {
+                          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: l.id, type: 'list' }),
                         })
-                      }} style={{
-                        background: selectedArticleIds.has(article.id)
-                          ? 'rgba(99,102,241,0.15)'
-                          : 'rgba(255,255,255,0.04)',
-                        borderRadius: 12, padding: '10px 14px', cursor: 'pointer',
-                        border: `1px solid ${selectedArticleIds.has(article.id) ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.06)'}`,
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        transition: 'all 0.15s',
-                      }}>
-                        <div style={{
-                          width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                          background: selectedArticleIds.has(article.id) ? '#6366f1' : 'rgba(255,255,255,0.08)',
-                          border: `1.5px solid ${selectedArticleIds.has(article.id) ? '#6366f1' : 'rgba(255,255,255,0.2)'}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: '#fff',
-                        }}>
-                          {selectedArticleIds.has(article.id) && NhIcons.check}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8',
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                            {article.title}
-                          </div>
-                          {article.category && (
-                            <span style={{ fontSize: 10, color: CAT_COLORS[article.category] || '#6366f1' }}>
-                              {catLabel(article.category)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                        await loadSubLists()
+                        showToast('List deleted')
+                      }} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 4 }}>{I.trash}</button>
+                    </div>
                   </div>
-                )}
-
-                <button
-                  onClick={handleGenerateNewsletter}
-                  disabled={!nlTitle.trim() || selectedArticleIds.size === 0 || nlLoading}
-                  style={{
-                    width: '100%', padding: '13px', borderRadius: 12, border: 'none',
-                    background: nlTitle.trim() && selectedArticleIds.size > 0 ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.2)',
-                    color: nlTitle.trim() && selectedArticleIds.size > 0 ? '#fff' : '#666',
-                    fontSize: 15, fontWeight: 700,
-                    cursor: nlTitle.trim() && selectedArticleIds.size > 0 ? 'pointer' : 'not-allowed',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  }}
-                >
-                  <span>{NhIcons.newsletter}</span>
-                  {nlLoading ? 'Generating…' : 'Generate Newsletter'}
-                </button>
-
-                {/* Previous newsletters */}
-                {newsletters.length > 0 && (
-                  <div style={{ marginTop: 24 }}>
-                    <h3 style={{ fontSize: 13, fontWeight: 700, color: '#888', textTransform: 'uppercase' as const, letterSpacing: '0.5px', margin: '0 0 12px' }}>
-                      Previous ({newsletters.length})
-                    </h3>
-                    {newsletters.map(nl => (
-                      <div key={nl.id} style={{
-                        background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: '12px 14px',
-                        marginBottom: 8, border: '1px solid rgba(255,255,255,0.06)',
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <div>
-                            <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{nl.title}</div>
-                            <div style={{ fontSize: 11, color: '#666', marginTop: 3 }}>{timeAgo(nl.created_at)}</div>
-                          </div>
-                          <span style={{
-                            fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20,
-                            background: nl.status === 'sent' ? 'rgba(34,197,94,0.2)' : 'rgba(99,102,241,0.15)',
-                            color: nl.status === 'sent' ? '#4ade80' : '#a5b4fc',
-                            textTransform: 'uppercase' as const,
-                          }}>
-                            {nl.status}
-                          </span>
-                        </div>
-                        {nl.html_content && (
-                          <button onClick={() => { setNlHtml(nl.html_content); setNlStep('preview') }} style={{
-                            marginTop: 8, background: 'none', border: 'none', color: '#a5b4fc',
-                            fontSize: 12, cursor: 'pointer', padding: 0, fontWeight: 600,
-                          }}>
-                            View HTML
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              /* Preview step */
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                  <button onClick={() => setNlStep('select')} style={{
-                    background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 10,
-                    color: '#aaa', padding: '8px 12px', fontSize: 13, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 4,
-                  }}>
-                    {NhIcons.back} Back
-                  </button>
-                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Newsletter Preview</h3>
-                </div>
-
-                <button onClick={handleCopyHtml} style={{
-                  width: '100%', padding: '11px', borderRadius: 12, border: 'none', marginBottom: 16,
-                  background: copied ? 'rgba(34,197,94,0.2)' : 'rgba(99,102,241,0.2)',
-                  color: copied ? '#4ade80' : '#a5b4fc',
-                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}>
-                  {copied ? NhIcons.check : NhIcons.copy}
-                  {copied ? 'Copied!' : 'Copy HTML'}
-                </button>
-
-                {nlHtml && (
-                  <div style={{
-                    background: '#fff', borderRadius: 12, overflow: 'hidden',
-                    maxHeight: 500, overflowY: 'auto' as const,
-                    border: '1px solid rgba(255,255,255,0.1)',
-                  }}>
-                    <iframe
-                      srcDoc={nlHtml}
-                      style={{ width: '100%', minHeight: 400, border: 'none', display: 'block' }}
-                      title="Newsletter Preview"
-                    />
-                  </div>
-                )}
+                ))}
               </div>
             )}
           </div>
         )}
 
-        {/* ── SETTINGS TAB ── */}
-        {tab === 'settings' && (
+        {/* ═══ BRANDS ═══ */}
+        {tab === 'brands' && (
           <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: '0 0 16px' }}>Businesses</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Brands & Sources</h3>
+              <button onClick={() => setShowAddBrand(p => !p)} style={btnSmall}>{I.plus} Add Brand</button>
+            </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 28 }}>
-              {businesses.map(b => (
-                <div key={b.id} style={{
-                  background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '14px 16px',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ width: 12, height: 12, borderRadius: '50%', background: b.color, display: 'inline-block' }} />
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{b.name}</div>
-                      <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-                        {articles.filter(a => a.business === b.id).length} articles
+            {showAddBrand && (
+              <div style={{ ...cardS, marginBottom: 16 }}>
+                <input value={newBrandName} onChange={e => setNewBrandName(e.target.value)}
+                  placeholder="Brand name (e.g. Balti House)" style={{ ...inputS, marginBottom: 8 }} />
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                  <input type="color" value={newBrandColor} onChange={e => setNewBrandColor(e.target.value)}
+                    style={{ width: 40, height: 36, border: 'none', borderRadius: 6, cursor: 'pointer', background: 'transparent' }} />
+                  <label style={{ fontSize: 12, color: '#888', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={newBrandIsClient} onChange={e => setNewBrandIsClient(e.target.checked)} />
+                    This is a client (not my business)
+                  </label>
+                </div>
+                <button onClick={handleAddBrand} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px' }}>Add Brand</button>
+              </div>
+            )}
+
+            {/* My businesses */}
+            {myBrands.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 11, color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>My Businesses</div>
+                {myBrands.map(b => (
+                  <BrandCard key={b.id} brand={b} isActive={activeBrand?.id === b.id}
+                    onSelect={() => setActiveBrand(b)}
+                    onDelete={async () => {
+                      await fetch('/api/news-hub/settings', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.id }) })
+                      await loadBrands()
+                      showToast('Deleted')
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Client businesses */}
+            {clientBrands.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 11, color: '#555', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>Clients</div>
+                {clientBrands.map(b => (
+                  <BrandCard key={b.id} brand={b} isActive={activeBrand?.id === b.id}
+                    onSelect={() => setActiveBrand(b)}
+                    onDelete={async () => {
+                      await fetch('/api/news-hub/settings', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: b.id }) })
+                      await loadBrands()
+                      showToast('Deleted')
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Sources for active brand */}
+            {activeBrand && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
+                    Sources for {activeBrand.name} <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({sources.length})</span>
+                  </h3>
+                  <button onClick={() => setShowAddSource(p => !p)} style={btnSmall}>{I.plus}</button>
+                </div>
+
+                {showAddSource && (
+                  <div style={{ ...cardS, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input value={newSrcLabel} onChange={e => setNewSrcLabel(e.target.value)}
+                      placeholder="Label (e.g. OpenClaw News)" style={inputS} />
+                    <input value={newSrcName} onChange={e => setNewSrcName(e.target.value)}
+                      placeholder="Source name" style={inputS} />
+                    <input value={newSrcUrl} onChange={e => setNewSrcUrl(e.target.value)}
+                      placeholder="URL (https://...)" style={inputS} />
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {['website', 'twitter', 'youtube', 'podcast', 'linkedin', 'reddit', 'blog'].map(t => (
+                        <button key={t} onClick={() => setNewSrcType(t)} style={{ ...chip(newSrcType === t), textTransform: 'capitalize' }}>{t}</button>
+                      ))}
+                    </div>
+                    <button onClick={handleAddSource} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px' }}>Add Source</button>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {sources.map(s => (
+                    <div key={s.id} style={{
+                      ...cardS, display: 'flex', alignItems: 'center', gap: 10,
+                    }}>
+                      {getFavicon(s.url) && <img src={getFavicon(s.url)} width={18} height={18} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{s.label || s.name}</div>
+                        <div style={{ fontSize: 11, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.url}</div>
                       </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleCollectForBusiness(b.id)}
-                    disabled={collectingFor === b.id}
-                    style={{
-                      background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)',
-                      borderRadius: 10, padding: '7px 12px', color: '#a5b4fc', fontSize: 12, fontWeight: 600,
-                      cursor: collectingFor === b.id ? 'not-allowed' : 'pointer',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      opacity: collectingFor === b.id ? 0.7 : 1,
-                    }}
-                  >
-                    <span style={collectingFor === b.id ? { animation: 'nhSpin 1s linear infinite', display: 'inline-flex' } : {}}>
-                      {NhIcons.collect}
-                    </span>
-                    {collectingFor === b.id ? 'Collecting…' : 'Collect'}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div style={{
-              background: 'rgba(99,102,241,0.08)', borderRadius: 14, padding: '14px 16px',
-              border: '1px solid rgba(99,102,241,0.15)', marginBottom: 20,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#a5b4fc', marginBottom: 6 }}>Collection Schedule</div>
-              <div style={{ fontSize: 13, color: '#888' }}>Auto-collects daily at 11:00 PM</div>
-              <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>Requires BRAVE_API_KEY env variable</div>
-            </div>
-
-            <div style={{
-              background: 'rgba(255,255,255,0.03)', borderRadius: 14, padding: '14px 16px',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#aaa', marginBottom: 10 }}>Categories</div>
-              {[
-                { id: 'technology', label: 'Technology', color: '#6366f1' },
-                { id: 'events-hospitality', label: 'Events & Hospitality', color: '#f97316' },
-                { id: 'business-marketing', label: 'Business & Marketing', color: '#22c55e' },
-              ].map(c => (
-                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.color, display: 'inline-block', flexShrink: 0 }} />
-                  <span style={{ fontSize: 13, color: '#ccc' }}>{c.label}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* ── News Sources ── */}
-            <div style={{ marginTop: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
-                  News Sources <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({sources.length})</span>
-                </h3>
-                <button onClick={() => setShowAddSource(v => !v)} style={{
-                  background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)',
-                  borderRadius: 8, padding: '5px 10px', color: '#a5b4fc', fontSize: 18, fontWeight: 300,
-                  cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>+</button>
-              </div>
-
-              {showAddSource && (
-                <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' as const }}>
-                  <input
-                    value={newSourceName} onChange={e => setNewSourceName(e.target.value)}
-                    placeholder="Source name"
-                    style={{ flex: 1, minWidth: 120, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '7px 10px', color: '#f0eee8', fontSize: 13, outline: 'none' }}
-                  />
-                  <input
-                    value={newSourceUrl} onChange={e => setNewSourceUrl(e.target.value)}
-                    placeholder="URL (https://...)"
-                    style={{ flex: 2, minWidth: 160, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '7px 10px', color: '#f0eee8', fontSize: 13, outline: 'none' }}
-                  />
-                  <button
-                    onClick={async () => {
-                      if (!newSourceName.trim() || !newSourceUrl.trim()) return
-                      await fetch('/api/news-hub/sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newSourceName.trim(), url: newSourceUrl.trim() }) })
-                      setNewSourceName(''); setNewSourceUrl(''); setShowAddSource(false)
-                      fetch('/api/news-hub/sources').then(r => r.json()).then(d => setSources(d.sources || [])).catch(() => {})
-                    }}
-                    style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 8, padding: '7px 14px', color: '#a5b4fc', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                  >Add</button>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {sources.map(s => (
-                  <div key={s.id} style={{
-                    background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    display: 'flex', alignItems: 'center', gap: 10,
-                  }}>
-                    {getFavicon(s.url) && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={getFavicon(s.url, 18)} width={18} height={18} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{s.name}</div>
-                      <div style={{ fontSize: 11, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{s.url}</div>
-                    </div>
-                    <button
-                      onClick={async () => {
+                      {s.source_type && s.source_type !== 'website' && (
+                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', textTransform: 'capitalize' }}>{s.source_type}</span>
+                      )}
+                      <button onClick={async () => {
                         await fetch('/api/news-hub/sources', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) })
-                        fetch('/api/news-hub/sources').then(r => r.json()).then(d => setSources(d.sources || [])).catch(() => {})
-                      }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px', flexShrink: 0, lineHeight: 1 }}
-                    >×</button>
-                  </div>
-                ))}
-                {sources.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No sources added yet.</div>}
-              </div>
-            </div>
-
-            {/* ── Industries ── */}
-            <div style={{ marginTop: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
-                  Industries <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({industries.length})</span>
-                </h3>
-                <button onClick={() => setShowAddIndustry(v => !v)} style={{
-                  background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)',
-                  borderRadius: 8, padding: '5px 10px', color: '#a5b4fc', fontSize: 18, fontWeight: 300,
-                  cursor: 'pointer', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>+</button>
-              </div>
-
-              {showAddIndustry && (
-                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  <input
-                    value={newIndustryName} onChange={e => setNewIndustryName(e.target.value)}
-                    placeholder="Industry name"
-                    style={{ flex: 1, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '7px 10px', color: '#f0eee8', fontSize: 13, outline: 'none' }}
-                  />
-                  <button
-                    onClick={async () => {
-                      if (!newIndustryName.trim()) return
-                      await fetch('/api/news-hub/industries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newIndustryName.trim() }) })
-                      setNewIndustryName(''); setShowAddIndustry(false)
-                      fetch('/api/news-hub/industries').then(r => r.json()).then(d => setIndustries(d.industries || [])).catch(() => {})
-                    }}
-                    style={{ background: 'rgba(99,102,241,0.2)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 8, padding: '7px 14px', color: '#a5b4fc', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                  >Add</button>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {industries.map(ind => (
-                  <div key={ind.id} style={{
-                    background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{ind.name}</span>
-                    <button
-                      onClick={async () => {
-                        await fetch('/api/news-hub/industries', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ind.id }) })
-                        fetch('/api/news-hub/industries').then(r => r.json()).then(d => setIndustries(d.industries || [])).catch(() => {})
-                      }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px', lineHeight: 1 }}
-                    >×</button>
-                  </div>
-                ))}
-                {industries.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No industries added yet.</div>}
-              </div>
-            </div>
-
-            {/* ── Content Creators ── */}
-            <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: 14, border: '1px solid rgba(255,255,255,0.08)', padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#888' }}>
-                  Content Creators <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({creators.length})</span>
-                </span>
-                <button
-                  onClick={() => setShowAddCreator(!showAddCreator)}
-                  style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 6, padding: '4px 10px', color: '#a5b4fc', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                >+</button>
-              </div>
-
-              {showAddCreator && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12, padding: '12px', background: 'rgba(255,255,255,0.04)', borderRadius: 10 }}>
-                  <input
-                    type="text"
-                    placeholder="e.g. Lex Fridman"
-                    value={newCreatorName}
-                    onChange={(e) => setNewCreatorName(e.target.value)}
-                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '10px 12px', color: '#f0eee8', fontSize: 13 }}
-                  />
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {CREATOR_PLATFORMS.map((p) => (
-                      <button
-                        key={p.id}
-                        onClick={() => setNewCreatorPlatform(p.id)}
-                        style={{
-                          padding: '6px 10px', borderRadius: 12, fontSize: 11, fontWeight: 500,
-                          background: newCreatorPlatform === p.id ? p.color + '25' : 'rgba(255,255,255,0.05)',
-                          border: '1px solid ' + (newCreatorPlatform === p.id ? p.color : 'rgba(255,255,255,0.1)'),
-                          color: newCreatorPlatform === p.id ? p.color : '#888',
-                          cursor: 'pointer'
-                        }}
-                      >{p.label}</button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={async () => {
-                      if (!newCreatorName.trim()) return
-                      await fetch('/api/news-hub/creators', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newCreatorName.trim(), platform: newCreatorPlatform }) })
-                      setNewCreatorName('')
-                      setShowAddCreator(false)
-                      fetch('/api/news-hub/creators').then(r => r.json()).then(d => setCreators(d.creators || [])).catch(() => {})
-                    }}
-                    style={{ background: '#6366f1', border: 'none', borderRadius: 8, padding: '8px', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-                  >Add Creator</button>
-                </div>
-              )}
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {creators.map((c) => (
-                  <div key={c.id} style={{
-                    background: 'rgba(255,255,255,0.03)', borderRadius: 10, padding: '10px 12px',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{c.name}</span>
-                      <span style={{
-                        fontSize: 10, padding: '2px 6px', borderRadius: 4,
-                        background: (CREATOR_PLATFORMS.find(p => p.id === c.platform)?.color || '#888') + '20',
-                        color: CREATOR_PLATFORMS.find(p => p.id === c.platform)?.color || '#888',
-                      }}>{CREATOR_PLATFORMS.find(p => p.id === c.platform)?.label || c.platform}</span>
+                        await loadSources()
+                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px', lineHeight: 1 }}>×</button>
                     </div>
-                    <button
-                      onClick={async () => {
-                        await fetch('/api/news-hub/creators', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: c.id }) })
-                        fetch('/api/news-hub/creators').then(r => r.json()).then(d => setCreators(d.creators || [])).catch(() => {})
-                      }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px', lineHeight: 1 }}
-                    >×</button>
-                  </div>
-                ))}
-                {creators.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No creators added yet.</div>}
+                  ))}
+                  {sources.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No sources yet. Add URLs, X accounts, or YouTube channels.</div>}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Toast */}
-      {toast && <NhToast msg={toast} />}
+      {toast && <Toast msg={toast} />}
+    </div>
+  )
+}
+
+/* ─── Brand Card ─── */
+function BrandCard({ brand, isActive, onSelect, onDelete }: {
+  brand: Brand; isActive: boolean; onSelect: () => void; onDelete: () => void
+}) {
+  return (
+    <div onClick={onSelect} style={{
+      ...cardS, marginBottom: 8, cursor: 'pointer', transition: 'all 0.15s',
+      borderLeft: isActive ? `3px solid ${brand.color}` : '3px solid transparent',
+      background: isActive ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.04)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ width: 12, height: 12, borderRadius: '50%', background: brand.color, flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{brand.name}</div>
+            {brand.tone && <div style={{ fontSize: 11, color: '#666' }}>Tone: {brand.tone}</div>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {isActive && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, background: 'rgba(34,197,94,0.2)', color: '#4ade80', fontWeight: 700 }}>ACTIVE</span>}
+          <button onClick={(e) => { e.stopPropagation(); onDelete() }} style={{ background: 'none', border: 'none', color: '#555', cursor: 'pointer', padding: 4 }}>{I.trash}</button>
+        </div>
+      </div>
     </div>
   )
 }
