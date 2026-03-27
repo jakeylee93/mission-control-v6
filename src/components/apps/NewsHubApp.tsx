@@ -393,19 +393,22 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
 
   useEffect(() => { loadBrands() }, [loadBrands])
   const loadIndustries = useCallback(async () => {
-    const r = await fetch('/api/news-hub/industries').then(r => r.json()).catch(() => ({ industries: [] }))
+    const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/industries${params}`).then(r => r.json()).catch(() => ({ industries: [] }))
     setIndustries(r.industries || [])
-  }, [])
+  }, [activeBrand])
 
   const loadCreators = useCallback(async () => {
-    const r = await fetch('/api/news-hub/creators').then(r => r.json()).catch(() => ({ creators: [] }))
+    const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/creators${params}`).then(r => r.json()).catch(() => ({ creators: [] }))
     setCreators(r.creators || [])
-  }, [])
+  }, [activeBrand])
 
   const loadLinks = useCallback(async () => {
-    const r = await fetch('/api/news-hub/links').then(r => r.json()).catch(() => ({ links: [] }))
+    const params = activeBrand ? `?business=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/links${params}`).then(r => r.json()).catch(() => ({ links: [] }))
     setLinks(r.links || [])
-  }, [])
+  }, [activeBrand])
 
   useEffect(() => {
     if (activeBrand) { loadArticles(); loadSources(); loadFavs(); loadIndustries(); loadCreators(); loadLinks() }

@@ -3,13 +3,15 @@ import { createServerSupabaseAdmin } from '@/lib/supabase'
 
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = createServerSupabaseAdmin()
+  const { searchParams } = new URL(req.url)
+  const brandId = searchParams.get('brand_id')
   try {
-    const { data, error } = await supabase
-      .from('news_creators')
-      .select('*')
-      .order('name', { ascending: true })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let query: any = supabase.from('news_creators').select('*').order('name', { ascending: true })
+    if (brandId) query = query.eq('brand_id', brandId)
+    const { data, error } = await query
     if (error) {
       if (error.code === 'PGRST116' || error.code === '42P01' || error.message?.includes('does not exist')) {
         return NextResponse.json({ ok: true, creators: [] })
@@ -30,9 +32,10 @@ export async function POST(req: NextRequest) {
   }
   const supabase = createServerSupabaseAdmin()
   try {
+    const { brand_id } = body
     const { data, error } = await supabase
       .from('news_creators')
-      .insert({ name: name.trim(), platform })
+      .insert({ name: name.trim(), platform, brand_id: brand_id || null })
       .select()
       .single()
     if (error) {
