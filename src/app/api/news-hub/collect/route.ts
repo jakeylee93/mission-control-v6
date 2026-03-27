@@ -102,12 +102,17 @@ export async function POST() {
   // ONLY collect from user's custom sources, industries, and creators
   // Step A: Custom sources (per-brand)
   try {
-    const { data: sources } = await supabase.from('news_sources').select('name, url, brand_id')
+    const { data: sources } = await supabase.from('news_sources').select('name, url, brand_id, label')
     if (sources && sources.length > 0) {
       for (const source of sources) {
         try {
           const domain = new URL(source.url).hostname.replace(/^www\./, '')
-          await braveSearch(`site:${domain} news`, source.brand_id)
+          // Try site-specific search first
+          await braveSearch(`site:${domain}`, source.brand_id)
+          // Also search by name for broader coverage
+          if (source.label || source.name) {
+            await braveSearch(`${source.label || source.name} latest news`, source.brand_id)
+          }
         } catch { /* skip */ }
       }
     }

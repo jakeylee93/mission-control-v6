@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { action, title, brand_name, brand_tone, sections, section_index, section_text } = body
+  const { action, title, brand_name, brand_tone, sections, section_index, section_text, context } = body
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -21,6 +21,7 @@ Tone: ${brand_tone || 'professional, warm, and engaging'}.
 
 The newsletter title is: "${title}"
 
+${context ? `IMPORTANT — Use ONLY these real articles/content as the basis for the newsletter. Do NOT invent or hallucinate content:\n${context}\n` : ''}
 Generate a newsletter with 4-6 sections. Each section should have:
 - A heading (short, punchy)
 - Body text (2-4 sentences, engaging and informative)

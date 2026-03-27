@@ -24,7 +24,26 @@ interface Favorite {
   saved_at: string; news_articles: Article | null
 }
 
-type Tab = 'feed' | 'favourites' | 'archived' | 'brands'
+interface Section {
+  type: string; heading: string; body: string; image_url?: string | null
+  cta_text?: string | null; cta_url?: string | null; locked?: boolean
+}
+
+interface Campaign {
+  id: string; title: string; brand_id: string; folder: string; status: string
+  sections: Section[]; subject_line: string; html_content?: string | null
+  list_id?: string | null; scheduled_at?: string | null; created_at: string
+}
+
+interface Template {
+  id: string; name: string; brand_id: string; sections: Section[]
+}
+
+interface SubList {
+  id: string; name: string; brand_id: string; description?: string
+}
+
+type Tab = 'feed' | 'favourites' | 'archived' | 'campaigns' | 'templates' | 'subscribers' | 'brands'
 
 /* ─── SVG Icons ─── */
 const I = {
@@ -39,6 +58,15 @@ const I = {
   archive: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>,
   chevDown: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>,
   building: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><path d="M9 18h6"/></svg>,
+  folder: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+  users: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  send: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+  lock: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  unlock: <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>,
+  up: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>,
+  down: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>,
+  edit: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  image: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
   expand: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>,
   collapse: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>,
 }
@@ -281,6 +309,28 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [newSrcLabel, setNewSrcLabel] = useState('')
   const [newSrcType, setNewSrcType] = useState('website')
 
+  // Campaigns
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [campaignFolder, setCampaignFolder] = useState('all')
+  const [editCampaign, setEditCampaign] = useState<Campaign | null>(null)
+  const [buildStep, setBuildStep] = useState<'list' | 'new' | 'edit' | 'preview'>('list')
+  const [buildTitle, setBuildTitle] = useState('')
+  const [buildSections, setBuildSections] = useState<Section[]>([])
+  const [buildSubject, setBuildSubject] = useState('')
+  const [buildListId, setBuildListId] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState('')
+  const [testEmail, setTestEmail] = useState('')
+  const [sending, setSending] = useState(false)
+
+  // Templates
+  const [templates, setTemplates] = useState<Template[]>([])
+
+  // Subscribers
+  const [subLists, setSubLists] = useState<SubList[]>([])
+  const [showAddList, setShowAddList] = useState(false)
+  const [newListName, setNewListName] = useState('')
+
   // Toast
   const [toast, setToast] = useState<string | null>(null)
   const showToast = useCallback((m: string) => { setToast(m); setTimeout(() => setToast(null), 2800) }, [])
@@ -329,9 +379,30 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (activeBrand) { loadArticles(); loadSources(); loadFavs() }
   }, [activeBrand]) // eslint-disable-line react-hooks/exhaustive-deps
+  const loadCampaigns = useCallback(async () => {
+    const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/campaigns${params}`).then(r => r.json()).catch(() => ({ campaigns: [] }))
+    setCampaigns(r.campaigns || [])
+  }, [activeBrand])
+
+  const loadTemplates = useCallback(async () => {
+    const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/templates${params}`).then(r => r.json()).catch(() => ({ templates: [] }))
+    setTemplates(r.templates || [])
+  }, [activeBrand])
+
+  const loadSubLists = useCallback(async () => {
+    const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/subscribers${params}`).then(r => r.json()).catch(() => ({ lists: [] }))
+    setSubLists(r.lists || [])
+  }, [activeBrand])
+
   useEffect(() => {
     if (tab === 'favourites') loadFavs()
     if (tab === 'archived') loadArchivedFavs()
+    if (tab === 'campaigns') { loadCampaigns(); loadSubLists() }
+    if (tab === 'templates') loadTemplates()
+    if (tab === 'subscribers') loadSubLists()
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ─── Handlers ─── */
@@ -402,13 +473,99 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
     showToast('Source added')
   }
 
+  // Campaign handlers
+  const handleAiDraft = async () => {
+    if (!buildTitle.trim() || !activeBrand) return
+    setAiLoading(true)
+    // Feed real favourited articles to the AI
+    const favArticles = favorites.filter(f => f.news_articles).map(f => ({
+      title: f.news_articles!.title, summary: f.news_articles!.ai_summary || f.news_articles!.summary || ''
+    }))
+    const r = await fetch('/api/news-hub/ai-draft', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'draft', title: buildTitle, brand_name: activeBrand.name, brand_tone: activeBrand.tone,
+        context: favArticles.length > 0 ? `Use these REAL articles as content (do NOT make up fake articles):\n${favArticles.map(a => `- ${a.title}: ${a.summary}`).join('\n')}` : undefined
+      }),
+    }).then(r => r.json()).catch(() => ({ ok: false }))
+    if (r.sections) {
+      setBuildSections(r.sections.map((s: Section) => ({ ...s, locked: false })))
+      setBuildSubject(r.subject_line || buildTitle)
+      setBuildStep('edit')
+      showToast('Draft generated from your articles')
+    } else { showToast(r.error || 'AI draft failed') }
+    setAiLoading(false)
+  }
+
+  const handleEnhanceSection = async (idx: number) => {
+    if (!activeBrand || buildSections[idx].locked) return
+    const r = await fetch('/api/news-hub/ai-draft', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'enhance', section_text: buildSections[idx].body, brand_name: activeBrand.name }),
+    }).then(r => r.json()).catch(() => ({ ok: false }))
+    if (r.ok && r.enhanced_text) {
+      setBuildSections(prev => prev.map((s, i) => i === idx ? { ...s, body: r.enhanced_text } : s))
+      showToast('Section enhanced')
+    }
+  }
+
+  const handleBuildPreview = () => {
+    if (!activeBrand) return
+    const date = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const bc = activeBrand.primary_color || activeBrand.color || '#6366f1'
+    const sectionsHtml = buildSections.map(s => {
+      if (s.type === 'divider') return '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">'
+      let h = '<div style="margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid #f3f4f6;">'
+      if (s.image_url) h += `<img src="${s.image_url}" style="width:100%;border-radius:12px;margin-bottom:16px;" />`
+      h += `<h2 style="margin:0 0 10px;font-size:18px;font-weight:700;color:#111827;">${s.heading}</h2>`
+      h += `<p style="margin:0 0 14px;color:#4b5563;font-size:15px;line-height:1.6;">${s.body}</p>`
+      if (s.cta_text) h += `<a href="${s.cta_url || '#'}" style="display:inline-block;background:${bc};color:#fff;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">${s.cta_text}</a>`
+      return h + '</div>'
+    }).join('')
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head><body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;"><div style="max-width:640px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);"><div style="background:${bc};padding:40px 32px;text-align:center;"><h1 style="margin:0 0 6px;color:#fff;font-size:28px;font-weight:800;">${activeBrand.name}</h1><p style="margin:0;color:rgba(255,255,255,0.7);font-size:14px;">${buildSubject} &bull; ${date}</p></div><div style="padding:40px 32px;">${sectionsHtml}</div><div style="background:#f3f4f6;padding:24px 32px;text-align:center;"><p style="margin:0;color:#9ca3af;font-size:12px;">Powered by Mission Control &bull; ${date}</p></div></div></body></html>`
+    setPreviewHtml(html)
+    setBuildStep('preview')
+  }
+
+  const handleSaveCampaign = async () => {
+    if (!activeBrand) return
+    handleBuildPreview() // ensure HTML is current
+    const payload = { title: buildTitle, brand_id: activeBrand.id, folder: campaignFolder === 'all' ? 'newsletters' : campaignFolder, sections: buildSections, subject_line: buildSubject, html_content: previewHtml, list_id: buildListId || null }
+    if (editCampaign) {
+      await fetch('/api/news-hub/campaigns', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editCampaign.id, ...payload }) })
+    } else {
+      await fetch('/api/news-hub/campaigns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    }
+    await loadCampaigns()
+    setBuildStep('list'); setEditCampaign(null)
+    showToast('Campaign saved')
+  }
+
+  const handleTestSend = async () => {
+    if (!testEmail.trim()) return
+    setSending(true)
+    const r = await fetch('/api/news-hub/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test_email: testEmail, html_content: previewHtml, subject_line: buildSubject || buildTitle }) }).then(r => r.json()).catch(() => ({ ok: false }))
+    showToast(r.ok ? 'Test email sent!' : (r.error || 'Send failed'))
+    setSending(false)
+  }
+
+  const handleAddList = async () => {
+    if (!newListName.trim() || !activeBrand) return
+    await fetch('/api/news-hub/subscribers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create_list', name: newListName, brand_id: activeBrand.id }) })
+    setNewListName(''); setShowAddList(false)
+    await loadSubLists()
+    showToast('List created')
+  }
+
+  const CAMPAIGN_FOLDERS = ['all', 'newsletters', 'promotions', 'birthdays', 'christmas', 'seasonal']
+
   const myBrands = brands.filter(b => !b.is_client)
   const clientBrands = brands.filter(b => b.is_client)
 
   const TABS: { id: Tab; label: string; icon: JSX.Element }[] = [
     { id: 'feed', label: 'Feed', icon: I.mail },
-    { id: 'favourites', label: 'Favourites', icon: I.heart(true) },
-    { id: 'archived', label: 'Archive', icon: I.archive },
+    { id: 'favourites', label: 'Favs', icon: I.heart(true) },
+    { id: 'campaigns', label: 'Campaigns', icon: I.folder },
+    { id: 'subscribers', label: 'Lists', icon: I.users },
     { id: 'brands', label: 'Brands', icon: I.building },
   ]
 
@@ -479,7 +636,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
         {/* Tab bar */}
         <div style={{ display: 'flex', gap: 0, overflowX: 'auto', scrollbarWidth: 'none', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
           {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
+            <button key={t.id} onClick={() => { setTab(t.id); if (t.id === 'campaigns') setBuildStep('list') }} style={{
               background: 'none', border: 'none', cursor: 'pointer', flex: 1,
               padding: '10px 8px', fontSize: 11, fontWeight: tab === t.id ? 700 : 400,
               color: tab === t.id ? '#a5b4fc' : '#666', whiteSpace: 'nowrap',
@@ -620,6 +777,229 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                     </div>
                   )
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══ CAMPAIGNS ═══ */}
+        {tab === 'campaigns' && (
+          <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
+            {buildStep === 'list' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Campaigns</h3>
+                  <button onClick={() => { setBuildStep('new'); setBuildTitle(''); setBuildSections([]); setBuildSubject(''); setEditCampaign(null) }} style={btnSmall}>{I.plus} New</button>
+                </div>
+                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 16, paddingBottom: 4 }}>
+                  {CAMPAIGN_FOLDERS.map(f => (
+                    <button key={f} onClick={() => setCampaignFolder(f)} style={{ ...chip(campaignFolder === f), textTransform: 'capitalize', flexShrink: 0 }}>{f}</button>
+                  ))}
+                </div>
+                {campaigns.filter(c => campaignFolder === 'all' || c.folder === campaignFolder).length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#555' }}>
+                    <p style={{ fontSize: 14, margin: '0 0 12px' }}>No campaigns yet.</p>
+                    <button onClick={() => setBuildStep('new')} style={btnSmall}>Create Campaign</button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {campaigns.filter(c => campaignFolder === 'all' || c.folder === campaignFolder).map(c => (
+                      <div key={c.id} style={{ ...cardS, cursor: 'pointer' }} onClick={() => {
+                        setEditCampaign(c); setBuildTitle(c.title); setBuildSections(c.sections || [])
+                        setBuildSubject(c.subject_line); setBuildListId(c.list_id || ''); setBuildStep('edit')
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{c.title}</div>
+                            <div style={{ fontSize: 11, color: '#666', marginTop: 3 }}>{c.folder} • {timeAgo(c.created_at)}</div>
+                          </div>
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 20, textTransform: 'uppercase',
+                            background: c.status === 'sent' ? 'rgba(34,197,94,0.2)' : 'rgba(99,102,241,0.15)',
+                            color: c.status === 'sent' ? '#4ade80' : '#a5b4fc',
+                          }}>{c.status}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            {buildStep === 'new' && (
+              <>
+                <button onClick={() => setBuildStep('list')} style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 4 }}>{I.back} Back</button>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: '0 0 16px' }}>New Campaign</h3>
+                <input value={buildTitle} onChange={e => setBuildTitle(e.target.value)} placeholder="Title e.g. 'March Industry News'" style={{ ...inputS, marginBottom: 12, fontSize: 15, fontWeight: 600 }} />
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  <button onClick={handleAiDraft} disabled={!buildTitle.trim() || aiLoading} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: buildTitle.trim() ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.2)', color: buildTitle.trim() ? '#fff' : '#666', fontSize: 14, fontWeight: 700, cursor: buildTitle.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                    {I.sparkle} {aiLoading ? 'Generating...' : 'AI Draft'}
+                  </button>
+                  <button onClick={() => {
+                    setBuildSections([{ type: 'hero', heading: buildTitle || 'Newsletter', body: 'Write your intro here...', locked: false }, { type: 'text', heading: 'Section 1', body: 'Your content...', locked: false }])
+                    setBuildSubject(buildTitle); setBuildStep('edit')
+                  }} style={{ ...btnSmall, padding: '12px 16px' }}>{I.edit} Manual</button>
+                </div>
+                {templates.length > 0 && (
+                  <div><p style={{ fontSize: 12, color: '#888', margin: '0 0 8px' }}>Or from template:</p>
+                    {templates.map(t => (
+                      <button key={t.id} onClick={() => { setBuildSections(t.sections); setBuildSubject(buildTitle); setBuildStep('edit') }} style={{ ...cardS, cursor: 'pointer', textAlign: 'left', width: '100%', marginBottom: 8, display: 'block' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{t.name}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {/* Pull from favourites */}
+                {favorites.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <p style={{ fontSize: 12, color: '#888', margin: '0 0 8px' }}>Your favourited articles ({favorites.length}):</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                      {favorites.filter(f => f.news_articles).map(f => (
+                        <div key={f.id} style={{ ...cardS, fontSize: 12, padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: '#ccc', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.news_articles!.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 11, color: '#666', marginTop: 6 }}>AI Draft will use these to build your newsletter content.</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {buildStep === 'edit' && (
+              <>
+                <button onClick={() => setBuildStep(editCampaign ? 'list' : 'new')} style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>{I.back} Back</button>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: '0 0 12px' }}>{editCampaign ? 'Edit' : 'Build'} Campaign</h3>
+                <input value={buildSubject} onChange={e => setBuildSubject(e.target.value)} placeholder="Subject line" style={{ ...inputS, marginBottom: 12 }} />
+                {subLists.length > 0 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Send to list:</label>
+                    <select value={buildListId} onChange={e => setBuildListId(e.target.value)} style={{ ...inputS, cursor: 'pointer' }}>
+                      <option value="">No list selected</option>
+                      {subLists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {/* Section editor */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                  {buildSections.map((sec, i) => (
+                    <div key={i} style={{ ...cardS, borderLeft: sec.locked ? '3px solid #4ade80' : `3px solid ${activeBrand?.color || '#6366f1'}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <select value={sec.type} onChange={e => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, type: e.target.value } : s))} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '3px 8px', color: '#a5b4fc', fontSize: 11, outline: 'none' }}>
+                          {['hero', 'text', 'image', 'offer', 'cta', 'divider'].map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                        <div style={{ flex: 1 }} />
+                        <button onClick={() => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, locked: !s.locked } : s))} title={sec.locked ? 'Unlock' : 'Lock'} style={{ background: 'none', border: 'none', cursor: 'pointer', color: sec.locked ? '#4ade80' : '#666', padding: 2 }}>
+                          {sec.locked ? I.lock : I.unlock}
+                        </button>
+                        <button onClick={() => { const a = [...buildSections]; if (i > 0) { [a[i-1], a[i]] = [a[i], a[i-1]]; setBuildSections(a) } }} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 2 }}>{I.up}</button>
+                        <button onClick={() => { const a = [...buildSections]; if (i < a.length-1) { [a[i], a[i+1]] = [a[i+1], a[i]]; setBuildSections(a) } }} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 2 }}>{I.down}</button>
+                        {!sec.locked && <button onClick={() => handleEnhanceSection(i)} style={{ ...btnSmall, padding: '3px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>{I.sparkle} Enhance</button>}
+                        <button onClick={() => setBuildSections(prev => prev.filter((_, j) => j !== i))} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 2 }}>{I.trash}</button>
+                      </div>
+                      {sec.type !== 'divider' && (
+                        <>
+                          <input value={sec.heading} onChange={e => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, heading: e.target.value } : s))} placeholder="Heading" style={{ ...inputS, marginBottom: 8, fontWeight: 700 }} />
+                          <textarea value={sec.body} onChange={e => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, body: e.target.value } : s))} rows={3} placeholder="Content..." style={{ ...inputS, resize: 'vertical' as const, marginBottom: 8 }} />
+                        </>
+                      )}
+                      {(sec.type === 'hero' || sec.type === 'image') && (
+                        <input value={sec.image_url || ''} onChange={e => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, image_url: e.target.value || null } : s))} placeholder="Image URL" style={{ ...inputS, fontSize: 12 }} />
+                      )}
+                      {(sec.type === 'offer' || sec.type === 'cta') && (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input value={sec.cta_text || ''} onChange={e => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, cta_text: e.target.value } : s))} placeholder="Button text" style={{ ...inputS, flex: 1, fontSize: 12 }} />
+                          <input value={sec.cta_url || ''} onChange={e => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, cta_url: e.target.value } : s))} placeholder="Button URL" style={{ ...inputS, flex: 2, fontSize: 12 }} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <button onClick={() => setBuildSections(prev => [...prev, { type: 'text', heading: 'New Section', body: '', locked: false }])} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{I.plus} Add Section</button>
+
+                  {/* Pull favourited article as section */}
+                  {favorites.length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <p style={{ fontSize: 11, color: '#666', margin: '0 0 6px' }}>Add from favourites:</p>
+                      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
+                        {favorites.filter(f => f.news_articles).slice(0, 10).map(f => (
+                          <button key={f.id} onClick={() => {
+                            const a = f.news_articles!
+                            setBuildSections(prev => [...prev, {
+                              type: 'text', heading: a.title, body: a.ai_summary || a.summary || '',
+                              image_url: a.image_url, cta_text: 'Read More', cta_url: a.url, locked: false
+                            }])
+                            showToast('Added article section')
+                          }} style={{ ...chip(false), flexShrink: 0, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>
+                            + {f.news_articles!.title.slice(0, 30)}...
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={handleBuildPreview} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: 'rgba(99,102,241,0.8)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Preview</button>
+                  <button onClick={handleSaveCampaign} style={{ ...btnSmall, padding: '12px 16px' }}>Save Draft</button>
+                </div>
+              </>
+            )}
+
+            {buildStep === 'preview' && (
+              <>
+                <button onClick={() => setBuildStep('edit')} style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>{I.back} Back to editor</button>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: '0 0 16px' }}>Preview</h3>
+                <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+                  <iframe srcDoc={previewHtml} style={{ width: '100%', minHeight: 400, border: 'none', display: 'block' }} title="Preview" />
+                </div>
+                <div style={{ ...cardS, marginBottom: 12 }}>
+                  <p style={{ fontSize: 12, color: '#888', margin: '0 0 8px' }}>Send test:</p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="your@email.com" style={{ ...inputS, flex: 1 }} />
+                    <button onClick={handleTestSend} disabled={!testEmail.trim() || sending} style={{ ...btnSmall, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 4 }}>{I.send} {sending ? '...' : 'Test'}</button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => { navigator.clipboard.writeText(previewHtml); showToast('HTML copied') }} style={{ ...btnSmall, flex: 1, textAlign: 'center', padding: '10px' }}>Copy HTML</button>
+                  <button onClick={handleSaveCampaign} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: 'rgba(99,102,241,0.8)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Save Campaign</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ═══ SUBSCRIBERS ═══ */}
+        {tab === 'subscribers' && (
+          <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Subscriber Lists {activeBrand ? `• ${activeBrand.name}` : ''}</h3>
+              <button onClick={() => setShowAddList(p => !p)} style={btnSmall}>{I.plus} New List</button>
+            </div>
+            {showAddList && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input value={newListName} onChange={e => setNewListName(e.target.value)} placeholder="List name (e.g. Corporate, Weddings)" style={{ ...inputS, flex: 1 }} />
+                <button onClick={handleAddList} style={btnSmall}>Add</button>
+              </div>
+            )}
+            {subLists.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#555' }}><p style={{ fontSize: 14, margin: 0 }}>No subscriber lists yet.</p></div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {subLists.map(l => (
+                  <div key={l.id} style={cardS}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{l.name}</div>
+                        <div style={{ fontSize: 11, color: '#666', marginTop: 3 }}>{l.description || 'No description'}</div>
+                      </div>
+                      <button onClick={async () => {
+                        await fetch('/api/news-hub/subscribers', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: l.id, type: 'list' }) })
+                        await loadSubLists(); showToast('Deleted')
+                      }} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 4 }}>{I.trash}</button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
