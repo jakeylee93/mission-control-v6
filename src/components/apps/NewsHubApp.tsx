@@ -534,14 +534,18 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const handleAiDraft = async () => {
     if (!buildTitle.trim() || !activeBrand) return
     setAiLoading(true)
-    // Feed real favourited articles to the AI
+    // Feed real articles to the AI — prioritise favourites, fall back to collected articles
     const favArticles = favorites.filter(f => f.news_articles).map(f => ({
       title: f.news_articles!.title, summary: f.news_articles!.ai_summary || f.news_articles!.summary || ''
     }))
+    const collectedArticles = articles.slice(0, 15).map(a => ({
+      title: a.title, summary: a.ai_summary || a.summary || ''
+    }))
+    const realArticles = favArticles.length > 0 ? favArticles : collectedArticles
     const r = await fetch('/api/news-hub/ai-draft', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'draft', title: buildTitle, brand_name: activeBrand.name, brand_tone: activeBrand.tone,
-        context: favArticles.length > 0 ? `Use these REAL articles as content (do NOT make up fake articles):\n${favArticles.map(a => `- ${a.title}: ${a.summary}`).join('\n')}` : undefined
+        context: realArticles.length > 0 ? `Use these REAL articles as content (do NOT make up fake articles):\n${realArticles.map(a => `- ${a.title}: ${a.summary}`).join('\n')}` : undefined
       }),
     }).then(r => r.json()).catch(() => ({ ok: false }))
     if (r.sections) {
@@ -967,14 +971,19 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                 {/* Section editor */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                   {buildSections.map((sec, i) => (
-                    <div key={i} style={{ ...cardS, borderLeft: sec.locked ? '3px solid #4ade80' : `3px solid ${activeBrand?.color || '#6366f1'}` }}>
+                    <div key={i} style={{ ...cardS, borderLeft: sec.locked ? '3px solid #4ade80' : `3px solid ${activeBrand?.color || '#6366f1'}`, background: sec.locked ? 'rgba(34,197,94,0.06)' : 'rgba(255,255,255,0.04)', opacity: sec.locked ? 0.85 : 1 }}>
+                      {sec.locked && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, padding: '4px 8px', background: 'rgba(34,197,94,0.15)', borderRadius: 6, fontSize: 11, color: '#4ade80', fontWeight: 600 }}>
+                          {I.lock} Locked — AI won&apos;t touch this section
+                        </div>
+                      )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                        <select value={sec.type} onChange={e => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, type: e.target.value } : s))} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '3px 8px', color: '#a5b4fc', fontSize: 11, outline: 'none' }}>
+                        <select value={sec.type} onChange={e => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, type: e.target.value } : s))} disabled={sec.locked} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '3px 8px', color: '#a5b4fc', fontSize: 11, outline: 'none', opacity: sec.locked ? 0.5 : 1 }}>
                           {['hero', 'text', 'image', 'offer', 'cta', 'divider'].map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                         <div style={{ flex: 1 }} />
-                        <button onClick={() => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, locked: !s.locked } : s))} title={sec.locked ? 'Unlock' : 'Lock'} style={{ background: 'none', border: 'none', cursor: 'pointer', color: sec.locked ? '#4ade80' : '#666', padding: 2 }}>
-                          {sec.locked ? I.lock : I.unlock}
+                        <button onClick={() => setBuildSections(prev => prev.map((s, j) => j === i ? { ...s, locked: !s.locked } : s))} title={sec.locked ? 'Click to unlock' : 'Click to lock'} style={{ background: sec.locked ? 'rgba(34,197,94,0.2)' : 'none', border: sec.locked ? '1px solid rgba(34,197,94,0.3)' : 'none', borderRadius: 6, cursor: 'pointer', color: sec.locked ? '#4ade80' : '#666', padding: '2px 6px', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}>
+                          {sec.locked ? I.lock : I.unlock} {sec.locked ? '✓' : ''}
                         </button>
                         <button onClick={() => { const a = [...buildSections]; if (i > 0) { [a[i-1], a[i]] = [a[i], a[i-1]]; setBuildSections(a) } }} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 2 }}>{I.up}</button>
                         <button onClick={() => { const a = [...buildSections]; if (i < a.length-1) { [a[i], a[i+1]] = [a[i+1], a[i]]; setBuildSections(a) } }} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', padding: 2 }}>{I.down}</button>
@@ -1002,21 +1011,36 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
 
                   {/* Pull favourited article as section */}
                   {favorites.length > 0 && (
-                    <div style={{ marginTop: 4 }}>
-                      <p style={{ fontSize: 11, color: '#666', margin: '0 0 6px' }}>Add from favourites:</p>
-                      <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
-                        {favorites.filter(f => f.news_articles).slice(0, 10).map(f => (
-                          <button key={f.id} onClick={() => {
-                            const a = f.news_articles!
-                            setBuildSections(prev => [...prev, {
-                              type: 'text', heading: a.title, body: a.ai_summary || a.summary || '',
-                              image_url: a.image_url, cta_text: 'Read More', cta_url: a.url, locked: false
-                            }])
-                            showToast('Added article section')
-                          }} style={{ ...chip(false), flexShrink: 0, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 11 }}>
-                            + {f.news_articles!.title.slice(0, 30)}...
-                          </button>
-                        ))}
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#f0eee8', marginBottom: 8 }}>Add from your favourites:</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 250, overflowY: 'auto' }}>
+                        {favorites.filter(f => f.news_articles).map(f => {
+                          const a = f.news_articles!
+                          const alreadyAdded = buildSections.some(s => s.heading === a.title)
+                          return (
+                            <div key={f.id} onClick={() => {
+                              if (alreadyAdded) return
+                              setBuildSections(prev => [...prev, {
+                                type: 'text', heading: a.title, body: a.ai_summary || a.summary || '',
+                                image_url: a.image_url, cta_text: 'Read More', cta_url: a.url, locked: false
+                              }])
+                              showToast('Added as section')
+                            }} style={{
+                              ...cardS, cursor: alreadyAdded ? 'default' : 'pointer', padding: '10px 12px',
+                              display: 'flex', gap: 10, alignItems: 'center',
+                              opacity: alreadyAdded ? 0.4 : 1, transition: 'opacity 0.15s',
+                            }}>
+                              {a.image_url && <div style={{ width: 40, height: 40, borderRadius: 6, flexShrink: 0, backgroundImage: `url(${a.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.title}</div>
+                                {a.source && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{a.source}</div>}
+                              </div>
+                              <span style={{ fontSize: 11, color: alreadyAdded ? '#4ade80' : '#a5b4fc', fontWeight: 600, flexShrink: 0 }}>
+                                {alreadyAdded ? '✓ Added' : '+ Add'}
+                              </span>
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   )}
