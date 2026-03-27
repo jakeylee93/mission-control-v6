@@ -309,6 +309,22 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [newSrcLabel, setNewSrcLabel] = useState('')
   const [newSrcType, setNewSrcType] = useState('website')
 
+  // Industries & Creators
+  const [industries, setIndustries] = useState<{ id: string; name: string; brand_id?: string }[]>([])
+  const [creators, setCreators] = useState<{ id: string; name: string; platform: string; brand_id?: string }[]>([])
+  const [showAddIndustry, setShowAddIndustry] = useState(false)
+  const [newIndustryName, setNewIndustryName] = useState('')
+  const [showAddCreator, setShowAddCreator] = useState(false)
+  const [newCreatorName, setNewCreatorName] = useState('')
+  const [newCreatorPlatform, setNewCreatorPlatform] = useState('youtube')
+
+  // Add link
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkTitle, setLinkTitle] = useState('')
+  const [linkNotes, setLinkNotes] = useState('')
+  const [linkSubmitting, setLinkSubmitting] = useState(false)
+  const [links, setLinks] = useState<{ id: string; url: string; title: string | null; notes: string | null; source_platform: string | null; added_at: string }[]>([])
+
   // Campaigns
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [campaignFolder, setCampaignFolder] = useState('all')
@@ -376,8 +392,23 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   }, [activeBrand])
 
   useEffect(() => { loadBrands() }, [loadBrands])
+  const loadIndustries = useCallback(async () => {
+    const r = await fetch('/api/news-hub/industries').then(r => r.json()).catch(() => ({ industries: [] }))
+    setIndustries(r.industries || [])
+  }, [])
+
+  const loadCreators = useCallback(async () => {
+    const r = await fetch('/api/news-hub/creators').then(r => r.json()).catch(() => ({ creators: [] }))
+    setCreators(r.creators || [])
+  }, [])
+
+  const loadLinks = useCallback(async () => {
+    const r = await fetch('/api/news-hub/links').then(r => r.json()).catch(() => ({ links: [] }))
+    setLinks(r.links || [])
+  }, [])
+
   useEffect(() => {
-    if (activeBrand) { loadArticles(); loadSources(); loadFavs() }
+    if (activeBrand) { loadArticles(); loadSources(); loadFavs(); loadIndustries(); loadCreators(); loadLinks() }
   }, [activeBrand]) // eslint-disable-line react-hooks/exhaustive-deps
   const loadCampaigns = useCallback(async () => {
     const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
@@ -554,6 +585,31 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
     setNewListName(''); setShowAddList(false)
     await loadSubLists()
     showToast('List created')
+  }
+
+  const handleAddIndustry = async () => {
+    if (!newIndustryName.trim()) return
+    await fetch('/api/news-hub/industries', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newIndustryName, brand_id: activeBrand?.id }) })
+    setNewIndustryName(''); setShowAddIndustry(false)
+    await loadIndustries()
+    showToast('Industry added')
+  }
+
+  const handleAddCreator = async () => {
+    if (!newCreatorName.trim()) return
+    await fetch('/api/news-hub/creators', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: newCreatorName, platform: newCreatorPlatform, brand_id: activeBrand?.id }) })
+    setNewCreatorName(''); setShowAddCreator(false)
+    await loadCreators()
+    showToast('Creator added')
+  }
+
+  const handleAddLink = async () => {
+    if (!linkUrl.trim()) return
+    setLinkSubmitting(true)
+    const r = await fetch('/api/news-hub/links', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: linkUrl, title: linkTitle || null, notes: linkNotes || null, source_platform: 'website', category: 'technology', business: activeBrand?.id || 'default' }) }).then(r => r.json()).catch(() => ({ ok: false }))
+    if (r.ok) { setLinkUrl(''); setLinkTitle(''); setLinkNotes(''); await loadLinks(); showToast('Link added') }
+    else showToast(r.error || 'Failed')
+    setLinkSubmitting(false)
   }
 
   const CAMPAIGN_FOLDERS = ['all', 'newsletters', 'promotions', 'birthdays', 'christmas', 'seasonal']
@@ -1118,6 +1174,90 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                     </div>
                   ))}
                   {sources.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No sources yet. Add URLs, X accounts, or YouTube channels.</div>}
+                </div>
+
+                {/* Industries */}
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Industries <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({industries.length})</span></h3>
+                    <button onClick={() => setShowAddIndustry(p => !p)} style={btnSmall}>{I.plus}</button>
+                  </div>
+                  {showAddIndustry && (
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                      <input value={newIndustryName} onChange={e => setNewIndustryName(e.target.value)} placeholder="Industry name" style={{ ...inputS, flex: 1 }} />
+                      <button onClick={handleAddIndustry} style={btnSmall}>Add</button>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {industries.map(ind => (
+                      <div key={ind.id} style={{ ...cardS, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{ind.name}</span>
+                        <button onClick={async () => {
+                          await fetch('/api/news-hub/industries', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ind.id }) })
+                          await loadIndustries()
+                        }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px' }}>×</button>
+                      </div>
+                    ))}
+                    {industries.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No industries. Add to collect industry-specific news.</div>}
+                  </div>
+                </div>
+
+                {/* Content Creators */}
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Content Creators <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({creators.length})</span></h3>
+                    <button onClick={() => setShowAddCreator(p => !p)} style={btnSmall}>{I.plus}</button>
+                  </div>
+                  {showAddCreator && (
+                    <div style={{ ...cardS, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <input value={newCreatorName} onChange={e => setNewCreatorName(e.target.value)} placeholder="e.g. Lex Fridman" style={inputS} />
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {['youtube', 'podcast', 'twitter', 'linkedin', 'reddit', 'blog'].map(p => (
+                          <button key={p} onClick={() => setNewCreatorPlatform(p)} style={{ ...chip(newCreatorPlatform === p), textTransform: 'capitalize' }}>{p}</button>
+                        ))}
+                      </div>
+                      <button onClick={handleAddCreator} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px' }}>Add Creator</button>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {creators.map(c => (
+                      <div key={c.id} style={{ ...cardS, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{c.name}</span>
+                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', textTransform: 'capitalize' }}>{c.platform}</span>
+                        </div>
+                        <button onClick={async () => {
+                          await fetch('/api/news-hub/creators', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: c.id }) })
+                          await loadCreators()
+                        }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px' }}>×</button>
+                      </div>
+                    ))}
+                    {creators.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No creators. Add YouTube channels, podcasts, X accounts.</div>}
+                  </div>
+                </div>
+
+                {/* Add Link */}
+                <div style={{ marginTop: 24 }}>
+                  <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: '0 0 12px' }}>Add a Link</h3>
+                  <div style={{ ...cardS, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://..." style={inputS} />
+                    <input value={linkTitle} onChange={e => setLinkTitle(e.target.value)} placeholder="Title (optional)" style={inputS} />
+                    <textarea value={linkNotes} onChange={e => setLinkNotes(e.target.value)} placeholder="Notes (optional)" rows={2} style={{ ...inputS, resize: 'vertical' as const }} />
+                    <button onClick={handleAddLink} disabled={!linkUrl.trim() || linkSubmitting} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px', opacity: linkUrl.trim() ? 1 : 0.5 }}>
+                      {linkSubmitting ? 'Adding...' : 'Add Link'}
+                    </button>
+                  </div>
+                  {links.length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <p style={{ fontSize: 12, color: '#888', margin: '0 0 8px' }}>Saved Links ({links.length})</p>
+                      {links.slice(0, 10).map(l => (
+                        <div key={l.id} onClick={() => window.open(l.url, '_blank')} style={{ ...cardS, marginBottom: 6, cursor: 'pointer', padding: '10px 12px' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.title || l.url}</div>
+                          <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>{timeAgo(l.added_at)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
