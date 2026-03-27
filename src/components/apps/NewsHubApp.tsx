@@ -43,7 +43,7 @@ interface SubList {
   id: string; name: string; brand_id: string; description?: string
 }
 
-type Tab = 'feed' | 'favourites' | 'archived' | 'campaigns' | 'templates' | 'subscribers' | 'brands'
+type Tab = 'feed' | 'favourites' | 'archived' | 'campaigns' | 'templates' | 'subscribers' | 'brands' | 'settings'
 
 /* ─── SVG Icons ─── */
 const I = {
@@ -67,6 +67,7 @@ const I = {
   down: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>,
   edit: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
   image: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+  gear: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
   expand: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>,
   collapse: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"/></svg>,
 }
@@ -444,6 +445,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
     if (tab === 'campaigns') { loadCampaigns(); loadSubLists() }
     if (tab === 'templates') loadTemplates()
     if (tab === 'subscribers') loadSubLists()
+    if (tab === 'settings') { loadSources(); loadIndustries(); loadCreators(); loadLinks() }
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ─── Handlers ─── */
@@ -647,6 +649,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
     { id: 'campaigns', label: 'Campaigns', icon: I.folder },
     { id: 'subscribers', label: 'Lists', icon: I.users },
     { id: 'brands', label: 'Brands', icon: I.building },
+    { id: 'settings', label: 'Settings', icon: I.gear },
   ]
 
   return (
@@ -1210,59 +1213,73 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
               </div>
             )}
 
-            {/* Sources for active brand */}
-            {activeBrand && (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
-                    Sources for {activeBrand.name} <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({sources.length})</span>
-                  </h3>
-                  <button onClick={() => setShowAddSource(p => !p)} style={btnSmall}>{I.plus}</button>
-                </div>
+          </div>
+        )}
 
-                {showAddSource && (
-                  <div style={{ ...cardS, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <input value={newSrcLabel} onChange={e => setNewSrcLabel(e.target.value)}
-                      placeholder="Label (e.g. OpenClaw News)" style={inputS} />
-                    <input value={newSrcName} onChange={e => setNewSrcName(e.target.value)}
-                      placeholder="Source name" style={inputS} />
-                    <input value={newSrcUrl} onChange={e => setNewSrcUrl(e.target.value)}
-                      placeholder="URL (https://...)" style={inputS} />
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {['website', 'twitter', 'youtube', 'podcast', 'linkedin', 'reddit', 'blog'].map(t => (
-                        <button key={t} onClick={() => setNewSrcType(t)} style={{ ...chip(newSrcType === t), textTransform: 'capitalize' }}>{t}</button>
-                      ))}
-                    </div>
-                    <button onClick={handleAddSource} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px' }}>Add Source</button>
+        {/* ═══ SETTINGS ═══ */}
+        {tab === 'settings' && (
+          <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: '0 0 4px' }}>
+              Settings {activeBrand ? `• ${activeBrand.name}` : ''}
+            </h3>
+            <p style={{ fontSize: 12, color: '#666', margin: '0 0 16px' }}>Sources, industries, and creators for the active brand. Switch brands in the top-right dropdown.</p>
+
+            {!activeBrand ? (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: '#555' }}>
+                <p style={{ fontSize: 14, margin: 0 }}>Select a brand first.</p>
+              </div>
+            ) : (
+              <>
+                {/* News Sources */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>
+                      News Sources <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({sources.length})</span>
+                    </h3>
+                    <button onClick={() => setShowAddSource(p => !p)} style={btnSmall}>{I.plus} Add</button>
                   </div>
-                )}
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {sources.map(s => (
-                    <div key={s.id} style={{ ...cardS, display: 'flex', alignItems: 'center', gap: 10 }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      {getFavicon(s.url) && <img src={getFavicon(s.url)} width={18} height={18} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{s.label || s.name}</div>
-                        <div style={{ fontSize: 11, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.url}</div>
+                  {showAddSource && (
+                    <div style={{ ...cardS, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <input value={newSrcLabel} onChange={e => setNewSrcLabel(e.target.value)} placeholder="Label (e.g. OpenClaw News)" style={inputS} />
+                      <input value={newSrcName} onChange={e => setNewSrcName(e.target.value)} placeholder="Source name" style={inputS} />
+                      <input value={newSrcUrl} onChange={e => setNewSrcUrl(e.target.value)} placeholder="URL (https://...)" style={inputS} />
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {['website', 'twitter', 'youtube', 'podcast', 'linkedin', 'reddit', 'blog'].map(t => (
+                          <button key={t} onClick={() => setNewSrcType(t)} style={{ ...chip(newSrcType === t), textTransform: 'capitalize' }}>{t}</button>
+                        ))}
                       </div>
-                      {s.source_type && s.source_type !== 'website' && (
-                        <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', textTransform: 'capitalize' }}>{s.source_type}</span>
-                      )}
-                      <button onClick={async () => {
-                        await fetch('/api/news-hub/sources', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) })
-                        await loadSources()
-                      }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px' }}>×</button>
+                      <button onClick={handleAddSource} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px' }}>Add Source</button>
                     </div>
-                  ))}
-                  {sources.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No sources yet. Add URLs, X accounts, or YouTube channels.</div>}
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {sources.map(s => (
+                      <div key={s.id} style={{ ...cardS, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {getFavicon(s.url) && <img src={getFavicon(s.url)} width={18} height={18} alt="" style={{ borderRadius: 3, flexShrink: 0 }} />}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#f0eee8' }}>{s.label || s.name}</div>
+                          <div style={{ fontSize: 11, color: '#555', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.url}</div>
+                        </div>
+                        {s.source_type && s.source_type !== 'website' && (
+                          <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', textTransform: 'capitalize' }}>{s.source_type}</span>
+                        )}
+                        <button onClick={async () => {
+                          await fetch('/api/news-hub/sources', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) })
+                          await loadSources()
+                        }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 16, padding: '2px 6px' }}>×</button>
+                      </div>
+                    ))}
+                    {sources.length === 0 && <div style={{ fontSize: 13, color: '#444', padding: '8px 0' }}>No sources yet. Add URLs, X accounts, or YouTube channels.</div>}
+                  </div>
                 </div>
 
                 {/* Industries */}
-                <div style={{ marginTop: 24 }}>
+                <div style={{ marginBottom: 24 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Industries <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({industries.length})</span></h3>
-                    <button onClick={() => setShowAddIndustry(p => !p)} style={btnSmall}>{I.plus}</button>
+                    <button onClick={() => setShowAddIndustry(p => !p)} style={btnSmall}>{I.plus} Add</button>
                   </div>
                   {showAddIndustry && (
                     <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
@@ -1285,10 +1302,10 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                 </div>
 
                 {/* Content Creators */}
-                <div style={{ marginTop: 24 }}>
+                <div style={{ marginBottom: 24 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Content Creators <span style={{ fontSize: 12, color: '#555', fontWeight: 400 }}>({creators.length})</span></h3>
-                    <button onClick={() => setShowAddCreator(p => !p)} style={btnSmall}>{I.plus}</button>
+                    <button onClick={() => setShowAddCreator(p => !p)} style={btnSmall}>{I.plus} Add</button>
                   </div>
                   {showAddCreator && (
                     <div style={{ ...cardS, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1319,7 +1336,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                 </div>
 
                 {/* Add Link */}
-                <div style={{ marginTop: 24 }}>
+                <div style={{ marginBottom: 24 }}>
                   <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: '0 0 12px' }}>Add a Link</h3>
                   <div style={{ ...cardS, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://..." style={inputS} />
@@ -1341,7 +1358,14 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                     </div>
                   )}
                 </div>
-              </div>
+
+                {/* Collection info */}
+                <div style={{ ...cardS, background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#a5b4fc', marginBottom: 6 }}>Collection Schedule</div>
+                  <div style={{ fontSize: 13, color: '#888' }}>Hit Refresh in the Feed tab to collect latest articles from your sources.</div>
+                  <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>Requires BRAVE_API_KEY env variable on Vercel.</div>
+                </div>
+              </>
             )}
           </div>
         )}
