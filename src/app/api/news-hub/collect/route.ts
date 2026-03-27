@@ -199,9 +199,10 @@ export async function POST() {
     business: r.brand_id || null,
   }))
 
+  // Upsert WITHOUT ignoreDuplicates — so brand_id gets updated if article already exists
   const { error: upsertError } = await supabase
     .from('news_articles')
-    .upsert(rows, { onConflict: 'url', ignoreDuplicates: true })
+    .upsert(rows, { onConflict: 'url' })
 
   if (upsertError) {
     if (upsertError.code === 'PGRST116' || upsertError.message?.includes('does not exist') || upsertError.code === '42P01') {
