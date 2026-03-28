@@ -11,6 +11,7 @@ import PlansTab from '@/components/tabs/PlansTab'
 import NewsHubApp from '@/components/apps/NewsHubApp'
 import MediaListApp from '@/components/apps/MediaListApp'
 import SkillShopApp from '@/components/apps/SkillShopApp'
+import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
 
 type TabId = 'business' | 'personal' | 'laboratory'
 type ActiveApp = string | null
@@ -100,6 +101,7 @@ const PERSONAL: AppDef[] = [
 ]
 
 const LAB: AppDef[] = [
+  { icon: I.playground, label: 'Roadmap', color: '#f59e0b', id: 'roadmap' },
   { icon: I.agents, label: 'Agents', color: '#6366f1', id: 'agents' },
   { icon: I.memory, label: 'Memory', color: '#ec4899', id: 'memory' },
   { icon: I.settings, label: 'Settings', color: '#64748b', id: 'settings' },
@@ -308,6 +310,7 @@ export default function HomePage() {
     if (app.id === 'newshub') { setActiveApp('newshub'); return }
     if (app.id === 'reading') { setActiveApp('reading'); return }
     if (app.id === 'skillshop') { setActiveApp('skillshop'); return }
+    if (app.id === 'roadmap') { setActiveApp('roadmap'); return }
     // Future: other apps
   }, [])
 
@@ -630,7 +633,7 @@ export default function HomePage() {
           borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.05)',
           borderBottom: 'none', padding: '20px 12px 110px',
         }}>
-          {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps' || activeApp === 'health' || activeApp === 'memory' || activeApp === 'docs' || activeApp === 'plans' || activeApp === 'newshub') ? null : (
+          {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps' || activeApp === 'health' || activeApp === 'memory' || activeApp === 'docs' || activeApp === 'plans' || activeApp === 'newshub' || activeApp === 'roadmap') ? null : (
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(5, 1fr)',
@@ -814,6 +817,19 @@ export default function HomePage() {
         }}>
           <div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px' }}>
             <SkillShopApp onBack={() => setActiveApp(null)} />
+          </div>
+        </div>
+      )}
+
+      {activeApp === 'roadmap' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+          overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+        }}>
+          <div style={{ maxWidth: 600, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <AppRoadmapApp onBack={() => setActiveApp(null)} />
           </div>
         </div>
       )}
