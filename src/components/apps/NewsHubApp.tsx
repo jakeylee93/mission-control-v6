@@ -122,9 +122,9 @@ function Toast({ msg }: { msg: string }) {
 }
 
 /* ─── Article Card ─── */
-function ArticleCard({ article, isFaved, onToggleFav, onSummarize, expanded, onToggleExpand }: {
+function ArticleCard({ article, isFaved, onToggleFav, onSummarize, onHide, expanded, onToggleExpand }: {
   article: Article; isFaved: boolean; onToggleFav: () => void
-  onSummarize: () => void; expanded: boolean; onToggleExpand: () => void
+  onSummarize: () => void; onHide: () => void; expanded: boolean; onToggleExpand: () => void
 }) {
   const summary = article.ai_summary || article.summary
   const hasSummary = !!summary
@@ -176,6 +176,11 @@ function ArticleCard({ article, isFaved, onToggleFav, onSummarize, expanded, onT
           <button onClick={(e) => { e.stopPropagation(); onToggleFav() }}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
             {I.heart(isFaved)}
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onHide() }}
+            title="Hide article"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#555', opacity: 0.7, transition: 'opacity 0.15s' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
       </div>
@@ -285,6 +290,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [articles, setArticles] = useState<Article[]>([])
   const [favIds, setFavIds] = useState<Set<string>>(new Set())
   const [favMap, setFavMap] = useState<Record<string, string>>({})
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [collecting, setCollecting] = useState(false)
   const [expandedArticle, setExpandedArticle] = useState<string | null>(null)
@@ -420,6 +426,12 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
     setFavMap(map)
   }, [activeBrand])
 
+  const loadHidden = useCallback(async () => {
+    const params = activeBrand ? `?business=${activeBrand.id}` : ''
+    const r = await fetch(`/api/news-hub/hidden${params}`).then(r => r.json()).catch(() => ({ hidden: [] }))
+    setHiddenIds(new Set(r.hidden || []))
+  }, [activeBrand])
+
   const loadArchivedFavs = useCallback(async () => {
     const params = new URLSearchParams({ archived: 'true' })
     if (activeBrand) params.set('business', activeBrand.id)
@@ -453,7 +465,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   }, [activeBrand])
 
   useEffect(() => {
-    if (activeBrand) { loadArticles(); loadSources(); loadFavs(); loadIndustries(); loadCreators(); loadLinks() }
+    if (activeBrand) { loadArticles(); loadSources(); loadFavs(); loadHidden(); loadIndustries(); loadCreators(); loadLinks() }
   }, [activeBrand]) // eslint-disable-line react-hooks/exhaustive-deps
   const loadCampaigns = useCallback(async () => {
     const params = activeBrand ? `?brand_id=${activeBrand.id}` : ''
@@ -532,6 +544,16 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
       showToast(r.error || 'Summary failed')
     }
     setSummarizing(null)
+  }
+
+  const handleHideArticle = async (articleId: string) => {
+    // Optimistic update — remove from view instantly
+    setHiddenIds(prev => { const s = new Set(prev); s.add(articleId); return s })
+    await fetch('/api/news-hub/hidden', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ article_id: articleId, business: activeBrand?.id || 'default' }),
+    })
+    showToast('Article hidden')
   }
 
   const handleAddBrand = async () => {
@@ -818,7 +840,8 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
           <div style={{ animation: 'nhFadeIn 0.25s ease' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <span style={{ fontSize: 12, color: '#666' }}>
-                {articles.length} articles {activeBrand ? `• ${activeBrand.name}` : ''} • last 7 days
+                {articles.filter(a => !hiddenIds.has(a.id)).length} articles {activeBrand ? `• ${activeBrand.name}` : ''} • last 7 days
+                {hiddenIds.size > 0 && <span style={{ color: '#555' }}> ({hiddenIds.size} hidden)</span>}
               </span>
               <button onClick={handleCollect} disabled={collecting} style={{
                 ...btnSmall, display: 'flex', alignItems: 'center', gap: 6, opacity: collecting ? 0.7 : 1,
@@ -879,14 +902,14 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
             ) : (
               <>
                 {/* Trending section */}
-                {articles.filter(a => a.is_trending).length > 0 && categoryFilter === 'all' && contentTypeFilter === 'all' && (
+                {articles.filter(a => a.is_trending && !hiddenIds.has(a.id)).length > 0 && categoryFilter === 'all' && contentTypeFilter === 'all' && (
                   <div style={{ marginBottom: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: '#f97316', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Trending</span>
                       <div style={{ flex: 1, height: 1, background: 'rgba(249,115,22,0.2)' }} />
                     </div>
                     <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
-                      {articles.filter(a => a.is_trending).slice(0, 6).map(article => (
+                      {articles.filter(a => a.is_trending && !hiddenIds.has(a.id)).slice(0, 6).map(article => (
                         <div key={article.id} onClick={() => window.open(article.url, '_blank')} style={{
                           minWidth: 180, maxWidth: 180, borderRadius: 12, overflow: 'hidden', flexShrink: 0,
                           background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.2)',
@@ -904,6 +927,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                 {/* Filtered articles */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {articles.filter(a => {
+                  if (hiddenIds.has(a.id)) return false
                   const catMatch = categoryFilter === 'all' || a.category === categoryFilter
                   const typeMatch = contentTypeFilter === 'all' || (contentTypeFilter === 'article' && !['video', 'podcast', 'social'].includes(a.category || '')) || a.category === contentTypeFilter
                   return catMatch && typeMatch
@@ -914,6 +938,7 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                     isFaved={favIds.has(article.id)}
                     onToggleFav={() => handleToggleFav(article)}
                     onSummarize={() => handleSummarize(article.id)}
+                    onHide={() => handleHideArticle(article.id)}
                     expanded={expandedArticle === article.id}
                     onToggleExpand={() => setExpandedArticle(expandedArticle === article.id ? null : article.id)}
                   />
