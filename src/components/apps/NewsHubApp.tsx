@@ -354,6 +354,12 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
   const [editTemplateName, setEditTemplateName] = useState('')
 
+  // Stitch import
+  const [showStitchImport, setShowStitchImport] = useState(false)
+  const [stitchProjects, setStitchProjects] = useState<{ id: string; projectId: string; screens: { id: string; imageUrl: string | null }[] }[]>([])
+  const [stitchLoading, setStitchLoading] = useState(false)
+  const [stitchImporting, setStitchImporting] = useState<string | null>(null)
+
   // Subscribers
   const [subLists, setSubLists] = useState<SubList[]>([])
   const [showAddList, setShowAddList] = useState(false)
@@ -577,6 +583,13 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
     if (!activeBrand) return
     const date = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
     const bc = activeBrand.primary_color || activeBrand.color || '#6366f1'
+    // If there's a stitch_html section, use it as the full template
+    const stitchSection = buildSections.find(s => s.type === 'stitch_html')
+    if (stitchSection) {
+      setPreviewHtml(stitchSection.body)
+      setBuildStep('preview')
+      return
+    }
     const sectionsHtml = buildSections.map(s => {
       if (s.type === 'divider') return '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">'
       let h = '<div style="margin-bottom:32px;padding-bottom:24px;border-bottom:1px solid #f3f4f6;">'
@@ -644,6 +657,38 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
     if (r.ok) { setLinkUrl(''); setLinkTitle(''); setLinkNotes(''); await loadLinks(); showToast('Link added') }
     else showToast(r.error || 'Failed')
     setLinkSubmitting(false)
+  }
+
+  const handleLoadStitchProjects = async () => {
+    setStitchLoading(true)
+    const r = await fetch('/api/news-hub/stitch?action=projects').then(r => r.json()).catch(() => ({ ok: false }))
+    if (r.ok) setStitchProjects(r.projects || [])
+    else showToast(r.error || 'Failed to load Stitch designs')
+    setStitchLoading(false)
+  }
+
+  const handleImportStitch = async (projectId: string, screenId: string) => {
+    if (!activeBrand) return
+    setStitchImporting(screenId)
+    const r = await fetch(`/api/news-hub/stitch?action=html&project_id=${projectId}&screen_id=${screenId}`).then(r => r.json()).catch(() => ({ ok: false }))
+    if (r.ok && r.html) {
+      // Save as template with the raw HTML
+      await fetch('/api/news-hub/templates', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `Stitch Design ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`,
+          brand_id: activeBrand.id,
+          sections: [{ type: 'stitch_html', heading: 'Stitch Design', body: r.html, locked: false }],
+          stitch_html: r.html,
+        }),
+      })
+      await loadTemplates()
+      setShowStitchImport(false)
+      showToast('Design imported as template!')
+    } else {
+      showToast(r.error || 'Import failed')
+    }
+    setStitchImporting(null)
   }
 
   const CAMPAIGN_FOLDERS = ['all', 'newsletters', 'promotions', 'birthdays', 'christmas', 'seasonal']
@@ -972,16 +1017,65 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                 <div style={{ marginTop: 28 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Templates {activeBrand ? `• ${activeBrand.name}` : ''}</h3>
-                    <button onClick={async () => {
-                      if (!activeBrand) return
-                      await fetch('/api/news-hub/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New Template', brand_id: activeBrand.id }) })
-                      await loadTemplates()
-                      showToast('Template created')
-                    }} style={btnSmall}>{I.plus} New Template</button>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => { setShowStitchImport(p => !p); if (!showStitchImport) handleLoadStitchProjects() }} style={btnSmall}>
+                        {I.sparkle} Import from Stitch
+                      </button>
+                      <button onClick={async () => {
+                        if (!activeBrand) return
+                        await fetch('/api/news-hub/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New Template', brand_id: activeBrand.id }) })
+                        await loadTemplates()
+                        showToast('Template created')
+                      }} style={btnSmall}>{I.plus} Blank</button>
+                    </div>
                   </div>
 
-                  {templates.length === 0 ? (
-                    <div style={{ fontSize: 13, color: '#555', padding: '12px 0' }}>No templates yet. Create one to reuse across campaigns.</div>
+                  {/* Stitch design browser */}
+                  {showStitchImport && (
+                    <div style={{ ...cardS, marginBottom: 16, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: '#a5b4fc' }}>Your Stitch Designs</span>
+                        <button onClick={() => setShowStitchImport(false)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 16 }}>×</button>
+                      </div>
+                      {stitchLoading ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: '#888', fontSize: 13 }}>Loading designs from Stitch...</div>
+                      ) : stitchProjects.length === 0 ? (
+                        <div style={{ fontSize: 13, color: '#666', padding: '12px 0' }}>No Stitch projects found. Create designs at stitch.withgoogle.com first.</div>
+                      ) : (
+                        <div>
+                          {stitchProjects.map(p => (
+                            <div key={p.id}>
+                              <div style={{ fontSize: 11, color: '#888', marginBottom: 8 }}>Project {p.projectId} — {p.screens.length} design{p.screens.length !== 1 ? 's' : ''}</div>
+                              <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 8 }}>
+                                {p.screens.map(s => (
+                                  <div key={s.id} style={{
+                                    minWidth: 140, maxWidth: 140, borderRadius: 10, overflow: 'hidden', flexShrink: 0,
+                                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                                    cursor: stitchImporting === s.id ? 'wait' : 'pointer',
+                                    opacity: stitchImporting === s.id ? 0.6 : 1,
+                                  }} onClick={() => handleImportStitch(p.projectId, s.id)}>
+                                    {s.imageUrl ? (
+                                      <img src={s.imageUrl} alt="Design" style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }} />
+                                    ) : (
+                                      <div style={{ width: '100%', height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666', fontSize: 12 }}>No preview</div>
+                                    )}
+                                    <div style={{ padding: '8px', textAlign: 'center' }}>
+                                      <span style={{ fontSize: 11, color: stitchImporting === s.id ? '#f59e0b' : '#a5b4fc', fontWeight: 600 }}>
+                                        {stitchImporting === s.id ? 'Importing...' : 'Tap to import'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {templates.length === 0 && !showStitchImport ? (
+                    <div style={{ fontSize: 13, color: '#555', padding: '12px 0' }}>No templates yet. Import from Stitch or create a blank one.</div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {templates.map(t => (
