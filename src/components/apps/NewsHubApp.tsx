@@ -360,6 +360,30 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
   const [stitchLoading, setStitchLoading] = useState(false)
   const [stitchImporting, setStitchImporting] = useState<string | null>(null)
 
+  // Preview
+  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop')
+  const iframeRef = useCallback((node: HTMLIFrameElement | null) => {
+    if (!node) return
+    // Make iframe content editable once loaded
+    const onLoad = () => {
+      try {
+        const doc = node.contentDocument
+        if (!doc) return
+        doc.designMode = 'on'
+        // Add image click handlers
+        doc.addEventListener('click', (e) => {
+          const target = e.target as HTMLElement
+          if (target.tagName === 'IMG') {
+            e.preventDefault()
+            const url = prompt('Enter new image URL:', (target as HTMLImageElement).src)
+            if (url) (target as HTMLImageElement).src = url
+          }
+        })
+      } catch { /* cross-origin */ }
+    }
+    node.addEventListener('load', onLoad)
+  }, [])
+
   // Subscribers
   const [subLists, setSubLists] = useState<SubList[]>([])
   const [showAddList, setShowAddList] = useState(false)
@@ -1263,10 +1287,68 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
             {buildStep === 'preview' && (
               <>
                 <button onClick={() => setBuildStep('edit')} style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: 13, padding: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>{I.back} Back to editor</button>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: '0 0 16px' }}>Preview</h3>
-                <div style={{ background: '#fff', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
-                  <iframe srcDoc={previewHtml} style={{ width: '100%', minHeight: 400, border: 'none', display: 'block' }} title="Preview" />
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#f0eee8', margin: 0 }}>Visual Editor</h3>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={() => setPreviewMode('desktop')} style={{
+                      ...chip(previewMode === 'desktop'), padding: '5px 12px',
+                    }}>Desktop</button>
+                    <button onClick={() => setPreviewMode('mobile')} style={{
+                      ...chip(previewMode === 'mobile'), padding: '5px 12px',
+                    }}>Mobile</button>
+                  </div>
                 </div>
+
+                <div style={{ fontSize: 11, color: '#666', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {I.edit} Click any text to edit directly • Click images to swap them
+                </div>
+
+                <div style={{
+                  background: previewMode === 'mobile' ? 'rgba(255,255,255,0.03)' : '#fff',
+                  borderRadius: 12, overflow: 'hidden', marginBottom: 16,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  display: 'flex', justifyContent: 'center',
+                  padding: previewMode === 'mobile' ? '16px' : 0,
+                }}>
+                  <iframe
+                    ref={iframeRef}
+                    srcDoc={previewHtml}
+                    style={{
+                      width: previewMode === 'mobile' ? 375 : '100%',
+                      minHeight: previewMode === 'mobile' ? 600 : 400,
+                      border: previewMode === 'mobile' ? '1px solid rgba(255,255,255,0.15)' : 'none',
+                      borderRadius: previewMode === 'mobile' ? 20 : 0,
+                      display: 'block',
+                      transition: 'width 0.3s ease',
+                      background: '#fff',
+                    }}
+                    title="Preview"
+                    id="preview-iframe"
+                  />
+                </div>
+
+                {/* Save edits from iframe back */}
+                <button onClick={() => {
+                  try {
+                    const iframe = document.getElementById('preview-iframe') as HTMLIFrameElement
+                    if (iframe?.contentDocument) {
+                      iframe.contentDocument.designMode = 'off'
+                      const editedHtml = '<!DOCTYPE html>' + iframe.contentDocument.documentElement.outerHTML
+                      setPreviewHtml(editedHtml)
+                      // Update stitch section if exists
+                      const hasStitch = buildSections.some(s => s.type === 'stitch_html')
+                      if (hasStitch) {
+                        setBuildSections(prev => prev.map(s => s.type === 'stitch_html' ? { ...s, body: editedHtml } : s))
+                      }
+                      showToast('Edits saved')
+                      iframe.contentDocument.designMode = 'on'
+                    }
+                  } catch { showToast('Could not save edits') }
+                }} style={{ ...btnSmall, width: '100%', textAlign: 'center', padding: '10px', marginBottom: 12, background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)' }}>
+                  Save Visual Edits
+                </button>
+
                 <div style={{ ...cardS, marginBottom: 12 }}>
                   <p style={{ fontSize: 12, color: '#888', margin: '0 0 8px' }}>Send test:</p>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -1275,7 +1357,21 @@ export default function NewsHubApp({ onBack }: { onBack: () => void }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => { navigator.clipboard.writeText(previewHtml); showToast('HTML copied') }} style={{ ...btnSmall, flex: 1, textAlign: 'center', padding: '10px' }}>Copy HTML</button>
+                  <button onClick={() => {
+                    try {
+                      const iframe = document.getElementById('preview-iframe') as HTMLIFrameElement
+                      if (iframe?.contentDocument) {
+                        iframe.contentDocument.designMode = 'off'
+                        const html = '<!DOCTYPE html>' + iframe.contentDocument.documentElement.outerHTML
+                        navigator.clipboard.writeText(html)
+                        showToast('HTML copied (with your edits)')
+                        iframe.contentDocument.designMode = 'on'
+                      } else {
+                        navigator.clipboard.writeText(previewHtml)
+                        showToast('HTML copied')
+                      }
+                    } catch { navigator.clipboard.writeText(previewHtml); showToast('HTML copied') }
+                  }} style={{ ...btnSmall, flex: 1, textAlign: 'center', padding: '10px' }}>Copy HTML</button>
                   <button onClick={handleSaveCampaign} style={{ flex: 1, padding: '12px', borderRadius: 12, border: 'none', background: 'rgba(99,102,241,0.8)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>Save Campaign</button>
                 </div>
               </>
