@@ -9,6 +9,7 @@ interface BraveNewsResult {
   description?: string
   thumbnail?: { src?: string }
   age?: string
+  page_age?: string
   meta_url?: { hostname?: string }
 }
 
@@ -47,10 +48,18 @@ function calcRelevance(title: string, description: string): number {
 }
 
 function parseAge(age?: string): string {
-  if (!age) return new Date().toISOString()
-  // Brave returns ages like "3 hours ago", "2 days ago", "1 week ago"
   const now = Date.now()
-  const lower = (age || '').toLowerCase()
+  if (!age || !age.trim()) {
+    // No age info — don't pretend it's "just now". Use collected_at instead (handled separately)
+    return new Date(now - 12 * 60 * 60 * 1000).toISOString() // fallback: 12h ago
+  }
+  
+  // Try parsing as ISO date first (some results return actual dates)
+  const isoDate = new Date(age)
+  if (!isNaN(isoDate.getTime()) && age.includes('-')) return isoDate.toISOString()
+  
+  // Brave returns ages like "3 hours ago", "2 days ago", "1 week ago"
+  const lower = age.toLowerCase()
   const numMatch = lower.match(/(\d+)/)
   const num = numMatch ? parseInt(numMatch[1], 10) : 1
 
@@ -59,7 +68,8 @@ function parseAge(age?: string): string {
   if (lower.includes('day')) return new Date(now - num * 24 * 60 * 60 * 1000).toISOString()
   if (lower.includes('week')) return new Date(now - num * 7 * 24 * 60 * 60 * 1000).toISOString()
   if (lower.includes('month')) return new Date(now - num * 30 * 24 * 60 * 60 * 1000).toISOString()
-  return new Date().toISOString()
+  if (lower.includes('year')) return new Date(now - num * 365 * 24 * 60 * 60 * 1000).toISOString()
+  return new Date(now - 12 * 60 * 60 * 1000).toISOString() // fallback: 12h ago
 }
 
 export async function POST() {
@@ -92,7 +102,7 @@ export async function POST() {
         if (r.url && r.title) {
           allResults.push({
             title: r.title, url: r.url, description: r.description || '',
-            thumbnail: r.thumbnail?.src || null, age: r.age || '', query, brand_id: brandId || null,
+            thumbnail: r.thumbnail?.src || null, age: r.age || r.page_age || '', query, brand_id: brandId || null,
           })
         }
       }
