@@ -8,18 +8,27 @@ interface Phase {
   done: boolean
 }
 
+interface NoteEntry {
+  text: string
+  date: string
+}
+
 interface RoadmapApp {
   id: string
   name: string
   description: string
+  overview: string
   icon: string
   icon_id: string | null
   icon_color: string | null
   status: 'idea' | 'planned' | 'building' | 'live' | 'review'
   category: 'business' | 'personal' | 'laboratory'
+  priority: 'high' | 'medium' | 'low'
+  effort: 'small' | 'medium' | 'large'
   phases: Phase[]
   ideas: string[]
   fixes: string[]
+  notes: NoteEntry[]
   created_at: string
   updated_at: string
 }
@@ -63,6 +72,18 @@ const STATUSES: { id: RoadmapApp['status']; label: string; color: string; emoji:
   { id: 'building', label: 'Building', color: '#f97316', emoji: '🔨' },
   { id: 'live', label: 'Live', color: '#22c55e', emoji: '✅' },
   { id: 'review', label: 'Review', color: '#ec4899', emoji: '🔍' },
+]
+
+const PRIORITIES: { id: RoadmapApp['priority']; label: string; color: string }[] = [
+  { id: 'high', label: 'High', color: '#ef4444' },
+  { id: 'medium', label: 'Medium', color: '#f59e0b' },
+  { id: 'low', label: 'Low', color: '#22c55e' },
+]
+
+const EFFORTS: { id: RoadmapApp['effort']; label: string; emoji: string }[] = [
+  { id: 'small', label: 'Quick Win', emoji: '⚡' },
+  { id: 'medium', label: 'Medium', emoji: '🔧' },
+  { id: 'large', label: 'Big Project', emoji: '🏗️' },
 ]
 
 const CATEGORIES: { id: RoadmapApp['category']; label: string }[] = [
@@ -166,6 +187,9 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [detailApp, setDetailApp] = useState<RoadmapApp | null>(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortBy, setSortBy] = useState<'updated' | 'priority' | 'name'>('updated')
+  const [newNote, setNewNote] = useState('')
 
   // Add form
   const [newName, setNewName] = useState('')
@@ -274,6 +298,14 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
     await handleUpdateApp(detailApp.id, { phases })
   }
 
+  const handleAddNote = async () => {
+    if (!newNote.trim() || !detailApp) return
+    const notes = [...(detailApp.notes || []), { text: newNote.trim(), date: new Date().toISOString() }]
+    await handleUpdateApp(detailApp.id, { notes })
+    setNewNote('')
+    showToast('Note added')
+  }
+
   const timeAgo = (d: string) => {
     const diff = Date.now() - new Date(d).getTime()
     const m = Math.floor(diff / 60000)
@@ -285,10 +317,20 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
     return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
   }
 
+  const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
+
   const filtered = apps.filter(a => {
     if (statusFilter !== 'all' && a.status !== statusFilter) return false
     if (categoryFilter !== 'all' && a.category !== categoryFilter) return false
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      return a.name.toLowerCase().includes(q) || a.description.toLowerCase().includes(q) || (a.overview || '').toLowerCase().includes(q) || (a.ideas || []).some(i => i.toLowerCase().includes(q))
+    }
     return true
+  }).sort((a, b) => {
+    if (sortBy === 'priority') return (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1)
+    if (sortBy === 'name') return a.name.localeCompare(b.name)
+    return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
   })
 
   /* ═══ DETAIL VIEW ═══ */
@@ -362,7 +404,61 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
                 </button>
               ))}
             </div>
+
+            {/* Priority & Effort */}
+            <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+              <div>
+                <span style={{ fontSize: 10, color: '#666', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Priority</span>
+                <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                  {PRIORITIES.map(p => (
+                    <button key={p.id} onClick={() => handleUpdateApp(detailApp.id, { priority: p.id })}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        background: detailApp.priority === p.id ? `${p.color}25` : 'rgba(255,255,255,0.04)',
+                        color: detailApp.priority === p.id ? p.color : '#666',
+                        border: detailApp.priority === p.id ? `1px solid ${p.color}40` : '1px solid rgba(255,255,255,0.06)',
+                      }}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: 10, color: '#666', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>Effort</span>
+                <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                  {EFFORTS.map(e => (
+                    <button key={e.id} onClick={() => handleUpdateApp(detailApp.id, { effort: e.id })}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        background: detailApp.effort === e.id ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
+                        color: detailApp.effort === e.id ? '#a5b4fc' : '#666',
+                        border: detailApp.effort === e.id ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(255,255,255,0.06)',
+                      }}>
+                      {e.emoji} {e.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Overview */}
+          {(detailApp.overview || true) && (
+            <div style={{ ...cardS, marginBottom: 14 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: '0 0 8px' }}>📖 Overview</h3>
+              <textarea
+                value={detailApp.overview || ''}
+                onChange={e => {
+                  const updated = { ...detailApp, overview: e.target.value }
+                  setDetailApp(updated)
+                }}
+                onBlur={() => handleUpdateApp(detailApp.id, { overview: detailApp.overview })}
+                placeholder="What could this app be? Describe the vision..."
+                rows={5}
+                style={{ ...inputS, resize: 'vertical' as const, lineHeight: 1.6, fontSize: 13, color: '#ccc' }}
+              />
+            </div>
+          )}
 
           {/* Phases */}
           <div style={{ marginBottom: 14 }}>
@@ -426,6 +522,25 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
             </div>
           </div>
 
+          {/* Notes Timeline */}
+          <div style={{ marginBottom: 14 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#f0eee8', margin: '0 0 8px' }}>📝 Notes</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {(detailApp.notes || []).slice().reverse().map((note, i) => (
+                <div key={i} style={{ ...cardS, padding: '10px 14px', borderLeft: '3px solid rgba(99,102,241,0.3)' }}>
+                  <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>{note.text}</div>
+                  <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>{timeAgo(note.date)}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <input value={newNote} onChange={e => setNewNote(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleAddNote()}
+                placeholder="Add a note or thought..." style={{ ...inputS, flex: 1 }} />
+              <button onClick={handleAddNote} style={btnSmall}>{I.plus}</button>
+            </div>
+          </div>
+
         </div>
         {toast && <Toast msg={toast} />}
       </div>
@@ -459,6 +574,33 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
 
       <div style={{ padding: '0 16px', paddingTop: 66, flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 40 }}>
 
+        {/* Stats bar */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14, overflowX: 'auto', scrollbarWidth: 'none' }}>
+          {STATUSES.map(s => {
+            const count = apps.filter(a => a.status === s.id).length
+            return (
+              <div key={s.id} style={{
+                flex: 1, minWidth: 60, padding: '8px 10px', borderRadius: 10,
+                background: `${s.color}10`, border: `1px solid ${s.color}20`,
+                textAlign: 'center',
+              }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: s.color }}>{count}</div>
+                <div style={{ fontSize: 9, color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>{s.label}</div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Search */}
+        <div style={{ marginBottom: 12 }}>
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search apps, ideas, features..."
+            style={{ ...inputS, background: 'rgba(255,255,255,0.04)', fontSize: 13 }}
+          />
+        </div>
+
         {/* Filters */}
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none', marginBottom: 10, paddingBottom: 4 }}>
           <button onClick={() => setStatusFilter('all')} style={{ ...chip(statusFilter === 'all'), flexShrink: 0 }}>All</button>
@@ -475,9 +617,18 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
           ))}
         </div>
 
-        {/* Add button */}
+        {/* Add button + sort */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <span style={{ fontSize: 12, color: '#666' }}>{filtered.length} apps</span>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: '#666', marginRight: 6 }}>{filtered.length} apps</span>
+            {(['updated', 'priority', 'name'] as const).map(s => (
+              <button key={s} onClick={() => setSortBy(s)} style={{
+                padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600, cursor: 'pointer',
+                background: sortBy === s ? 'rgba(99,102,241,0.2)' : 'none',
+                color: sortBy === s ? '#a5b4fc' : '#666', border: 'none',
+              }}>{s === 'updated' ? '🕐' : s === 'priority' ? '🔥' : '🔤'}</button>
+            ))}
+          </div>
           <button onClick={() => setShowAdd(p => !p)} style={btnSmall}>{I.plus} Add App</button>
         </div>
 
@@ -555,7 +706,16 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
                               {app.description && (
                                 <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.description}</div>
                               )}
-                              <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 10, color: '#555' }}>
+                              <div style={{ display: 'flex', gap: 6, marginTop: 6, fontSize: 10, color: '#555', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <span style={{
+                                  padding: '1px 6px', borderRadius: 4, fontWeight: 600,
+                                  background: `${PRIORITIES.find(p => p.id === app.priority)?.color || '#f59e0b'}15`,
+                                  color: PRIORITIES.find(p => p.id === app.priority)?.color || '#f59e0b',
+                                }}>{app.priority || 'medium'}</span>
+                                <span style={{
+                                  padding: '1px 6px', borderRadius: 4,
+                                  background: 'rgba(255,255,255,0.06)',
+                                }}>{EFFORTS.find(e => e.id === app.effort)?.emoji || '🔧'} {app.effort || 'medium'}</span>
                                 {(app.ideas || []).length > 0 && <span>💡 {app.ideas.length}</span>}
                                 {(app.fixes || []).length > 0 && <span>🔧 {app.fixes.length}</span>}
                                 {(app.phases || []).length > 0 && <span>📋 {app.phases.filter(p => p.done).length}/{app.phases.length}</span>}
@@ -594,7 +754,16 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
                       {app.description && (
                         <div style={{ fontSize: 11, color: '#888', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{app.description}</div>
                       )}
-                      <div style={{ display: 'flex', gap: 8, marginTop: 4, fontSize: 10, color: '#555' }}>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 4, fontSize: 10, color: '#555', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{
+                          padding: '1px 6px', borderRadius: 4, fontWeight: 600,
+                          background: `${PRIORITIES.find(p => p.id === app.priority)?.color || '#f59e0b'}15`,
+                          color: PRIORITIES.find(p => p.id === app.priority)?.color || '#f59e0b',
+                        }}>{app.priority || 'medium'}</span>
+                        <span style={{
+                          padding: '1px 6px', borderRadius: 4,
+                          background: 'rgba(255,255,255,0.06)',
+                        }}>{EFFORTS.find(e => e.id === app.effort)?.emoji || '🔧'} {app.effort || 'medium'}</span>
                         <span>{CATEGORIES.find(c => c.id === app.category)?.label}</span>
                         <span>•</span>
                         <span>{timeAgo(app.updated_at)}</span>
