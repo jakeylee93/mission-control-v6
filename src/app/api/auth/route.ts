@@ -6,7 +6,8 @@ export async function POST(req: NextRequest) {
   const { password } = await req.json()
   const correct = process.env.MC_PASSWORD || '3108'
 
-  if (password === correct) {
+  // Compare as strings, trim whitespace
+  if (String(password).trim() === String(correct).trim()) {
     const res = NextResponse.json({ ok: true })
     // Set cookie that lasts 90 days
     res.cookies.set('mc_auth', 'authenticated', {

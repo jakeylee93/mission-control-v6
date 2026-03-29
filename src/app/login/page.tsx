@@ -9,16 +9,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!password.trim() || loading) return
+  const handleSubmit = async (code?: string) => {
+    const pin = code || password
+    if (!pin.trim() || loading) return
     setLoading(true)
     setError(false)
 
     const res = await fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ password: pin }),
     })
 
     if (res.ok) {
@@ -29,6 +29,27 @@ export default function LoginPage() {
       setPassword('')
     }
     setLoading(false)
+  }
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    handleSubmit()
+  }
+
+  const handlePadPress = (num: string) => {
+    if (password.length >= 8) return
+    const next = password + num
+    setPassword(next)
+    setError(false)
+    // Auto-submit at 4 digits
+    if (next.length === 4) {
+      setTimeout(() => handleSubmit(next), 150)
+    }
+  }
+
+  const handleBackspace = () => {
+    setPassword(p => p.slice(0, -1))
+    setError(false)
   }
 
   return (
@@ -63,49 +84,76 @@ export default function LoginPage() {
           <p style={{ fontSize: 13, color: '#666', marginTop: 6 }}>Enter your passcode to continue</p>
         </div>
 
-        {/* Login form */}
-        <form onSubmit={handleSubmit}>
-          <div style={{ position: 'relative', marginBottom: 16 }}>
-            <input
-              type="password"
-              value={password}
-              onChange={e => { setPassword(e.target.value); setError(false) }}
-              placeholder="••••"
-              autoFocus
-              style={{
-                width: '100%', padding: '16px 20px', borderRadius: 14,
-                background: 'rgba(255,255,255,0.06)',
-                border: error ? '1px solid rgba(239,68,68,0.5)' : '1px solid rgba(255,255,255,0.1)',
-                color: '#f0eee8', fontSize: 24, fontWeight: 300,
-                letterSpacing: 12, textAlign: 'center',
-                outline: 'none', boxSizing: 'border-box',
-                transition: 'border-color 0.2s',
-              }}
-            />
-            {error && (
-              <div style={{
-                fontSize: 12, color: '#ef4444', marginTop: 8,
-                animation: 'shake 0.4s ease',
-              }}>
-                Wrong passcode
-              </div>
-            )}
-          </div>
+        {/* Passcode dots */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 14, marginBottom: 24 }}>
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} style={{
+              width: 16, height: 16, borderRadius: '50%',
+              background: password.length > i ? (error ? '#ef4444' : '#6366f1') : 'rgba(255,255,255,0.1)',
+              border: error && password.length === 0 ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(255,255,255,0.08)',
+              transition: 'all 0.15s ease',
+              transform: password.length > i ? 'scale(1.1)' : 'scale(1)',
+            }} />
+          ))}
+        </div>
 
-          <button
-            type="submit"
-            disabled={!password.trim() || loading}
-            style={{
-              width: '100%', padding: '14px', borderRadius: 14,
-              border: 'none', cursor: password.trim() ? 'pointer' : 'not-allowed',
-              background: password.trim() ? 'rgba(99,102,241,0.8)' : 'rgba(99,102,241,0.2)',
-              color: password.trim() ? '#fff' : '#666',
-              fontSize: 15, fontWeight: 700,
-              transition: 'all 0.2s',
-            }}
-          >
-            {loading ? 'Checking...' : 'Enter'}
+        {error && (
+          <div style={{
+            fontSize: 12, color: '#ef4444', marginBottom: 16,
+            animation: 'shake 0.4s ease',
+          }}>
+            Wrong passcode
+          </div>
+        )}
+
+        {loading && (
+          <div style={{ fontSize: 12, color: '#6366f1', marginBottom: 16 }}>Checking...</div>
+        )}
+
+        {/* Number pad */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 12, maxWidth: 260, margin: '0 auto',
+        }}>
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
+            <button key={num} onClick={() => handlePadPress(num)} style={{
+              width: '100%', aspectRatio: '1.4', borderRadius: 16,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: '#f0eee8', fontSize: 24, fontWeight: 400,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.1s',
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}>{num}</button>
+          ))}
+          {/* Bottom row: empty, 0, backspace */}
+          <div />
+          <button onClick={() => handlePadPress('0')} style={{
+            width: '100%', aspectRatio: '1.4', borderRadius: 16,
+            background: 'rgba(255,255,255,0.06)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            color: '#f0eee8', fontSize: 24, fontWeight: 400,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: "'Space Grotesk', sans-serif",
+          }}>0</button>
+          <button onClick={handleBackspace} style={{
+            width: '100%', aspectRatio: '1.4', borderRadius: 16,
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            color: '#888', fontSize: 14, fontWeight: 600,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"/>
+              <line x1="18" y1="9" x2="12" y2="15"/>
+              <line x1="12" y1="9" x2="18" y2="15"/>
+            </svg>
           </button>
+        </div>
+
+        {/* Hidden form for keyboard input fallback */}
+        <form onSubmit={handleFormSubmit} style={{ position: 'absolute', opacity: 0, pointerEvents: 'none' }}>
+          <input type="password" value={password} onChange={e => { setPassword(e.target.value); setError(false) }} autoFocus />
         </form>
 
         <div style={{ fontSize: 10, color: '#333', marginTop: 40 }}>

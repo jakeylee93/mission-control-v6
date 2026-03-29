@@ -23,7 +23,7 @@ interface Agent {
 }
 
 const AGENTS: Agent[] = [
-  { id: 'marg', name: 'Margarita', role: 'Orchestrator', model: 'Claude Opus', provider: 'Anthropic', avatar: '/images/marg-new.png', thumbnail: '/images/marg-new.png', accent: '#FFD700', monthSpend: '£847.20', lastActive: 'Just now', weekSummary: 'Health app, Media List, Maps redesign' },
+  { id: 'marg', name: 'Margarita', role: 'Orchestrator', model: 'Claude Opus', provider: 'Anthropic', avatar: '/images/marg-robot.gif', thumbnail: '/images/marg-robot.gif', accent: '#FFD700', monthSpend: '£847.20', lastActive: 'Just now', weekSummary: 'Health app, Media List, Maps redesign' },
   { id: 'doc', name: 'Doc', role: 'Builder', model: 'Codex', provider: 'OpenAI', avatar: '/images/doc.png', thumbnail: '/images/doc.png', accent: '#60A5FA', monthSpend: '£124.50', lastActive: '2h ago', weekSummary: 'Mission Control builds' },
   { id: 'cindy', name: 'Cindy', role: 'Assistant', model: 'Kimi (Moonshot)', provider: 'Moonshot', avatar: '/images/cindy.png', thumbnail: '/images/cindy.png', accent: '#C084FC', monthSpend: '£31.80', lastActive: '5h ago', weekSummary: 'Calendar & contacts' },
 ]
@@ -359,13 +359,26 @@ export default function HomePage() {
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 500, margin: '0 auto', padding: '0 16px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Header — compact on mobile */}
-        <header style={{ paddingTop: 44, marginBottom: 16, textAlign: 'center' }}>
+        {/* Header — LED Clock + Clean Layout */}
+        <header style={{ paddingTop: 40, marginBottom: 20, textAlign: 'center' }}>
+          {/* LED Digital Clock */}
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            padding: '8px 20px', borderRadius: 12,
+            background: 'rgba(0,20,0,0.4)', border: '1px solid rgba(34,197,94,0.2)',
+            boxShadow: '0 0 20px rgba(34,197,94,0.1), inset 0 0 20px rgba(34,197,94,0.05)',
+            marginBottom: 16,
+          }}>
+            <span style={{
+              fontSize: 28, fontWeight: 400, fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace",
+              color: '#22c55e', letterSpacing: 4, textShadow: '0 0 10px rgba(34,197,94,0.5), 0 0 20px rgba(34,197,94,0.3)',
+            }}>{timeFmt}</span>
+          </div>
+          
           <div style={{ color: '#555', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' }}>{dayName} · {dateFmt}</div>
-          <h1 style={{ fontSize: 34, fontWeight: 700, margin: '2px 0', letterSpacing: -1, fontFamily: "'Space Grotesk', sans-serif" }}>Jake</h1>
+          <h1 style={{ fontSize: 32, fontWeight: 700, margin: '4px 0', letterSpacing: -1, fontFamily: "'Space Grotesk', sans-serif" }}>Jake</h1>
           <div style={{ color: '#555', fontSize: 10, letterSpacing: 3, textTransform: 'uppercase' }}>Mission Control</div>
           <div style={{ fontSize: 10, color: '#444', marginTop: 2 }}>v6.1</div>
-          <div style={{ fontSize: 26, fontWeight: 200, fontFamily: 'monospace', letterSpacing: 3, marginTop: 6, opacity: 0.7 }}>{timeFmt}</div>
         </header>
 
         {/* Agent Selector — Hero Section */}
@@ -398,19 +411,42 @@ export default function HomePage() {
                 filter: 'blur(40px)', pointerEvents: 'none',
               }} />
 
-              {/* Character Thumbnail */}
+              {/* Character Thumbnail - Animated GIF for Marg with mix-blend-mode */}
               <div style={{
                 width: 100, height: 110, flexShrink: 0,
                 display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
                 position: 'relative',
               }}>
-                <Image
-                  src={featuredAgent.thumbnail}
-                  alt={featuredAgent.name}
-                  width={100}
-                  height={110}
-                  style={{ objectFit: 'contain', transition: 'opacity 0.3s ease' }}
-                />
+                {featuredAgent.id === 'marg' ? (
+                  <img
+                    src={featuredAgent.thumbnail}
+                    alt={featuredAgent.name}
+                    width={100}
+                    height={110}
+                    style={{ 
+                      objectFit: 'contain', 
+                      mixBlendMode: 'screen',
+                      filter: 'contrast(1.1) brightness(1.1)',
+                      cursor: 'pointer',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const img = e.currentTarget;
+                      const src = img.src;
+                      img.src = '';
+                      setTimeout(() => img.src = src, 10);
+                    }}
+                    title="Tap to replay animation"
+                  />
+                ) : (
+                  <Image
+                    src={featuredAgent.thumbnail}
+                    alt={featuredAgent.name}
+                    width={100}
+                    height={110}
+                    style={{ objectFit: 'contain', transition: 'opacity 0.3s ease' }}
+                  />
+                )}
               </div>
 
               {/* Agent Info */}
@@ -533,7 +569,23 @@ export default function HomePage() {
                       width: '100%', height: '100%', borderRadius: '50%',
                       overflow: 'hidden', background: 'rgba(255,255,255,0.06)',
                     }}>
-                      <Image src={a.avatar} alt={a.name} width={36} height={36} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      {a.id === 'marg' ? (
+                        <img 
+                          src={a.avatar} 
+                          alt={a.name} 
+                          width={36} 
+                          height={36} 
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover',
+                            mixBlendMode: 'screen',
+                            filter: 'contrast(1.1) brightness(1.1)',
+                          }} 
+                        />
+                      ) : (
+                        <Image src={a.avatar} alt={a.name} width={36} height={36} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      )}
                     </div>
                   </div>
                   <span style={{
