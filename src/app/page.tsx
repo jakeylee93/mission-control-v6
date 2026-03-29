@@ -23,9 +23,9 @@ interface Agent {
 }
 
 const AGENTS: Agent[] = [
-  { id: 'marg', name: 'Margarita', role: 'Orchestrator', model: 'Claude Opus', provider: 'Anthropic', avatar: '/images/marg-robot.gif', thumbnail: '/images/marg-robot.gif', accent: '#FFD700', monthSpend: '£847.20', lastActive: 'Just now', weekSummary: 'Health app, Media List, Maps redesign' },
-  { id: 'doc', name: 'Doc', role: 'Builder', model: 'Codex', provider: 'OpenAI', avatar: '/images/doc.png', thumbnail: '/images/doc.png', accent: '#60A5FA', monthSpend: '£124.50', lastActive: '2h ago', weekSummary: 'Mission Control builds' },
-  { id: 'cindy', name: 'Cindy', role: 'Assistant', model: 'Kimi (Moonshot)', provider: 'Moonshot', avatar: '/images/cindy.png', thumbnail: '/images/cindy.png', accent: '#C084FC', monthSpend: '£31.80', lastActive: '5h ago', weekSummary: 'Calendar & contacts' },
+  { id: 'marg', name: 'Margarita', role: 'Orchestrator', model: 'Claude Opus', provider: 'Anthropic', avatar: '/images/marg-robot.png', thumbnail: '/images/marg-robot.png', accent: '#FFD700', monthSpend: '£847.20', lastActive: 'Just now', weekSummary: 'Health app, Media List, Maps redesign' },
+  { id: 'doc', name: 'Doc', role: 'Builder', model: 'Codex', provider: 'OpenAI', avatar: '/images/doc-robot.png', thumbnail: '/images/doc-robot.png', accent: '#60A5FA', monthSpend: '£124.50', lastActive: '2h ago', weekSummary: 'Mission Control builds' },
+  { id: 'cindy', name: 'Cindy', role: 'Assistant', model: 'Kimi (Moonshot)', provider: 'Moonshot', avatar: '/images/cindy-robot.png', thumbnail: '/images/cindy-robot.png', accent: '#C084FC', monthSpend: '£31.80', lastActive: '5h ago', weekSummary: 'Calendar & contacts' },
 ]
 
 /* ── SVG Icons ── */
@@ -411,42 +411,19 @@ export default function HomePage() {
                 filter: 'blur(40px)', pointerEvents: 'none',
               }} />
 
-              {/* Character Thumbnail - Animated GIF for Marg with mix-blend-mode */}
+              {/* Character Thumbnail — Robot PNGs */}
               <div style={{
-                width: 100, height: 110, flexShrink: 0,
-                display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+                width: 110, height: 130, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 position: 'relative',
               }}>
-                {featuredAgent.id === 'marg' ? (
-                  <img
-                    src={featuredAgent.thumbnail}
-                    alt={featuredAgent.name}
-                    width={100}
-                    height={110}
-                    style={{ 
-                      objectFit: 'contain', 
-                      mixBlendMode: 'screen',
-                      filter: 'contrast(1.1) brightness(1.1)',
-                      cursor: 'pointer',
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const img = e.currentTarget;
-                      const src = img.src;
-                      img.src = '';
-                      setTimeout(() => img.src = src, 10);
-                    }}
-                    title="Tap to replay animation"
-                  />
-                ) : (
-                  <Image
-                    src={featuredAgent.thumbnail}
-                    alt={featuredAgent.name}
-                    width={100}
-                    height={110}
-                    style={{ objectFit: 'contain', transition: 'opacity 0.3s ease' }}
-                  />
-                )}
+                <Image
+                  src={featuredAgent.thumbnail}
+                  alt={featuredAgent.name}
+                  width={110}
+                  height={130}
+                  style={{ objectFit: 'contain', transition: 'opacity 0.3s ease' }}
+                />
               </div>
 
               {/* Agent Info */}
@@ -567,25 +544,9 @@ export default function HomePage() {
                   }}>
                     <div style={{
                       width: '100%', height: '100%', borderRadius: '50%',
-                      overflow: 'hidden', background: 'rgba(255,255,255,0.06)',
+                      overflow: 'hidden', background: 'rgba(10,8,18,0.9)',
                     }}>
-                      {a.id === 'marg' ? (
-                        <img 
-                          src={a.avatar} 
-                          alt={a.name} 
-                          width={36} 
-                          height={36} 
-                          style={{ 
-                            width: '100%', 
-                            height: '100%', 
-                            objectFit: 'cover',
-                            mixBlendMode: 'screen',
-                            filter: 'contrast(1.1) brightness(1.1)',
-                          }} 
-                        />
-                      ) : (
-                        <Image src={a.avatar} alt={a.name} width={36} height={36} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      )}
+                      <Image src={a.avatar} alt={a.name} width={36} height={36} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                   </div>
                   <span style={{
