@@ -13,6 +13,8 @@ interface RoadmapApp {
   name: string
   description: string
   icon: string
+  icon_id: string | null
+  icon_color: string | null
   status: 'idea' | 'planned' | 'building' | 'live' | 'review'
   category: 'business' | 'personal' | 'laboratory'
   phases: Phase[]
@@ -20,6 +22,37 @@ interface RoadmapApp {
   fixes: string[]
   created_at: string
   updated_at: string
+}
+
+/* ─── App Icon Map (matches home screen icons) ─── */
+const APP_ICONS: Record<string, JSX.Element> = {
+  email: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>,
+  calendar: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  costs: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  analytics: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+  tasks: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+  contacts: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  docs: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>,
+  alerts: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  web: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+  messages: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+  newspaper: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9h4"/><line x1="10" y1="6" x2="18" y2="6"/><line x1="10" y1="10" x2="18" y2="10"/><line x1="10" y1="14" x2="14" y2="14"/></svg>,
+  weather: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>,
+  health: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  music: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>,
+  photos: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+  maps: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+  notes: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  shopping: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>,
+  home: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  reading: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>,
+  downtime: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
+  lovely: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  agents: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>,
+  memory: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+  settings: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  skillshop: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 20 C7 15 12 11 17 9"/><path d="M17 9 C19 6 22 5 23 3 C23 1 21 1 19 3 C18 5 17 9 17 9"/><path d="M17 9 C19 11 21 14 20 16 C19 18 17 17 16 15 C15 13 17 9 17 9"/></svg>,
+  playground: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
 }
 
 type ViewMode = 'board' | 'list'
@@ -78,6 +111,37 @@ function Toast({ msg }: { msg: string }) {
   }}>{msg}</div>
 }
 
+/* ─── App Icon Tile ─── */
+function AppIcon({ app, size = 40 }: { app: RoadmapApp; size?: number }) {
+  const iconSvg = app.icon_id ? APP_ICONS[app.icon_id] : null
+  const color = app.icon_color || '#6366f1'
+
+  if (iconSvg) {
+    return (
+      <div style={{
+        width: size, height: size, borderRadius: size * 0.27,
+        background: `${color}12`, border: `1px solid ${color}20`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: color, flexShrink: 0,
+      }}>
+        {iconSvg}
+      </div>
+    )
+  }
+
+  // Fallback to emoji
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: size * 0.27,
+      background: 'rgba(255,255,255,0.06)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.55, flexShrink: 0,
+    }}>
+      {app.icon || '📱'}
+    </div>
+  )
+}
+
 /* ─── Progress bar ─── */
 function ProgressBar({ phases }: { phases: Phase[] }) {
   if (!phases || phases.length === 0) return null
@@ -107,6 +171,8 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
   const [newIcon, setNewIcon] = useState('📱')
+  const [newIconId, setNewIconId] = useState<string | null>(null)
+  const [newIconColor, setNewIconColor] = useState('#6366f1')
   const [newStatus, setNewStatus] = useState<RoadmapApp['status']>('idea')
   const [newCategory, setNewCategory] = useState<RoadmapApp['category']>('business')
 
@@ -131,9 +197,9 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
     if (!newName.trim()) return
     await fetch('/api/app-roadmap', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName, description: newDesc, icon: newIcon, status: newStatus, category: newCategory }),
+      body: JSON.stringify({ name: newName, description: newDesc, icon: newIcon, icon_id: newIconId, icon_color: newIconColor, status: newStatus, category: newCategory }),
     })
-    setNewName(''); setNewDesc(''); setNewIcon('📱'); setNewStatus('idea'); setNewCategory('business'); setShowAdd(false)
+    setNewName(''); setNewDesc(''); setNewIcon('📱'); setNewIconId(null); setNewIconColor('#6366f1'); setNewStatus('idea'); setNewCategory('business'); setShowAdd(false)
     await loadApps()
     showToast('App added')
   }
@@ -245,7 +311,10 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
             <button onClick={() => setDetailApp(null)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', padding: '4px 0' }}>{I.back}</button>
-            <span style={{ fontSize: 17, fontWeight: 700, color: '#f0eee8' }}>{detailApp.icon} {detailApp.name}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AppIcon app={detailApp} size={28} />
+              <span style={{ fontSize: 17, fontWeight: 700, color: '#f0eee8' }}>{detailApp.name}</span>
+            </div>
             <button onClick={() => handleDeleteApp(detailApp.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 4 }}>{I.trash}</button>
           </div>
         </div>
@@ -254,8 +323,8 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
 
           {/* Status & description */}
           <div style={{ ...cardS, marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 28 }}>{detailApp.icon}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+              <AppIcon app={detailApp} size={52} />
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#f0eee8' }}>{detailApp.name}</div>
                 <div style={{ fontSize: 11, color: '#666' }}>
@@ -417,11 +486,34 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
           <div style={{ ...cardS, marginBottom: 16, animation: 'arFadeIn 0.2s ease' }}>
             <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="App name" style={{ ...inputS, marginBottom: 8, fontWeight: 600 }} />
             <textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Description" rows={2} style={{ ...inputS, marginBottom: 8, resize: 'vertical' as const }} />
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <input value={newIcon} onChange={e => setNewIcon(e.target.value)} placeholder="Icon emoji" style={{ ...inputS, width: 60, textAlign: 'center', fontSize: 20, padding: '6px' }} />
-              <select value={newCategory} onChange={e => setNewCategory(e.target.value as RoadmapApp['category'])} style={{ ...inputS, flex: 1, cursor: 'pointer' }}>
-                {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 6 }}>Icon</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                {Object.entries(APP_ICONS).map(([iconId, svg]) => (
+                  <button key={iconId} onClick={() => { setNewIconId(iconId); setNewIcon('') }} style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: newIconId === iconId ? `${newIconColor}30` : 'rgba(255,255,255,0.06)',
+                    border: newIconId === iconId ? `2px solid ${newIconColor}` : '1px solid rgba(255,255,255,0.1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: newIconId === iconId ? newIconColor : '#888',
+                    cursor: 'pointer', padding: 0,
+                  }}>{svg}</button>
+                ))}
+                <button onClick={() => { setNewIconId(null) }} style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: !newIconId ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.06)',
+                  border: !newIconId ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', fontSize: 16, padding: 0,
+                }}>📱</button>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {!newIconId && <input value={newIcon} onChange={e => setNewIcon(e.target.value)} placeholder="Emoji" style={{ ...inputS, width: 60, textAlign: 'center', fontSize: 20, padding: '6px' }} />}
+                <input type="color" value={newIconColor} onChange={e => setNewIconColor(e.target.value)} style={{ width: 40, height: 36, border: 'none', borderRadius: 6, cursor: 'pointer', background: 'transparent' }} />
+                <select value={newCategory} onChange={e => setNewCategory(e.target.value as RoadmapApp['category'])} style={{ ...inputS, flex: 1, cursor: 'pointer' }}>
+                  {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
               {STATUSES.map(s => (
@@ -457,7 +549,7 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
                       {statusApps.map(app => (
                         <div key={app.id} onClick={() => setDetailApp(app)} style={{ ...cardS, cursor: 'pointer', borderLeft: `3px solid ${s.color}`, transition: 'background 0.15s' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <span style={{ fontSize: 24 }}>{app.icon}</span>
+                            <AppIcon app={app} size={42} />
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{app.name}</div>
                               {app.description && (
@@ -489,7 +581,7 @@ export default function AppRoadmapApp({ onBack }: { onBack: () => void }) {
               return (
                 <div key={app.id} onClick={() => setDetailApp(app)} style={{ ...cardS, cursor: 'pointer', transition: 'background 0.15s' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 24 }}>{app.icon}</span>
+                    <AppIcon app={app} size={42} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#f0eee8' }}>{app.name}</span>

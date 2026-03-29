@@ -23,7 +23,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const supabase = createServerSupabaseAdmin()
   const body = await req.json()
-  const { name, description, icon, status, phases, ideas, fixes, category } = body
+  const { name, description, icon, icon_id, icon_color, status, phases, ideas, fixes, category } = body
 
   if (!name?.trim()) {
     return NextResponse.json({ ok: false, error: 'name required' }, { status: 400 })
@@ -35,6 +35,8 @@ export async function POST(req: NextRequest) {
       name,
       description: description || '',
       icon: icon || '📱',
+      icon_id: icon_id || null,
+      icon_color: icon_color || '#6366f1',
       status: status || 'idea',
       category: category || 'business',
       phases: phases || [],
