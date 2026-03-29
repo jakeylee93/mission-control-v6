@@ -413,16 +413,17 @@ export default function HomePage() {
 
               {/* Character Thumbnail — Robot PNGs */}
               <div style={{
-                width: 110, height: 130, flexShrink: 0,
+                width: 120, height: 150, flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 position: 'relative',
+                overflow: 'hidden', borderRadius: 16,
               }}>
                 <Image
                   src={featuredAgent.thumbnail}
                   alt={featuredAgent.name}
-                  width={110}
-                  height={130}
-                  style={{ objectFit: 'contain', transition: 'opacity 0.3s ease' }}
+                  width={120}
+                  height={150}
+                  style={{ objectFit: 'cover', objectPosition: 'center top', transition: 'opacity 0.3s ease' }}
                 />
               </div>
 
