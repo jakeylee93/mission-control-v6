@@ -1,13 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [isDark, setIsDark] = useState(true)
   const router = useRouter()
+
+  useEffect(() => {
+    const stored = localStorage.getItem('mc_theme')
+    if (stored === 'light') setIsDark(false)
+  }, [])
 
   const handleSubmit = async (code?: string) => {
     const pin = code || password
@@ -55,9 +61,10 @@ export default function LoginPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
+      background: isDark ? 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)' : 'linear-gradient(170deg, #f8f9fb 0%, #eef0f5 35%, #f0f2f7 70%, #e8eaf0 100%)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontFamily: "'Inter', system-ui, sans-serif",
+      transition: 'background 0.4s ease',
     }}>
       {/* Ambient glow */}
       <div style={{
@@ -75,13 +82,13 @@ export default function LoginPage() {
         {/* Logo / Title */}
         <div style={{ marginBottom: 40 }}>
           <div style={{
-            fontSize: 10, color: '#555', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 8,
+            fontSize: 10, color: isDark ? '#555' : '#aaa', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 8,
           }}>Mission Control</div>
           <h1 style={{
-            fontSize: 32, fontWeight: 700, color: '#f0eee8', margin: 0,
+            fontSize: 32, fontWeight: 700, color: isDark ? '#f0eee8' : '#1a1a2e', margin: 0,
             fontFamily: "'Space Grotesk', sans-serif", letterSpacing: -1,
           }}>Welcome back</h1>
-          <p style={{ fontSize: 13, color: '#666', marginTop: 6 }}>Enter your passcode to continue</p>
+          <p style={{ fontSize: 13, color: isDark ? '#666' : '#999', marginTop: 6 }}>Enter your passcode to continue</p>
         </div>
 
         {/* Passcode dots */}
@@ -118,9 +125,9 @@ export default function LoginPage() {
           {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
             <button key={num} onClick={() => handlePadPress(num)} style={{
               width: '100%', aspectRatio: '1.4', borderRadius: 16,
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: '#f0eee8', fontSize: 24, fontWeight: 400,
+              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+              border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+              color: isDark ? '#f0eee8' : '#1a1a2e', fontSize: 24, fontWeight: 400,
               cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.1s',
               fontFamily: "'Space Grotesk', sans-serif",
@@ -130,17 +137,17 @@ export default function LoginPage() {
           <div />
           <button onClick={() => handlePadPress('0')} style={{
             width: '100%', aspectRatio: '1.4', borderRadius: 16,
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            color: '#f0eee8', fontSize: 24, fontWeight: 400,
+            background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            border: isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
+            color: isDark ? '#f0eee8' : '#1a1a2e', fontSize: 24, fontWeight: 400,
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontFamily: "'Space Grotesk', sans-serif",
           }}>0</button>
           <button onClick={handleBackspace} style={{
             width: '100%', aspectRatio: '1.4', borderRadius: 16,
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            color: '#888', fontSize: 14, fontWeight: 600,
+            background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+            border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+            color: isDark ? '#888' : '#999', fontSize: 14, fontWeight: 600,
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

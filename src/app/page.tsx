@@ -12,6 +12,7 @@ import NewsHubApp from '@/components/apps/NewsHubApp'
 import MediaListApp from '@/components/apps/MediaListApp'
 import SkillShopApp from '@/components/apps/SkillShopApp'
 import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
+import { useTheme } from '@/lib/theme'
 
 type TabId = 'business' | 'personal' | 'laboratory'
 type ActiveApp = string | null
@@ -267,6 +268,7 @@ export default function HomePage() {
   const [agentActivity, setAgentActivity] = useState<{ summary: string; days: { date: string; items: string[] }[] } | null>(null)
   const [activityLoading, setActivityLoading] = useState(false)
 
+  const { isDark, toggle: toggleTheme, t } = useTheme()
   const featuredAgent = AGENTS.find(a => a.id === selectedAgent) || AGENTS[0]
 
   const fetchAgentActivity = useCallback(async (agentId: string) => {
@@ -352,33 +354,46 @@ export default function HomePage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)',
-      color: '#F0EEE8', fontFamily: "'Inter', system-ui, sans-serif",
+      background: t.bgGradient,
+      color: t.text, fontFamily: "'Inter', system-ui, sans-serif",
+      transition: 'background 0.4s ease, color 0.3s ease',
     }}>
-      <div style={{ position: 'fixed', top: '5%', left: '50%', transform: 'translateX(-50%)', width: 500, height: 500, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.06), transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', top: '5%', left: '50%', transform: 'translateX(-50%)', width: 500, height: 500, borderRadius: '50%', background: `radial-gradient(circle, ${t.bgGlow}, transparent 70%)`, pointerEvents: 'none', zIndex: 0 }} />
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: 500, margin: '0 auto', padding: '0 16px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Header — LED Clock + Clean Layout */}
-        <header style={{ paddingTop: 40, marginBottom: 20, textAlign: 'center' }}>
+        {/* Header — LED Clock + Theme Toggle */}
+        <header style={{ paddingTop: 40, marginBottom: 20, textAlign: 'center', position: 'relative' }}>
+          {/* Theme Toggle */}
+          <button onClick={toggleTheme} style={{
+            position: 'absolute', top: 44, right: 0, zIndex: 10,
+            width: 36, height: 36, borderRadius: 18,
+            background: t.bgCard, border: `1px solid ${t.border}`,
+            color: isDark ? '#f59e0b' : '#6366f1', fontSize: 16,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', transition: 'all 0.3s ease',
+          }}>
+            {isDark ? '☀️' : '🌙'}
+          </button>
+
           {/* LED Digital Clock */}
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             padding: '8px 20px', borderRadius: 12,
-            background: 'rgba(0,20,0,0.4)', border: '1px solid rgba(34,197,94,0.2)',
-            boxShadow: '0 0 20px rgba(34,197,94,0.1), inset 0 0 20px rgba(34,197,94,0.05)',
-            marginBottom: 16,
+            background: t.clockBg, border: `1px solid ${t.clockBorder}`,
+            boxShadow: `0 0 20px ${t.clockGlow}, inset 0 0 20px ${isDark ? 'rgba(34,197,94,0.05)' : 'rgba(34,197,94,0.03)'}`,
+            marginBottom: 16, transition: 'all 0.3s ease',
           }}>
             <span style={{
               fontSize: 28, fontWeight: 400, fontFamily: "'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace",
-              color: '#22c55e', letterSpacing: 4, textShadow: '0 0 10px rgba(34,197,94,0.5), 0 0 20px rgba(34,197,94,0.3)',
+              color: '#22c55e', letterSpacing: 4, textShadow: isDark ? '0 0 10px rgba(34,197,94,0.5), 0 0 20px rgba(34,197,94,0.3)' : '0 0 6px rgba(34,197,94,0.3)',
             }}>{timeFmt}</span>
           </div>
           
-          <div style={{ color: '#555', fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' }}>{dayName} · {dateFmt}</div>
-          <h1 style={{ fontSize: 32, fontWeight: 700, margin: '4px 0', letterSpacing: -1, fontFamily: "'Space Grotesk', sans-serif" }}>Jake</h1>
-          <div style={{ color: '#555', fontSize: 10, letterSpacing: 3, textTransform: 'uppercase' }}>Mission Control</div>
-          <div style={{ fontSize: 10, color: '#444', marginTop: 2 }}>v6.1</div>
+          <div style={{ color: t.textDim, fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' }}>{dayName} · {dateFmt}</div>
+          <h1 style={{ fontSize: 32, fontWeight: 700, margin: '4px 0', letterSpacing: -1, fontFamily: "'Space Grotesk', sans-serif", color: t.text }}>{`Jake`}</h1>
+          <div style={{ color: t.textDim, fontSize: 10, letterSpacing: 3, textTransform: 'uppercase' }}>Mission Control</div>
+          <div style={{ fontSize: 10, color: t.textDim, marginTop: 2 }}>v6.1</div>
         </header>
 
         {/* Agent Selector — Hero Section */}
@@ -391,8 +406,8 @@ export default function HomePage() {
                 setAgentDetailOpen(v => !v)
               }}
               style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: `1px solid rgba(255,255,255,0.06)`,
+                background: t.bgCard,
+                border: `1px solid ${t.border}`,
                 borderRadius: 20,
                 padding: '16px 18px',
                 display: 'flex',
@@ -436,16 +451,16 @@ export default function HomePage() {
                     padding: '2px 8px', borderRadius: 10, fontWeight: 600, letterSpacing: 0.3,
                   }}>{featuredAgent.role}</span>
                 </div>
-                <div style={{ fontSize: 12, color: '#777', marginBottom: 6 }}>
+                <div style={{ fontSize: 12, color: t.textMuted, marginBottom: 6 }}>
                   {featuredAgent.model} · {featuredAgent.provider}
                 </div>
-                <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>
-                  <span style={{ color: '#666' }}>This week:</span>{' '}
-                  <span style={{ color: '#aaa' }}>{featuredAgent.weekSummary}</span>
+                <div style={{ fontSize: 11, color: t.textSecondary, marginBottom: 6 }}>
+                  <span style={{ color: t.textMuted }}>This week:</span>{' '}
+                  <span style={{ color: t.textSecondary }}>{featuredAgent.weekSummary}</span>
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: featuredAgent.accent, fontFamily: "'Space Grotesk', sans-serif" }}>
                   {featuredAgent.monthSpend}
-                  <span style={{ fontSize: 10, fontWeight: 400, color: '#555', marginLeft: 4 }}>this month</span>
+                  <span style={{ fontSize: 10, fontWeight: 400, color: t.textDim, marginLeft: 4 }}>this month</span>
                 </div>
               </div>
 
@@ -469,8 +484,8 @@ export default function HomePage() {
               transition: 'max-height 0.4s ease, opacity 0.3s ease',
             }}>
               <div style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                border: `1px solid ${t.border}`,
                 borderTop: 'none',
                 borderRadius: '0 0 20px 20px',
                 padding: '14px 18px 16px',
@@ -545,7 +560,7 @@ export default function HomePage() {
                   }}>
                     <div style={{
                       width: '100%', height: '100%', borderRadius: '50%',
-                      overflow: 'hidden', background: 'rgba(10,8,18,0.9)',
+                      overflow: 'hidden', background: isDark ? 'rgba(10,8,18,0.9)' : 'rgba(0,0,0,0.05)',
                     }}>
                       <Image src={a.avatar} alt={a.name} width={36} height={36} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
@@ -564,11 +579,12 @@ export default function HomePage() {
         {!activeApp && (
           <div style={{
             marginBottom: 14,
-            background: 'rgba(255,255,255,0.035)',
-            border: '1px solid rgba(255,255,255,0.07)',
+            background: t.bgCard,
+            border: `1px solid ${t.borderLight}`,
             borderRadius: 14,
             padding: '8px 10px',
             backdropFilter: 'blur(12px)',
+            transition: 'all 0.3s ease',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
@@ -583,11 +599,11 @@ export default function HomePage() {
                 placeholder="Ask anything..."
                 style={{
                   flex: 1,
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  background: t.bgInput,
+                  border: `1px solid ${t.borderLight}`,
                   borderRadius: 10,
                   height: 34,
-                  color: '#EDE9FE',
+                  color: t.text,
                   fontSize: 13,
                   padding: '0 10px',
                   outline: 'none',
@@ -624,9 +640,9 @@ export default function HomePage() {
                   marginTop: 8,
                   padding: '8px 10px',
                   borderRadius: 10,
-                  background: 'rgba(15,12,26,0.72)',
-                  border: `1px solid ${quickExpanded ? 'rgba(99,102,241,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                  color: '#BDB6DF',
+                  background: isDark ? 'rgba(15,12,26,0.72)' : 'rgba(0,0,0,0.04)',
+                  border: `1px solid ${quickExpanded ? 'rgba(99,102,241,0.35)' : t.borderLight}`,
+                  color: t.textSecondary,
                   fontSize: 12,
                   lineHeight: 1.4,
                   maxHeight: quickExpanded ? 220 : 72,
@@ -643,9 +659,10 @@ export default function HomePage() {
 
         {/* App Content Area */}
         <div style={{
-          flex: 1, background: 'rgba(255,255,255,0.02)',
-          borderRadius: '20px 20px 0 0', border: '1px solid rgba(255,255,255,0.05)',
+          flex: 1, background: t.bgOverlay,
+          borderRadius: '20px 20px 0 0', border: `1px solid ${t.border}`,
           borderBottom: 'none', padding: '20px 12px 110px',
+          transition: 'all 0.3s ease',
         }}>
           {(activeApp === 'calendar' || activeApp === 'lovely' || activeApp === 'maps' || activeApp === 'health' || activeApp === 'memory' || activeApp === 'docs' || activeApp === 'plans' || activeApp === 'newshub' || activeApp === 'roadmap') ? null : (
             <div style={{
@@ -666,7 +683,7 @@ export default function HomePage() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: app.color, transition: 'transform 0.1s',
                   }}>{app.icon}</div>
-                  <span style={{ fontSize: 10, color: '#888', fontWeight: 500 }}>{app.label}</span>
+                  <span style={{ fontSize: 10, color: t.textMuted, fontWeight: 500 }}>{app.label}</span>
                 </button>
               ))}
             </div>
@@ -851,25 +868,26 @@ export default function HomePage() {
       {/* Tab Bar */}
       <div style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
-        background: 'rgba(10,8,18,0.95)', backdropFilter: 'blur(20px)',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
+        background: t.tabBar, backdropFilter: 'blur(20px)',
+        borderTop: `1px solid ${t.tabBorder}`,
         display: 'flex', justifyContent: 'center',
         paddingBottom: 'max(10px, env(safe-area-inset-bottom))', paddingTop: 8, zIndex: 100,
+        transition: 'all 0.3s ease',
       }}>
         <div style={{ display: 'flex', maxWidth: 360, width: '100%', justifyContent: 'space-around' }}>
           {([
             { id: 'business' as TabId, icon: I.briefcase, label: 'Business' },
             { id: 'personal' as TabId, icon: I.user, label: 'Personal' },
             { id: 'laboratory' as TabId, icon: I.flask, label: 'Laboratory' },
-          ]).map(t => (
-            <button key={t.id} onClick={() => { setTab(t.id); setActiveApp(null) }} style={{
+          ]).map(tb => (
+            <button key={tb.id} onClick={() => { setTab(tb.id); setActiveApp(null) }} style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               background: 'none', border: 'none', cursor: 'pointer', padding: '2px 16px',
-              color: tab === t.id ? '#6366f1' : '#555', transition: 'color 0.2s',
+              color: tab === tb.id ? '#6366f1' : t.textDim, transition: 'color 0.2s',
             }}>
-              {t.icon}
-              <span style={{ fontSize: 9, fontWeight: tab === t.id ? 700 : 500, letterSpacing: 0.5 }}>{t.label}</span>
-              {tab === t.id && <div style={{ width: 4, height: 4, borderRadius: 2, background: '#6366f1' }} />}
+              {tb.icon}
+              <span style={{ fontSize: 9, fontWeight: tab === tb.id ? 700 : 500, letterSpacing: 0.5 }}>{tb.label}</span>
+              {tab === tb.id && <div style={{ width: 4, height: 4, borderRadius: 2, background: '#6366f1' }} />}
             </button>
           ))}
         </div>
