@@ -14,7 +14,7 @@ import SkillShopApp from '@/components/apps/SkillShopApp'
 import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
 import { useTheme } from '@/lib/theme'
 
-type SpaceId = 'today' | 'work' | 'life' | 'lab'
+type SpaceId = 'today' | 'work' | 'life' | 'lab' | 'review'
 type ActiveApp = string | null
 type QuickChatMessage = { role: 'user' | 'assistant'; content: string }
 
@@ -225,6 +225,7 @@ export default function HomePage() {
     { id: 'work', label: 'Work', icon: I.briefcase },
     { id: 'life', label: 'Life', icon: I.lovely },
     { id: 'lab', label: 'Lab', icon: I.flask },
+    { id: 'review', label: 'Review', icon: I.calendar },
   ]
 
   const quickLinks = [
