@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 # Mission Control v7 — Builder Cron (runs every 7 minutes)
 # Picks next phase, builds, commits, deploys
 

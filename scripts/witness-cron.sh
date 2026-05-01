@@ -1,4 +1,5 @@
 #!/bin/bash
+export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 # Mission Control v7 — Witness Cron (runs every 3 minutes)
 # Read-only observer, reports progress to Discord
 
