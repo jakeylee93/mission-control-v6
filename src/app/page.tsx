@@ -203,6 +203,7 @@ export default function HomePage() {
   useEffect(() => { const handler = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setCmdOpen(v => !v) } }; window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler) }, [])
   useEffect(() => { fetch('/api/costs').then(r => r.json()).then(d => { if (d?.brain != null && d?.muscles != null) setTodayCosts(d) }).catch(() => {}) }, [])
   useEffect(() => { setCalLoading(true); fetch('/api/calendar/events').then(r => r.json()).then(d => { const evts = d.events || []; const today = new Date(); const upcoming = evts.filter((e: CalEvent) => new Date(e.start) >= today).slice(0, 3); setCalendarPreview(upcoming); calCache = { events: evts, fetchedAt: Date.now() } }).catch(() => {}).finally(() => setCalLoading(false)) }, [])
+  useEffect(() => { setWeatherLoading(true); fetch('/api/weather').then(r => r.json()).then(d => { setWeather(d) }).catch(() => {}).finally(() => setWeatherLoading(false)) }, [])
 
   const fetchAgentActivity = useCallback(async (agentId: string) => { setActivityLoading(true); try { const res = await fetch(`/api/agent-activity?agent=${agentId}`); if (!res.ok) throw new Error('Failed'); const data = await res.json(); setAgentActivity(data) } catch { setAgentActivity(null) } finally { setActivityLoading(false) } }, [])
 
@@ -299,17 +300,26 @@ export default function HomePage() {
                     </div>
                   </div>
                   
-                  {/* Date + Weather placeholder */}
+                  {/* Date + Weather */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {I.calendar}
                       <span style={{ fontSize: 12, color: '#aaa' }}>{dayName}, {dateFmt}</span>
                     </div>
                     <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.1)' }} />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {I.weather}
-                      <span style={{ fontSize: 12, color: '#aaa' }}>Weather coming soon</span>
-                    </div>
+                    {weatherLoading ? (
+                      <span style={{ fontSize: 12, color: '#666' }}>Loading weather...</span>
+                    ) : weather ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 14 }}>{weather.icon}</span>
+                        <span style={{ fontSize: 12, color: '#aaa' }}>{weather.temp}°C {weather.condition}</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {I.weather}
+                        <span style={{ fontSize: 12, color: '#aaa' }}>Weather unavailable</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -331,6 +341,33 @@ export default function HomePage() {
                   ) })}
                 </div>
               ) : <Card><div style={{ fontSize: 13, color: '#666' }}>No upcoming events</div></Card>}
+
+              {/* Weather Card */}
+              <SectionHeader title="Weather" />
+              {weatherLoading ? <Card><div style={{ color: '#666', fontSize: 13 }}>Loading weather...</div></Card> : weather ? (
+                <Card>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: 36 }}>{weather.icon}</span>
+                      <div>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: '#E9E6FF', fontFamily: "'Space Grotesk', sans-serif" }}>{weather.temp}°C</div>
+                        <div style={{ fontSize: 12, color: '#888' }}>{weather.condition}</div>
+                        <div style={{ fontSize: 10, color: '#666' }}>{weather.location}</div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Forecast */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    {weather.forecast.map((f, i) => (
+                      <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+                        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>{f.day}</div>
+                        <div style={{ fontSize: 18, marginBottom: 2 }}>{f.icon}</div>
+                        <div style={{ fontSize: 11, color: '#aaa' }}>{f.temp}°</div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ) : <Card><div style={{ fontSize: 13, color: '#666' }}>Weather unavailable</div></Card>}
 
               {/* Costs */}
               <SectionHeader title="AI Spend Today" />
