@@ -189,6 +189,8 @@ export default function HomePage() {
   const [calLoading, setCalLoading] = useState(false)
   const [weather, setWeather] = useState<WeatherData | null>(null)
   const [weatherLoading, setWeatherLoading] = useState(false)
+  const [tasks, setTasks] = useState<{ total: number; overdue: number; dueToday: number; inProgress: number; highPriority: number; tasks: { id: string; title: string; status: string; priority?: string; dueDate?: string }[] } | null>(null)
+  const [tasksLoading, setTasksLoading] = useState(false)
 
   const { isDark, toggle: toggleTheme, t } = useTheme()
   const featuredAgent = AGENTS.find(a => a.id === selectedAgent) || AGENTS[0]
@@ -204,6 +206,7 @@ export default function HomePage() {
   useEffect(() => { fetch('/api/costs').then(r => r.json()).then(d => { if (d?.brain != null && d?.muscles != null) setTodayCosts(d) }).catch(() => {}) }, [])
   useEffect(() => { setCalLoading(true); fetch('/api/calendar/events').then(r => r.json()).then(d => { const evts = d.events || []; const today = new Date(); const upcoming = evts.filter((e: CalEvent) => new Date(e.start) >= today).slice(0, 3); setCalendarPreview(upcoming); calCache = { events: evts, fetchedAt: Date.now() } }).catch(() => {}).finally(() => setCalLoading(false)) }, [])
   useEffect(() => { setWeatherLoading(true); fetch('/api/weather').then(r => r.json()).then(d => { setWeather(d) }).catch(() => {}).finally(() => setWeatherLoading(false)) }, [])
+  useEffect(() => { setTasksLoading(true); fetch('/api/tasks').then(r => r.json()).then(d => { setTasks(d) }).catch(() => {}).finally(() => setTasksLoading(false)) }, [])
 
   const fetchAgentActivity = useCallback(async (agentId: string) => { setActivityLoading(true); try { const res = await fetch(`/api/agent-activity?agent=${agentId}`); if (!res.ok) throw new Error('Failed'); const data = await res.json(); setAgentActivity(data) } catch { setAgentActivity(null) } finally { setActivityLoading(false) } }, [])
 
@@ -368,6 +371,46 @@ export default function HomePage() {
                   </div>
                 </Card>
               ) : <Card><div style={{ fontSize: 13, color: '#666' }}>Weather unavailable</div></Card>}
+
+              {/* Tasks Due */}
+              <SectionHeader title="Tasks" action="See all" onAction={() => setActiveApp('plans')} />
+              {tasksLoading ? <Card><div style={{ color: '#666', fontSize: 13 }}>Loading tasks...</div></Card> : tasks ? (
+                <Card onClick={() => setActiveApp('plans')}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    {tasks.overdue > 0 && (
+                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', background: 'rgba(239,68,68,0.1)', borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#ef4444' }}>{tasks.overdue}</div>
+                        <div style={{ fontSize: 10, color: '#ef4444', textTransform: 'uppercase', letterSpacing: 0.5 }}>Overdue</div>
+                      </div>
+                    )}
+                    {tasks.dueToday > 0 && (
+                      <div style={{ flex: 1, textAlign: 'center', padding: '8px', background: 'rgba(245,158,11,0.1)', borderRadius: 10, border: '1px solid rgba(245,158,11,0.2)' }}>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: '#f59e0b' }}>{tasks.dueToday}</div>
+                        <div style={{ fontSize: 10, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: 0.5 }}>Due Today</div>
+                      </div>
+                    )}
+                    <div style={{ flex: 1, textAlign: 'center', padding: '8px', background: 'rgba(99,102,241,0.1)', borderRadius: 10, border: '1px solid rgba(99,102,241,0.2)' }}>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#6366f1' }}>{tasks.inProgress}</div>
+                      <div style={{ fontSize: 10, color: '#6366f1', textTransform: 'uppercase', letterSpacing: 0.5 }}>In Progress</div>
+                    </div>
+                  </div>
+                  {tasks.tasks.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {tasks.tasks.slice(0, 3).map((task, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                          <div style={{ width: 6, height: 6, borderRadius: 3, background: task.status === 'blocked' ? '#ef4444' : task.priority === 'high' ? '#f59e0b' : '#6366f1', flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, color: '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{task.title}</div>
+                          </div>
+                          {task.dueDate && task.dueDate < new Date().toISOString().split('T')[0] && (
+                            <span style={{ fontSize: 10, color: '#ef4444', fontWeight: 600 }}>Overdue</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              ) : <Card><div style={{ fontSize: 13, color: '#666' }}>No tasks found</div></Card>}
 
               {/* Costs */}
               <SectionHeader title="AI Spend Today" />
