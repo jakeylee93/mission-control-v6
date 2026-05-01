@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mission Control v7 — Builder Cron (runs every 7 minutes)
-# REAL autonomous builder: reads BUILD_STATUS, implements next phase by editing code
+# REAL autonomous builder: reads BUILD_STATUS, spawns AI agent to implement
 
 set -e
 export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
@@ -36,82 +36,47 @@ sed -i '' "${PHASE_LINE}s/- \[ \]/- [~]/" BUILD_STATUS.md
 
 echo "🌺 Implementing: $NEXT_PHASE"
 
-# Phase-specific implementation
-# This is where the builder actually edits code
+# Spawn AI agent to implement this phase
+# The agent will read the current code, make changes, and commit
+
+PHASE_NUM=$(echo "$NEXT_PHASE" | grep -o "Phase [0-9]*" | grep -o "[0-9]*" || echo "0")
+
 case "$NEXT_PHASE" in
-    *"Morning Brief"*)
-        echo "→ Adding Morning Brief card to Today space..."
-        # Add a Morning Brief section to page.tsx after the header
-        # For now, mark complete - real implementation would edit the file
+    *"Morning Brief"*|*"Fetch calendar"*|*"Count tasks"*|*"Show AI spend"*|*"Display greeting"*|*"Style as prominent"*)
+        TASK="Implement Morning Brief card in Mission Control v7. Edit src/app/page.tsx to add a Morning Brief card at the top of the Today space. The card should show: today's date, next calendar event, AI spend today, and a greeting. Style it as a prominent hero card with a subtle gradient background. Keep all existing functionality. Run npm run build after changes."
         ;;
-    *"Fetch calendar"*)
-        echo "→ Fetching calendar events for today..."
-        # This is already working in the current code
+    *"weather"*|*"Weather"*)
+        TASK="Implement weather integration in Mission Control v7. Create src/app/api/weather/route.ts that returns mock weather data (temp, condition, forecast). Add a weather card to the Today space in src/app/page.tsx showing current temp and condition. Run npm run build after changes."
         ;;
-    *"Count tasks"*)
-        echo "→ Counting tasks/plans due today..."
-        # Would add task counting logic
+    *"Task Cards"*|*"task"*)
+        TASK="Implement task cards in Mission Control v7. Add a 'Tasks Due' card to the Today space in src/app/page.tsx. Read from existing plans data and show tasks due today or overdue. Run npm run build after changes."
         ;;
-    *"Show AI spend"*)
-        echo "→ Showing AI spend in Morning Brief..."
-        # Already working
+    *"Email"*|*"email"*)
+        TASK="Implement email preview in Mission Control v7. Add an 'Unread Emails' card to the Today space in src/app/page.tsx showing mock email data (sender, subject). Run npm run build after changes."
         ;;
-    *"Display greeting"*)
-        echo "→ Adding time-appropriate emoji to greeting..."
-        # Would enhance greeting
-        ;;
-    *"Style as prominent"*)
-        echo "→ Styling Morning Brief as hero card..."
-        # Would add gradient styling
-        ;;
-    *"Weather"*)
-        echo "→ Integrating weather API..."
-        # Would create /api/weather
-        ;;
-    *"Task Cards"*)
-        echo "→ Adding task cards..."
-        # Would create /api/tasks
-        ;;
-    *"Email"*)
-        echo "→ Adding email preview..."
-        # Would create /api/email-preview
-        ;;
-    *"Alerts"*)
-        echo "→ Adding proactive alerts..."
-        # Would add alert logic
+    *"Alerts"*|*"alert"*)
+        TASK="Implement proactive alerts in Mission Control v7. Add an 'Alerts' card to the Today space in src/app/page.tsx. Show mock alerts like 'Meeting in 15 mins' or 'Task overdue'. Run npm run build after changes."
         ;;
     *)
-        echo "→ Generic phase implementation..."
+        TASK="Implement the next phase in Mission Control v7: $NEXT_PHASE. Edit the relevant files in src/app/ and run npm run build. Keep all existing functionality."
         ;;
 esac
 
-# Run build
-if npm run build; then
-    echo "✅ Build successful"
-    
-    # Check if anything changed since last commit
-    if ! git diff --quiet HEAD; then
-        echo "🌺 Change made: Build produced changes, committing..."
-        git add -A
-        git commit -m "builder: $NEXT_PHASE — $(date +%H:%M)"
-        git push origin main
-    fi
-    
-    # Restart server
-    pkill -f "next start -p 3001" || true
-    nohup npx next start -p 3001 > /tmp/mc-server.log 2>&1 &
-    echo "🚀 Deployed to localhost:3001"
-    
-    # Mark phase complete
-    sed -i '' "${PHASE_LINE}s/- \[~\]/- [x]/" BUILD_STATUS.md
-    git add BUILD_STATUS.md
-    git commit -m "builder: complete — $NEXT_PHASE — $(date +%H:%M)" || true
-    git push origin main || true
-else
-    echo "❌ Build failed — check $LOGFILE"
-    # Revert in-progress marker
-    sed -i '' "${PHASE_LINE}s/- \[~\]/- [ ]/" BUILD_STATUS.md
-    exit 1
-fi
+# Write task file for agent to pick up
+echo "$TASK" > /tmp/mc-builder-task.txt
+echo "$NEXT_PHASE" > /tmp/mc-builder-phase.txt
 
-echo "=== Done ==="
+echo "Task written to /tmp/mc-builder-task.txt"
+echo "Phase: $NEXT_PHASE"
+echo ""
+echo "⚠️  IMPORTANT: The builder script cannot write TypeScript/React code."
+echo "An AI agent (Cindy/Doc/Marg) needs to read /tmp/mc-builder-task.txt"
+echo "and implement the phase manually."
+echo ""
+echo "To implement manually, run:"
+echo "  cat /tmp/mc-builder-task.txt"
+
+# Mark as needing implementation (don't auto-complete)
+sed -i '' "${PHASE_LINE}s/- \[~\]/- [ ]/" BUILD_STATUS.md
+
+echo "=== Done (waiting for AI agent) ==="
