@@ -76,29 +76,111 @@ const CACHE_TTL = 60 * 60 * 1000
 /* ── Command Bar ── */
 function CommandBar({ open, onClose, onNavigate }: { open: boolean; onClose: () => void; onNavigate: (app: string) => void }) {
   const [query, setQuery] = useState('')
+  const [recentItems, setRecentItems] = useState<{ label: string; app: string; icon: JSX.Element; type: string }[]>([])
+  const [searchResults, setSearchResults] = useState<{ label: string; app: string; icon: JSX.Element; type: string; subtitle?: string }[]>([])
+
   const commands = [
-    { label: 'Calendar', app: 'calendar', icon: I.calendar, keywords: 'calendar events schedule meetings' },
-    { label: 'Plans', app: 'plans', icon: I.tasks, keywords: 'plans tasks todo ventures projects' },
-    { label: 'News Hub', app: 'newshub', icon: I.news, keywords: 'news articles newsletter' },
-    { label: 'Health', app: 'health', icon: I.health, keywords: 'health fitness wellness' },
-    { label: 'Maps', app: 'maps', icon: I.mapPin, keywords: 'maps locations places' },
-    { label: 'Memory', app: 'memory', icon: I.memory, keywords: 'memory search brain' },
-    { label: 'Docs', app: 'docs', icon: I.notes, keywords: 'docs documents vault files' },
-    { label: 'Media List', app: 'reading', icon: I.notes, keywords: 'media reading podcasts newsletters' },
-    { label: 'Skill Shop', app: 'skillshop', icon: I.settings, keywords: 'skills shop marketplace' },
-    { label: 'Roadmap', app: 'roadmap', icon: I.zap, keywords: 'roadmap apps tracker' },
-    { label: 'Lovely', app: 'lovely', icon: I.lovely, keywords: 'lovely personal' },
+    { label: 'Calendar', app: 'calendar', icon: I.calendar, keywords: 'calendar events schedule meetings', type: 'app' },
+    { label: 'Plans', app: 'plans', icon: I.tasks, keywords: 'plans tasks todo ventures projects', type: 'app' },
+    { label: 'News Hub', app: 'newshub', icon: I.news, keywords: 'news articles newsletter', type: 'app' },
+    { label: 'Health', app: 'health', icon: I.health, keywords: 'health fitness wellness', type: 'app' },
+    { label: 'Maps', app: 'maps', icon: I.mapPin, keywords: 'maps locations places', type: 'app' },
+    { label: 'Memory', app: 'memory', icon: I.memory, keywords: 'memory search brain', type: 'app' },
+    { label: 'Docs', app: 'docs', icon: I.notes, keywords: 'docs documents vault files', type: 'app' },
+    { label: 'Media List', app: 'reading', icon: I.notes, keywords: 'media reading podcasts newsletters', type: 'app' },
+    { label: 'Skill Shop', app: 'skillshop', icon: I.settings, keywords: 'skills shop marketplace', type: 'app' },
+    { label: 'Roadmap', app: 'roadmap', icon: I.zap, keywords: 'roadmap apps tracker', type: 'app' },
+    { label: 'Lovely', app: 'lovely', icon: I.lovely, keywords: 'lovely personal', type: 'app' },
   ]
-  const filtered = query.trim() ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase()) || c.keywords.toLowerCase().includes(query.toLowerCase())) : commands
+
+  const actions = [
+    { label: 'Create Task', app: 'plans', icon: I.plus, keywords: 'create task add todo', type: 'action' },
+    { label: 'Add Event', app: 'calendar', icon: I.calendar, keywords: 'add event schedule meeting', type: 'action' },
+    { label: 'Quick Chat', app: '', icon: I.zap, keywords: 'chat ask question', type: 'action' },
+  ]
+
+  useEffect(() => {
+    // Load recent items from localStorage
+    try {
+      const saved = localStorage.getItem('mc-recent-items')
+      if (saved) setRecentItems(JSON.parse(saved))
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (!query.trim()) {
+      setSearchResults([])
+      return
+    }
+    const q = query.toLowerCase()
+    const results: { label: string; app: string; icon: JSX.Element; type: string; subtitle?: string }[] = []
+    
+    // Search apps
+    commands.filter(c => c.label.toLowerCase().includes(q) || c.keywords.toLowerCase().includes(q)).forEach(c => {
+      results.push({ label: c.label, app: c.app, icon: c.icon, type: 'app' })
+    })
+    
+    // Search actions
+    actions.filter(a => a.label.toLowerCase().includes(q) || a.keywords.toLowerCase().includes(q)).forEach(a => {
+      results.push({ label: a.label, app: a.app, icon: a.icon, type: 'action', subtitle: 'Action' })
+    })
+    
+    setSearchResults(results)
+  }, [query])
+
   useEffect(() => { const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }; if (open) window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler) }, [open, onClose])
+  
+  const handleSelect = (item: { label: string; app: string; icon: JSX.Element; type: string }) => {
+    // Save to recent
+    try {
+      const newRecent = [item, ...recentItems.filter(r => r.label !== item.label)].slice(0, 5)
+      setRecentItems(newRecent)
+      localStorage.setItem('mc-recent-items', JSON.stringify(newRecent))
+    } catch {}
+    
+    if (item.type === 'action' && item.label === 'Quick Chat') {
+      onClose()
+      // Focus quick chat input
+      const input = document.querySelector('input[placeholder="Ask anything..."]') as HTMLInputElement
+      if (input) input.focus()
+    } else {
+      onNavigate(item.app)
+      onClose()
+    }
+  }
+
   if (!open) return null
+
+  const displayItems = query.trim() ? searchResults : recentItems.length > 0 ? recentItems : commands.slice(0, 5)
+  const sectionTitle = query.trim() ? 'Results' : recentItems.length > 0 ? 'Recent' : 'Apps'
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '15vh' }} onClick={onClose}>
       <div style={{ width: '90%', maxWidth: 480, background: 'rgba(15,12,26,0.98)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{I.search}<input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Search apps, actions..." style={{ flex: 1, background: 'none', border: 'none', color: '#F0EEE8', fontSize: 15, outline: 'none' }} /><span style={{ fontSize: 11, color: '#555', fontFamily: 'monospace' }}>ESC</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>{I.search}<input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Search apps, actions, or type a command..." style={{ flex: 1, background: 'none', border: 'none', color: '#F0EEE8', fontSize: 15, outline: 'none' }} /><span style={{ fontSize: 11, color: '#555', fontFamily: 'monospace' }}>ESC</span></div>
+        
+        {/* Section header */}
+        <div style={{ padding: '8px 16px', fontSize: 11, color: '#666', textTransform: 'uppercase', letterSpacing: 1, fontWeight: 600 }}>{sectionTitle}</div>
+        
         <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-          {filtered.map((cmd, i) => (<button key={cmd.label} onClick={() => { onNavigate(cmd.app); onClose() }} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 16px', background: i === 0 ? 'rgba(99,102,241,0.1)' : 'none', border: 'none', color: '#aaa', cursor: 'pointer', textAlign: 'left', fontSize: 14 }}><span style={{ color: '#6366f1' }}>{cmd.icon}</span><span style={{ color: '#F0EEE8' }}>{cmd.label}</span></button>))}
-          {filtered.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#555', fontSize: 13 }}>No results</div>}
+          {displayItems.map((cmd, i) => (
+            <button key={`${cmd.label}-${i}`} onClick={() => handleSelect(cmd)} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 16px', background: i === 0 && query.trim() ? 'rgba(99,102,241,0.1)' : 'none', border: 'none', color: '#aaa', cursor: 'pointer', textAlign: 'left', fontSize: 14 }}>
+              <span style={{ color: '#6366f1' }}>{cmd.icon}</span>
+              <div style={{ flex: 1 }}>
+                <span style={{ color: '#F0EEE8' }}>{cmd.label}</span>
+                {(cmd as any).subtitle && <span style={{ fontSize: 11, color: '#666', marginLeft: 8 }}>{(cmd as any).subtitle}</span>}
+              </div>
+              {(cmd as any).type === 'action' && <span style={{ fontSize: 10, color: '#6366f1', background: 'rgba(99,102,241,0.1)', padding: '2px 8px', borderRadius: 8 }}>Action</span>}
+            </button>
+          ))}
+          {query.trim() && displayItems.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#555', fontSize: 13 }}>No results for "{query}"</div>}
+        </div>
+        
+        {/* Footer hints */}
+        <div style={{ padding: '8px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: 12, fontSize: 11, color: '#555' }}>
+          <span>↑↓ Navigate</span>
+          <span>↵ Select</span>
+          <span>ESC Close</span>
         </div>
       </div>
     </div>
