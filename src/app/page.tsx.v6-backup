@@ -1,0 +1,271 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
+import LovelyTab from '@/components/tabs/LovelyTab'
+import MapsApp from '@/components/apps/MapsApp'
+import { HealthApp } from '@/components/HealthApp'
+import { MemoryView } from '@/components/tabs/MemoryView'
+import DocsTab from '@/components/tabs/DocsTab'
+import PlansTab from '@/components/tabs/PlansTab'
+import NewsHubApp from '@/components/apps/NewsHubApp'
+import MediaListApp from '@/components/apps/MediaListApp'
+import SkillShopApp from '@/components/apps/SkillShopApp'
+import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
+import { useTheme } from '@/lib/theme'
+
+type SpaceId = 'today' | 'work' | 'life' | 'lab'
+type ActiveApp = string | null
+type QuickChatMessage = { role: 'user' | 'assistant'; content: string }
+
+interface Agent {
+  id: string; name: string; role: string; model: string; provider: string
+  avatar: string; thumbnail: string; accent: string; monthSpend: string; lastActive: string; weekSummary: string
+}
+
+const AGENTS: Agent[] = [
+  { id: 'marg', name: 'Margarita', role: 'Orchestrator', model: 'Claude Opus', provider: 'Anthropic', avatar: '/images/marg-robot.png', thumbnail: '/images/marg-robot.png', accent: '#FFD700', monthSpend: '£847.20', lastActive: 'Just now', weekSummary: 'Health app, Media List, Maps redesign' },
+  { id: 'doc', name: 'Doc', role: 'Builder', model: 'Codex', provider: 'OpenAI', avatar: '/images/doc-robot.png', thumbnail: '/images/doc-robot.png', accent: '#60A5FA', monthSpend: '£124.50', lastActive: '2h ago', weekSummary: 'Mission Control builds' },
+  { id: 'cindy', name: 'Cindy', role: 'Assistant', model: 'Kimi (Moonshot)', provider: 'Moonshot', avatar: '/images/cindy-robot.png', thumbnail: '/images/cindy-robot.png', accent: '#C084FC', monthSpend: '£31.80', lastActive: '5h ago', weekSummary: 'Calendar & contacts' },
+]
+
+/* ── SVG Icons ── */
+const I = {
+  email: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>,
+  calendar: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  costs: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+  tasks: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+  weather: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>,
+  health: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  notes: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  news: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9h4"/><line x1="10" y1="6" x2="18" y2="6"/><line x1="10" y1="10" x2="18" y2="10"/><line x1="10" y1="14" x2="14" y2="14"/></svg>,
+  agents: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>,
+  memory: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+  settings: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
+  usage: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  search: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  back: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
+  plus: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  chevronRight: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>,
+  clock: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+  mapPin: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+  zap: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  lovely: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+  home: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  flask: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 3h6v7l5 8a3 3 0 0 1-2.5 4.5h-11A3 3 0 0 1 4 18l5-8V3z"/><line x1="9" y1="3" x2="15" y2="3"/></svg>,
+  briefcase: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+  user: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  command: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>,
+}
+
+interface CalEvent { summary?: string; title?: string; start: string; end: string; location?: string; color?: string; calendar?: string; isAllDay?: boolean }
+
+let calCache: { events: CalEvent[]; fetchedAt: number } | null = null
+const CACHE_TTL = 60 * 60 * 1000
+
+/* ── Command Bar ── */
+function CommandBar({ open, onClose, onNavigate }: { open: boolean; onClose: () => void; onNavigate: (app: string) => void }) {
+  const [query, setQuery] = useState('')
+
+  const commands = [
+    { label: 'Calendar', app: 'calendar', icon: I.calendar, keywords: 'calendar events schedule meetings' },
+    { label: 'Plans', app: 'plans', icon: I.tasks, keywords: 'plans tasks todo ventures projects' },
+    { label: 'News Hub', app: 'newshub', icon: I.news, keywords: 'news articles newsletter' },
+    { label: 'Health', app: 'health', icon: I.health, keywords: 'health fitness wellness' },
+    { label: 'Maps', app: 'maps', icon: I.mapPin, keywords: 'maps locations places' },
+    { label: 'Memory', app: 'memory', icon: I.memory, keywords: 'memory search brain' },
+    { label: 'Docs', app: 'docs', icon: I.notes, keywords: 'docs documents vault files' },
+    { label: 'Media List', app: 'reading', icon: I.notes, keywords: 'media reading podcasts newsletters' },
+    { label: 'Skill Shop', app: 'skillshop', icon: I.settings, keywords: 'skills shop marketplace' },
+    { label: 'Roadmap', app: 'roadmap', icon: I.zap, keywords: 'roadmap apps tracker' },
+    { label: 'Lovely', app: 'lovely', icon: I.lovely, keywords: 'lovely personal' },
+  ]
+
+  const filtered = query.trim()
+    ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase()) || c.keywords.toLowerCase().includes(query.toLowerCase()))
+    : commands
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    if (open) window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [open, onClose])
+
+  if (!open) return null
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '15vh' }} onClick={onClose}>
+      <div style={{ width: '90%', maxWidth: 480, background: 'rgba(15,12,26,0.98)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 16, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          {I.search}
+          <input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Search apps, actions..." style={{ flex: 1, background: 'none', border: 'none', color: '#F0EEE8', fontSize: 15, outline: 'none' }} />
+          <span style={{ fontSize: 11, color: '#555', fontFamily: 'monospace' }}>ESC</span>
+        </div>
+        <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+          {filtered.map((cmd, i) => (
+            <button key={cmd.label} onClick={() => { onNavigate(cmd.app); onClose() }} style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', padding: '12px 16px', background: i === 0 ? 'rgba(99,102,241,0.1)' : 'none', border: 'none', color: '#aaa', cursor: 'pointer', textAlign: 'left', fontSize: 14 }}>
+              <span style={{ color: '#6366f1' }}>{cmd.icon}</span>
+              <span style={{ color: '#F0EEE8' }}>{cmd.label}</span>
+            </button>
+          ))}
+          {filtered.length === 0 && <div style={{ padding: 20, textAlign: 'center', color: '#555', fontSize: 13 }}>No results</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Calendar App View ── */
+function CalendarView({ onBack }: { onBack: () => void }) {
+  const [events, setEvents] = useState<CalEvent[]>(calCache?.events || [])
+  const [loading, setLoading] = useState(!calCache || (Date.now() - (calCache?.fetchedAt || 0) > CACHE_TTL))
+  const [refreshing, setRefreshing] = useState(false)
+  const [activeCalendar, setActiveCalendar] = useState<string>('all')
+
+  const fetchEvents = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true)
+    try {
+      const res = await fetch('/api/calendar/events')
+      const data = await res.json()
+      const evts = data.events || []
+      setEvents(evts)
+      calCache = { events: evts, fetchedAt: Date.now() }
+    } catch {}
+    finally { setLoading(false); setRefreshing(false) }
+  }, [])
+
+  useEffect(() => {
+    if (!calCache || (Date.now() - calCache.fetchedAt > CACHE_TTL)) fetchEvents()
+  }, [fetchEvents])
+
+  const today = new Date()
+  const filtered = activeCalendar === 'all' ? events : events.filter(e => e.calendar === activeCalendar)
+  const upcoming = filtered.filter(e => new Date(e.start) >= today).slice(0, 30)
+  const grouped: Record<string, CalEvent[]> = {}
+  upcoming.forEach(e => {
+    const d = new Date(e.start).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+    if (!grouped[d]) grouped[d] = []
+    grouped[d].push(e)
+  })
+  const calNames = Array.from(new Set(events.map(e => e.calendar).filter(Boolean))) as string[]
+
+  return (
+    <div style={{ padding: '0 4px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12, color: '#aaa', padding: '8px 14px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>{I.back} Back</button>
+        <button onClick={() => fetchEvents(true)} style={{ background: 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 12, color: refreshing ? '#6366f1' : '#aaa', padding: '8px 14px', fontSize: 13, cursor: 'pointer' }}>{refreshing ? 'Refreshing...' : 'Refresh'}</button>
+      </div>
+      <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4, fontFamily: "'Space Grotesk', sans-serif" }}>Calendar</h2>
+      <p style={{ fontSize: 12, color: '#666', marginBottom: 14 }}>{events.length} events · jake@anyvendor.co.uk</p>
+      {calNames.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 12 }}>
+          <button onClick={() => setActiveCalendar('all')} style={{ padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', border: 'none', background: activeCalendar === 'all' ? '#6366f1' : 'rgba(255,255,255,0.06)', color: activeCalendar === 'all' ? '#fff' : '#888' }}>All</button>
+          {calNames.map(name => (
+            <button key={name} onClick={() => setActiveCalendar(name)} style={{ padding: '6px 14px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', cursor: 'pointer', border: 'none', background: activeCalendar === name ? '#6366f1' : 'rgba(255,255,255,0.06)', color: activeCalendar === name ? '#fff' : '#888' }}>{name}</button>
+          ))}
+        </div>
+      )}
+      {loading && <div style={{ color: '#666', fontSize: 13, textAlign: 'center', padding: '40px 0' }}>Loading calendar...</div>}
+      {!loading && Object.entries(grouped).map(([date, dayEvents]) => (
+        <div key={date} style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{date}</div>
+          {dayEvents.map((ev, i) => {
+            const start = new Date(ev.start)
+            const end = new Date(ev.end)
+            const time = start.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+            const endTime = end.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+            return (
+              <div key={i} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: '14px 16px', marginBottom: 8, borderLeft: `3px solid ${ev.color || '#6366f1'}` }}>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{ev.title || ev.summary}</div>
+                <div style={{ fontSize: 12, color: '#888' }}>{ev.isAllDay ? 'All day' : `${time} – ${endTime}`}</div>
+                {ev.calendar && <div style={{ fontSize: 11, color: '#777', marginTop: 2 }}>{ev.calendar}</div>}
+                {ev.location && <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>📍 {ev.location}</div>}
+              </div>
+            )
+          })}
+        </div>
+      ))}
+      {!loading && upcoming.length === 0 && <div style={{ textAlign: 'center', color: '#666', padding: '40px 0', fontSize: 14 }}>No upcoming events{activeCalendar !== 'all' ? ` in ${activeCalendar}` : ''}</div>}
+    </div>
+  )
+}
+
+/* ── Card Component ── */
+function Card({ children, style, onClick }: { children: React.ReactNode; style?: React.CSSProperties; onClick?: () => void }) {
+  return (
+    <div onClick={onClick} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, padding: '14px 16px', transition: 'all 0.2s ease', cursor: onClick ? 'pointer' : 'default', ...style }}>
+      {children}
+    </div>
+  )
+}
+
+/* ── Section Header ── */
+function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, marginTop: 4 }}>
+      <span style={{ fontSize: 12, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1.2 }}>{title}</span>
+      {action && onAction && <button onClick={onAction} style={{ fontSize: 11, color: '#6366f1', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>{action} {I.chevronRight}</button>}
+    </div>
+  )
+}
+
+/* ── Main ── */
+export default function HomePage() {
+  const [space, setSpace] = useState<SpaceId>('today')
+  const [activeApp, setActiveApp] = useState<ActiveApp>(null)
+  const [now, setNow] = useState(new Date())
+  const [quickInput, setQuickInput] = useState('')
+  const [quickHistory, setQuickHistory] = useState<QuickChatMessage[]>([])
+  const [quickReply, setQuickReply] = useState('')
+  const [quickLoading, setQuickLoading] = useState(false)
+  const [quickExpanded, setQuickExpanded] = useState(false)
+  const [selectedAgent, setSelectedAgent] = useState<string>('marg')
+  const [agentDetailOpen, setAgentDetailOpen] = useState(false)
+  const [agentActivity, setAgentActivity] = useState<{ summary: string; days: { date: string; items: string[] }[] } | null>(null)
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [cmdOpen, setCmdOpen] = useState(false)
+  const [todayCosts, setTodayCosts] = useState<{ brain: number; muscles: number; total: number } | null>(null)
+  const [calendarPreview, setCalendarPreview] = useState<CalEvent[]>([])
+  const [calLoading, setCalLoading] = useState(false)
+
+  const { isDark, toggle: toggleTheme, t } = useTheme()
+  const featuredAgent = AGENTS.find(a => a.id === selectedAgent) || AGENTS[0]
+
+  // Clock
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
+
+  // Cmd+K handler
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setCmdOpen(v => !v) }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
+  // Fetch today's costs
+  useEffect(() => {
+    fetch('/api/costs').then(r => r.json()).then(d => {
+      if (d?.brain != null && d?.muscles != null) setTodayCosts(d)
+    }).catch(() => {})
+  }, [])
+
+  // Fetch calendar preview
+  useEffect(() => {
+    setCalLoading(true)
+    fetch('/api/calendar/events').then(r => r.json()).then(d => {
+      const evts = d.events || []
+      const today = new Date()
+      const upcoming = evts.filter((e: CalEvent) => new Date(e.start) >= today).slice(0, 3)
+      setCalendarPreview(upcoming)
+      calCache = { events: evts, fetchedAt: Date.now() }
+    }).catch(() => {}).finally(() => setCalLoading(false))
+  }, [])
+
+  const fetchAgentActivity = useCallback(async (agentId: string) => {
+    setActivityLoading(true)
+    try {
+      const res = await fetch(`/api/agent-activity?agent=${agentId}`)
+      if (!res.ok) throw new Error('Failed')
+      const data = await res.json()
+      setAgentActivity(data
