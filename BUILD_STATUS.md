@@ -31,7 +31,7 @@
 - [x] Count tasks/plans due today
 - [x] Show AI spend so far
 - [x] Display greeting with time-appropriate emoji
-- [~] Style as prominent hero card with gradient background
+- [x] Style as prominent hero card with gradient background
 
 ---
 
