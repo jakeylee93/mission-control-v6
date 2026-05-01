@@ -191,6 +191,8 @@ export default function HomePage() {
   const [weatherLoading, setWeatherLoading] = useState(false)
   const [tasks, setTasks] = useState<{ total: number; overdue: number; dueToday: number; inProgress: number; highPriority: number; tasks: { id: string; title: string; status: string; priority?: string; dueDate?: string }[] } | null>(null)
   const [tasksLoading, setTasksLoading] = useState(false)
+  const [emails, setEmails] = useState<{ total: number; unread: number; emails: { id: string; sender: string; subject: string; preview: string; time: string; unread: boolean }[] } | null>(null)
+  const [emailsLoading, setEmailsLoading] = useState(false)
 
   const { isDark, toggle: toggleTheme, t } = useTheme()
   const featuredAgent = AGENTS.find(a => a.id === selectedAgent) || AGENTS[0]
@@ -207,6 +209,7 @@ export default function HomePage() {
   useEffect(() => { setCalLoading(true); fetch('/api/calendar/events').then(r => r.json()).then(d => { const evts = d.events || []; const today = new Date(); const upcoming = evts.filter((e: CalEvent) => new Date(e.start) >= today).slice(0, 3); setCalendarPreview(upcoming); calCache = { events: evts, fetchedAt: Date.now() } }).catch(() => {}).finally(() => setCalLoading(false)) }, [])
   useEffect(() => { setWeatherLoading(true); fetch('/api/weather').then(r => r.json()).then(d => { setWeather(d) }).catch(() => {}).finally(() => setWeatherLoading(false)) }, [])
   useEffect(() => { setTasksLoading(true); fetch('/api/tasks').then(r => r.json()).then(d => { setTasks(d) }).catch(() => {}).finally(() => setTasksLoading(false)) }, [])
+  useEffect(() => { setEmailsLoading(true); fetch('/api/email-preview').then(r => r.json()).then(d => { setEmails(d) }).catch(() => {}).finally(() => setEmailsLoading(false)) }, [])
 
   const fetchAgentActivity = useCallback(async (agentId: string) => { setActivityLoading(true); try { const res = await fetch(`/api/agent-activity?agent=${agentId}`); if (!res.ok) throw new Error('Failed'); const data = await res.json(); setAgentActivity(data) } catch { setAgentActivity(null) } finally { setActivityLoading(false) } }, [])
 
@@ -411,6 +414,40 @@ export default function HomePage() {
                   )}
                 </Card>
               ) : <Card><div style={{ fontSize: 13, color: '#666' }}>No tasks found</div></Card>}
+
+              {/* Email Preview */}
+              <SectionHeader title="Inbox" action="Open Gmail" onAction={() => window.open('https://mail.google.com', '_blank')} />
+              {emailsLoading ? <Card><div style={{ color: '#666', fontSize: 13 }}>Loading emails...</div></Card> : emails ? (
+                <Card>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', background: emails.unread > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', borderRadius: 10, border: `1px solid ${emails.unread > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}` }}>
+                      <div style={{ width: 8, height: 8, borderRadius: 4, background: emails.unread > 0 ? '#ef4444' : '#22c55e' }} />
+                      <span style={{ fontSize: 11, fontWeight: 600, color: emails.unread > 0 ? '#ef4444' : '#22c55e' }}>{emails.unread} unread</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: '#666' }}>{emails.total} total</span>
+                  </div>
+                  {emails.emails.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {emails.emails.slice(0, 3).map((email, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderBottom: i < 2 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 16, background: email.unread ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: email.unread ? '#6366f1' : '#888', flexShrink: 0 }}>
+                            {email.sender.charAt(0)}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                              <span style={{ fontSize: 12, fontWeight: email.unread ? 700 : 500, color: email.unread ? '#E9E6FF' : '#aaa' }}>{email.sender}</span>
+                              <span style={{ fontSize: 10, color: '#666' }}>{email.time}</span>
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: email.unread ? 600 : 400, color: email.unread ? '#ccc' : '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{email.subject}</div>
+                            <div style={{ fontSize: 11, color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>{email.preview}</div>
+                          </div>
+                          {email.unread && <div style={{ width: 8, height: 8, borderRadius: 4, background: '#6366f1', flexShrink: 0 }} />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              ) : <Card><div style={{ fontSize: 13, color: '#666' }}>No emails found</div></Card>}
 
               {/* Costs */}
               <SectionHeader title="AI Spend Today" />
