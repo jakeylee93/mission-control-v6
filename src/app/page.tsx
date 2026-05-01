@@ -631,6 +631,75 @@ export default function HomePage() {
               </Card>
             </>
           )}
+
+          {/* ── REVIEW SPACE ── */}
+          {space === 'review' && !activeApp && (
+            <>
+              <SectionHeader title="This Week" />
+              <Card>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(99,102,241,0.08)', borderRadius: 12 }}>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#6366f1', fontFamily: "'Space Grotesk', sans-serif" }}>{calendarPreview.length}</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>Events</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(34,197,94,0.08)', borderRadius: 12 }}>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#22c55e', fontFamily: "'Space Grotesk', sans-serif" }}>{todayCosts ? `£${todayCosts.total.toFixed(0)}` : '—'}</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>AI Spend</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(239,68,68,0.08)', borderRadius: 12 }}>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#ef4444', fontFamily: "'Space Grotesk', sans-serif" }}>{tasks?.overdue || 0}</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>Overdue</div>
+                  </div>
+                  <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(245,158,11,0.08)', borderRadius: 12 }}>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b', fontFamily: "'Space Grotesk', sans-serif" }}>{tasks?.inProgress || 0}</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>In Progress</div>
+                  </div>
+                </div>
+              </Card>
+
+              <SectionHeader title="Agent Activity" />
+              <Card>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {AGENTS.map(a => (
+                    <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, overflow: 'hidden' }}><Image src={a.thumbnail} alt={a.name} width={36} height={36} style={{ objectFit: 'cover' }} /></div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{a.name}</div>
+                        <div style={{ fontSize: 11, color: '#888' }}>{a.weekSummary}</div>
+                      </div>
+                      <div style={{ fontSize: 11, color: a.accent, fontWeight: 600 }}>{a.monthSpend}</div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <SectionHeader title="Build Progress" />
+              <Card>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <span style={{ fontSize: 12, color: '#aaa' }}>Mission Control v7</span>
+                    <span style={{ fontSize: 12, color: '#6366f1', fontWeight: 600 }}>6 / 11 phases</span>
+                  </div>
+                  <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: '55%', height: '100%', background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: 3 }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 1: Foundation</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 2: Morning Brief</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 3: Weather</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 4: Task Cards</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 5: Email Preview</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 6: Proactive Alerts</div>
+                  <div style={{ fontSize: 11, color: '#6366f1' }}>🔄 Phase 7: Weekly Review</div>
+                  <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 8: Mobile PWA</div>
+                  <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 9: Voice Capture</div>
+                  <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 10: Cross-Space Search</div>
+                  <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 11: Cost Prediction</div>
+                </div>
+              </Card>
+            </>
+          )}
         </div>
 
         {/* Quick Chat */}
