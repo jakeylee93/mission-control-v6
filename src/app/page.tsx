@@ -60,6 +60,14 @@ const I = {
 
 interface CalEvent { summary?: string; title?: string; start: string; end: string; location?: string; color?: string; calendar?: string; isAllDay?: boolean }
 
+interface WeatherData {
+  temp: number
+  condition: string
+  icon: string
+  location: string
+  forecast: { day: string; temp: number; condition: string; icon: string }[]
+}
+
 let calCache: { events: CalEvent[]; fetchedAt: number } | null = null
 const CACHE_TTL = 60 * 60 * 1000
 
@@ -179,6 +187,8 @@ export default function HomePage() {
   const [todayCosts, setTodayCosts] = useState<{ brain: number; muscles: number; total: number } | null>(null)
   const [calendarPreview, setCalendarPreview] = useState<CalEvent[]>([])
   const [calLoading, setCalLoading] = useState(false)
+  const [weather, setWeather] = useState<WeatherData | null>(null)
+  const [weatherLoading, setWeatherLoading] = useState(false)
 
   const { isDark, toggle: toggleTheme, t } = useTheme()
   const featuredAgent = AGENTS.find(a => a.id === selectedAgent) || AGENTS[0]
