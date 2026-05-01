@@ -30,7 +30,7 @@
 - [x] Fetch calendar events for today
 - [x] Count tasks/plans due today
 - [x] Show AI spend so far
-- [ ] Display greeting with time-appropriate emoji
+- [~] Display greeting with time-appropriate emoji
 - [ ] Style as prominent hero card with gradient background
 
 ---
