@@ -36,7 +36,7 @@
 ---
 
 ## Phase 3: Weather Integration
-- [~] Create /api/weather endpoint (OpenWeatherMap or similar)
+- [x] Create /api/weather endpoint (OpenWeatherMap or similar)
 - [ ] Add weather card to Today space
 - [ ] Show current temp, condition, icon
 - [ ] Add forecast for next 3 days
