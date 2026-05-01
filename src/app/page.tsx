@@ -247,6 +247,63 @@ export default function HomePage() {
           {/* ── TODAY SPACE ── */}
           {space === 'today' && !activeApp && (
             <>
+              {/* Morning Brief */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 50%, rgba(99,102,241,0.05) 100%)',
+                border: '1px solid rgba(99,102,241,0.2)',
+                borderRadius: 20,
+                padding: '20px',
+                marginBottom: 20,
+                position: 'relative',
+                overflow: 'hidden',
+              }}>
+                <div style={{ position: 'absolute', top: -30, right: -30, width: 100, height: 100, borderRadius: '50%', background: 'rgba(99,102,241,0.08)', filter: 'blur(40px)' }} />
+                <div style={{ position: 'relative', zIndex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <span style={{ fontSize: 20 }}>{hour < 12 ? '🌅' : hour < 18 ? '☀️' : '🌙'}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#E9E6FF', fontFamily: "'Space Grotesk', sans-serif" }}>Morning Brief</span>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {/* Next Event */}
+                    <div>
+                      <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>Next Up</div>
+                      {calendarPreview.length > 0 ? (
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: '#E9E6FF' }}>{calendarPreview[0].title || calendarPreview[0].summary}</div>
+                          <div style={{ fontSize: 11, color: '#888' }}>
+                            {new Date(calendarPreview[0].start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                            {calendarPreview[0].calendar && ` · ${calendarPreview[0].calendar}`}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 12, color: '#666' }}>No events today</div>
+                      )}
+                    </div>
+                    
+                    {/* AI Spend */}
+                    <div>
+                      <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>AI Spend</div>
+                      <div style={{ fontSize: 18, fontWeight: 700, color: '#22c55e', fontFamily: "'Space Grotesk', sans-serif" }}>{todayCosts ? `£${todayCosts.total.toFixed(2)}` : '—'}</div>
+                      <div style={{ fontSize: 10, color: '#666' }}>Today so far</div>
+                    </div>
+                  </div>
+                  
+                  {/* Date + Weather placeholder */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {I.calendar}
+                      <span style={{ fontSize: 12, color: '#aaa' }}>{dayName}, {dateFmt}</span>
+                    </div>
+                    <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.1)' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {I.weather}
+                      <span style={{ fontSize: 12, color: '#aaa' }}>Weather coming soon</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Calendar Preview */}
               <SectionHeader title="Up Next" action="See all" onAction={() => setActiveApp('calendar')} />
               {calLoading ? <Card><div style={{ color: '#666', fontSize: 13 }}>Loading...</div></Card> : calendarPreview.length > 0 ? (
