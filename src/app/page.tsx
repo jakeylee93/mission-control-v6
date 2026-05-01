@@ -13,6 +13,7 @@ import MediaListApp from '@/components/apps/MediaListApp'
 import SkillShopApp from '@/components/apps/SkillShopApp'
 import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
 import { useTheme } from '@/lib/theme'
+import PWAInstall from '@/components/PWAInstall'
 
 type SpaceId = 'today' | 'work' | 'life' | 'lab' | 'review'
 type ActiveApp = string | null
@@ -746,6 +747,9 @@ export default function HomePage() {
         {activeApp === 'reading' && <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)', overflowY: 'auto', paddingBottom: 80 }}><div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px' }}><MediaListApp onBack={() => setActiveApp(null)} /></div></div>}
         {activeApp === 'skillshop' && <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)', overflowY: 'auto', paddingBottom: 80 }}><div style={{ maxWidth: 500, margin: '0 auto', padding: '0 16px' }}><SkillShopApp onBack={() => setActiveApp(null)} /></div></div>}
         {activeApp === 'roadmap' && <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'linear-gradient(170deg, #0a0812 0%, #110d20 35%, #0e0a18 70%, #080610 100%)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}><div style={{ maxWidth: 600, width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', height: '100%' }}><AppRoadmapApp onBack={() => setActiveApp(null)} /></div></div>}
+
+        {/* PWA Install Prompt */}
+        <PWAInstall />
 
         {/* Command Bar */}
         <CommandBar open={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={(app) => setActiveApp(app)} />

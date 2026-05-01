@@ -5,8 +5,14 @@ import { ThemeProvider } from '@/lib/theme'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Mission Control v6',
-  description: 'Life Operating System',
+  title: 'Mission Control v7',
+  description: 'Your life & business command centre',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Mission Control',
+  },
 }
 
 export const viewport: Viewport = {
@@ -30,8 +36,10 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-        <meta name="theme-color" content="#000000" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#0a0812" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
       <body>
         <ThemeProvider>
