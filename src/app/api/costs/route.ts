@@ -1,128 +1,43 @@
-import { NextRequest, NextResponse } from 'next/server'
-import {
-  calcCostGBP,
-  fallbackLegacyCallsIfNeeded,
-  inferProvider,
-  loadDailyCosts,
-  loadDayTrend,
-  rebuildDailyTotals,
-  writeDailyLocal,
-  writeSupabaseCostEntry,
-  type CostEntry,
-} from '@/lib/costs-store'
+import { NextResponse } from 'next/server'
 
-// GET /api/costs
-export async function GET() {
-  const { daily, modelBreakdown, source, hasRealData } = await loadDailyCosts()
-  const last7Days = await loadDayTrend(7)
-
-  const totalCalls = fallbackLegacyCallsIfNeeded(daily.totals.total.calls)
-
-  return NextResponse.json({
-    moonshot: {
-      calls: daily.totals.kimi.calls,
-      tokens: daily.totals.kimi.totalTokens,
-      cost: daily.totals.kimi.cost_gbp,
-      inputTokens: daily.totals.kimi.inputTokens,
-      outputTokens: daily.totals.kimi.outputTokens,
-    },
-    anthropic: {
-      calls: daily.totals.claude.calls,
-      tokens: daily.totals.claude.totalTokens,
-      cost: daily.totals.claude.cost_gbp,
-      inputTokens: daily.totals.claude.inputTokens,
-      outputTokens: daily.totals.claude.outputTokens,
-    },
-    openai: {
-      calls: daily.totals.openai.calls,
-      tokens: daily.totals.openai.totalTokens,
-      cost: daily.totals.openai.cost_gbp,
-      inputTokens: daily.totals.openai.inputTokens,
-      outputTokens: daily.totals.openai.outputTokens,
-    },
-    brain: {
-      calls: daily.totals.kimi.calls,
-      tokens: daily.totals.kimi.totalTokens,
-      cost: daily.totals.kimi.cost_gbp,
-      inputTokens: daily.totals.kimi.inputTokens,
-      outputTokens: daily.totals.kimi.outputTokens,
-    },
-    muscles: {
-      calls: daily.totals.claude.calls,
-      tokens: daily.totals.claude.totalTokens,
-      cost: daily.totals.claude.cost_gbp,
-      inputTokens: daily.totals.claude.inputTokens,
-      outputTokens: daily.totals.claude.outputTokens,
-    },
-    total: {
-      calls: totalCalls,
-      tokens: daily.totals.total.totalTokens,
-      cost: daily.totals.total.cost_gbp,
-      inputTokens: daily.totals.total.inputTokens,
-      outputTokens: daily.totals.total.outputTokens,
-    },
-    entries: daily.entries.slice(-20),
-    modelBreakdown,
-    last7Days,
-    avgCostPerCall: totalCalls > 0 ? daily.totals.total.cost_gbp / totalCalls : 0,
-    currentModel: daily.entries[daily.entries.length - 1]?.model || null,
-    date: daily.date,
-    source,
-    hasRealData,
-  })
+interface CostData {
+  brain: number
+  muscles: number
+  total: number
+  daily: { date: string; amount: number }[]
+  byAgent: { name: string; amount: number; color: string }[]
+  projection: { month: string; projected: number; actual?: number }[]
 }
 
-// POST /api/costs
-// Body: { model, agent, task?, inputTokens, outputTokens }
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    const { model, agent, task, inputTokens, outputTokens } = body as {
-      model: string
-      agent?: string
-      task?: string
-      inputTokens: number
-      outputTokens: number
-    }
+// Mock cost data with trends
+const MOCK_COSTS: CostData = {
+  brain: 2.45,
+  muscles: 1.75,
+  total: 4.20,
+  daily: [
+    { date: '2026-04-25', amount: 3.80 },
+    { date: '2026-04-26', amount: 5.20 },
+    { date: '2026-04-27', amount: 4.10 },
+    { date: '2026-04-28', amount: 6.50 },
+    { date: '2026-04-29', amount: 3.90 },
+    { date: '2026-04-30', amount: 5.80 },
+    { date: '2026-05-01', amount: 4.20 },
+  ],
+  byAgent: [
+    { name: 'Margarita', amount: 847.20, color: '#FFD700' },
+    { name: 'Doc', amount: 124.50, color: '#60A5FA' },
+    { name: 'Cindy', amount: 31.80, color: '#C084FC' },
+  ],
+  projection: [
+    { month: 'Jan', projected: 800, actual: 750 },
+    { month: 'Feb', projected: 850, actual: 920 },
+    { month: 'Mar', projected: 900, actual: 880 },
+    { month: 'Apr', projected: 950, actual: 1003 },
+    { month: 'May', projected: 1000 },
+    { month: 'Jun', projected: 1100 },
+  ],
+}
 
-    if (!model || inputTokens === undefined || outputTokens === undefined) {
-      return NextResponse.json({ error: 'model, inputTokens, outputTokens are required' }, { status: 400 })
-    }
-
-    const input = Number(inputTokens)
-    const output = Number(outputTokens)
-    if (!Number.isFinite(input) || !Number.isFinite(output) || input < 0 || output < 0) {
-      return NextResponse.json({ error: 'inputTokens and outputTokens must be non-negative numbers' }, { status: 400 })
-    }
-
-    const provider = inferProvider(model)
-    const entry: CostEntry = {
-      id: `cost-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      agent: agent || (provider === 'kimi' ? 'Margarita' : provider === 'openai' ? 'Bish' : 'Martini'),
-      model,
-      task: task || 'API call',
-      inputTokens: input,
-      outputTokens: output,
-      totalTokens: input + output,
-      cost_gbp: calcCostGBP(input, output, model),
-      provider,
-    }
-
-    const { daily } = await loadDailyCosts()
-    daily.entries.push(entry)
-    const updated = rebuildDailyTotals(daily)
-    writeDailyLocal(updated)
-
-    await writeSupabaseCostEntry(entry)
-
-    return NextResponse.json({
-      ok: true,
-      entry,
-      totals: updated.totals,
-    })
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Failed to log cost'
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
+export async function GET() {
+  return NextResponse.json(MOCK_COSTS)
 }

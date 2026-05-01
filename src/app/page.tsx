@@ -268,7 +268,7 @@ export default function HomePage() {
   const [agentActivity, setAgentActivity] = useState<{ summary: string; days: { date: string; items: string[] }[] } | null>(null)
   const [activityLoading, setActivityLoading] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
-  const [todayCosts, setTodayCosts] = useState<{ brain: number; muscles: number; total: number } | null>(null)
+  const [todayCosts, setTodayCosts] = useState<{ brain: number; muscles: number; total: number; daily: { date: string; amount: number }[]; byAgent: { name: string; amount: number; color: string }[]; projection: { month: string; projected: number; actual?: number }[] } | null>(null)
   const [calendarPreview, setCalendarPreview] = useState<CalEvent[]>([])
   const [calLoading, setCalLoading] = useState(false)
   const [weather, setWeather] = useState<WeatherData | null>(null)
@@ -741,6 +741,91 @@ export default function HomePage() {
                 </div>
               </Card>
 
+              {/* Cost Prediction */}
+              <SectionHeader title="Cost Analysis" />
+              <Card>
+                {/* Daily trend */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 10 }}>7-Day Spend</div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 80 }}>
+                    {todayCosts?.daily.map((d, i) => {
+                      const max = Math.max(...(todayCosts?.daily.map(x => x.amount) || [1]))
+                      const height = (d.amount / max) * 100
+                      return (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                          <div style={{ fontSize: 10, color: '#666' }}>£{d.amount.toFixed(1)}</div>
+                          <div style={{ width: '100%', height: `${height}%`, background: i === (todayCosts?.daily.length || 1) - 1 ? 'linear-gradient(180deg, #6366f1, #8b5cf6)' : 'rgba(99,102,241,0.3)', borderRadius: 4, minHeight: 4 }} />
+                          <div style={{ fontSize: 9, color: '#666' }}>{new Date(d.date).toLocaleDateString('en-GB', { weekday: 'narrow' })}</div>
+                        </div>
+                      )
+                    }) || <div style={{ color: '#666', fontSize: 12 }}>No data</div>}
+                  </div>
+                </div>
+
+                {/* By Agent */}
+                <div style={{ marginBottom: 16, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 10 }}>By Agent</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {todayCosts?.byAgent.map((agent, i) => {
+                      const max = Math.max(...(todayCosts?.byAgent.map(x => x.amount) || [1]))
+                      const width = (agent.amount / max) * 100
+                      return (
+                        <div key={i}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontSize: 12, color: '#aaa' }}>{agent.name}</span>
+                            <span style={{ fontSize: 12, color: agent.color, fontWeight: 600 }}>£{agent.amount.toFixed(2)}</span>
+                          </div>
+                          <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3 }}>
+                            <div style={{ width: `${width}%`, height: '100%', background: agent.color, borderRadius: 3 }} />
+                          </div>
+                        </div>
+                      )
+                    }) || <div style={{ color: '#666', fontSize: 12 }}>No data</div>}
+                  </div>
+                </div>
+
+                {/* Projection */}
+                <div style={{ paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 10 }}>Monthly Projection</div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 100 }}>
+                    {todayCosts?.projection.map((p, i) => {
+                      const max = Math.max(...(todayCosts?.projection.map(x => x.actual || x.projected) || [1]))
+                      const projHeight = (p.projected / max) * 100
+                      const actualHeight = p.actual ? (p.actual / max) * 100 : 0
+                      return (
+                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 80 }}>
+                            {p.actual && (
+                              <div style={{ width: 8, height: `${actualHeight}%`, background: '#22c55e', borderRadius: 2 }} />
+                            )}
+                            <div style={{ width: 8, height: `${projHeight}%`, background: p.actual ? 'rgba(99,102,241,0.4)' : 'linear-gradient(180deg, #6366f1, #8b5cf6)', borderRadius: 2 }} />
+                          </div>
+                          <div style={{ fontSize: 9, color: '#666' }}>{p.month}</div>
+                        </div>
+                      )
+                    }) || <div style={{ color: '#666', fontSize: 12 }}>No data</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, marginTop: 8, justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ width: 8, height: 8, background: '#22c55e', borderRadius: 2 }} />
+                      <span style={{ fontSize: 10, color: '#888' }}>Actual</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ width: 8, height: 8, background: '#6366f1', borderRadius: 2 }} />
+                      <span style={{ fontSize: 10, color: '#888' }}>Projected</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Budget Alert */}
+                {todayCosts && todayCosts.total > 5 && (
+                  <div style={{ marginTop: 12, padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: 10, border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <div style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>⚠️ Over daily budget</div>
+                    <div style={{ fontSize: 11, color: '#888' }}>Today's spend (£{todayCosts.total.toFixed(2)}) exceeds your £5.00 daily budget</div>
+                  </div>
+                )}
+              </Card>
+
               <SectionHeader title="Agent Activity" />
               <Card>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -777,9 +862,9 @@ export default function HomePage() {
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 6: Proactive Alerts</div>
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 7: Weekly Review</div>
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 8: Mobile PWA</div>
-                  <div style={{ fontSize: 11, color: '#6366f1' }}>🔄 Phase 9: Voice Capture</div>
-                  <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 10: Cross-Space Search</div>
-                  <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 11: Cost Prediction</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 9: Voice Capture</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 10: Cross-Space Search</div>
+                  <div style={{ fontSize: 11, color: '#6366f1' }}>🔄 Phase 11: Cost Prediction</div>
                 </div>
               </Card>
             </>
