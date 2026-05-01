@@ -193,6 +193,9 @@ export default function HomePage() {
   const [tasksLoading, setTasksLoading] = useState(false)
   const [emails, setEmails] = useState<{ total: number; unread: number; emails: { id: string; sender: string; subject: string; preview: string; time: string; unread: boolean }[] } | null>(null)
   const [emailsLoading, setEmailsLoading] = useState(false)
+  const [alerts, setAlerts] = useState<{ alerts: { id: string; type: string; message: string; urgency: string; action?: string; actionUrl?: string; dismissible: boolean }[]; highPriority: number } | null>(null)
+  const [alertsLoading, setAlertsLoading] = useState(false)
+  const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([])
 
   const { isDark, toggle: toggleTheme, t } = useTheme()
   const featuredAgent = AGENTS.find(a => a.id === selectedAgent) || AGENTS[0]
@@ -210,6 +213,7 @@ export default function HomePage() {
   useEffect(() => { setWeatherLoading(true); fetch('/api/weather').then(r => r.json()).then(d => { setWeather(d) }).catch(() => {}).finally(() => setWeatherLoading(false)) }, [])
   useEffect(() => { setTasksLoading(true); fetch('/api/tasks').then(r => r.json()).then(d => { setTasks(d) }).catch(() => {}).finally(() => setTasksLoading(false)) }, [])
   useEffect(() => { setEmailsLoading(true); fetch('/api/email-preview').then(r => r.json()).then(d => { setEmails(d) }).catch(() => {}).finally(() => setEmailsLoading(false)) }, [])
+  useEffect(() => { setAlertsLoading(true); fetch('/api/alerts').then(r => r.json()).then(d => { setAlerts(d) }).catch(() => {}).finally(() => setAlertsLoading(false)) }, [])
 
   const fetchAgentActivity = useCallback(async (agentId: string) => { setActivityLoading(true); try { const res = await fetch(`/api/agent-activity?agent=${agentId}`); if (!res.ok) throw new Error('Failed'); const data = await res.json(); setAgentActivity(data) } catch { setAgentActivity(null) } finally { setActivityLoading(false) } }, [])
 
@@ -264,6 +268,58 @@ export default function HomePage() {
           {/* ── TODAY SPACE ── */}
           {space === 'today' && !activeApp && (
             <>
+              {/* Alerts */}
+              {alertsLoading ? null : alerts && alerts.alerts.filter(a => !dismissedAlerts.includes(a.id)).length > 0 ? (
+                <div style={{ marginBottom: 16 }}>
+                  {alerts.alerts.filter(a => !dismissedAlerts.includes(a.id)).map((alert, i) => (
+                    <div key={alert.id} style={{
+                      background: alert.urgency === 'high' ? 'rgba(239,68,68,0.08)' : alert.urgency === 'medium' ? 'rgba(245,158,11,0.08)' : 'rgba(99,102,241,0.08)',
+                      border: `1px solid ${alert.urgency === 'high' ? 'rgba(239,68,68,0.2)' : alert.urgency === 'medium' ? 'rgba(245,158,11,0.2)' : 'rgba(99,102,241,0.2)'}`,
+                      borderRadius: 14,
+                      padding: '12px 14px',
+                      marginBottom: 8,
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 10,
+                    }}>
+                      <div style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 4,
+                        background: alert.urgency === 'high' ? '#ef4444' : alert.urgency === 'medium' ? '#f59e0b' : '#6366f1',
+                        marginTop: 4,
+                        flexShrink: 0,
+                      }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: '#E9E6FF', marginBottom: 2 }}>{alert.message}</div>
+                        {alert.action && (
+                          <button onClick={() => alert.actionUrl && alert.actionUrl.startsWith('#') ? setActiveApp(alert.actionUrl.slice(1)) : alert.actionUrl && window.open(alert.actionUrl, '_blank')} style={{
+                            fontSize: 11,
+                            color: alert.urgency === 'high' ? '#ef4444' : alert.urgency === 'medium' ? '#f59e0b' : '#6366f1',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 0,
+                            fontWeight: 600,
+                          }}>{alert.action} →</button>
+                        )}
+                      </div>
+                      {alert.dismissible && (
+                        <button onClick={() => setDismissedAlerts(prev => [...prev, alert.id])} style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#666',
+                          cursor: 'pointer',
+                          fontSize: 16,
+                          padding: 0,
+                          lineHeight: 1,
+                        }}>×</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
               {/* Morning Brief */}
               <div style={{
                 background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 50%, rgba(99,102,241,0.05) 100%)',
