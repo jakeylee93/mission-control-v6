@@ -26,8 +26,8 @@
 ---
 
 ## Phase 2: Morning Brief Card
-- [x] Add "Morning Brief" card to Today space (top of page)
-- [x] Fetch calendar events for today
+- [ ] Add "Morning Brief" card to Today space (top of page)
+- [ ] Fetch calendar events for today
 - [ ] Count tasks/plans due today
 - [ ] Show AI spend so far
 - [ ] Display greeting with time-appropriate emoji
