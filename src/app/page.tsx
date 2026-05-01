@@ -14,6 +14,7 @@ import SkillShopApp from '@/components/apps/SkillShopApp'
 import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
 import { useTheme } from '@/lib/theme'
 import PWAInstall from '@/components/PWAInstall'
+import VoiceCapture from '@/components/VoiceCapture'
 
 type SpaceId = 'today' | 'work' | 'life' | 'lab' | 'review'
 type ActiveApp = string | null
@@ -692,9 +693,9 @@ export default function HomePage() {
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 4: Task Cards</div>
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 5: Email Preview</div>
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 6: Proactive Alerts</div>
-                  <div style={{ fontSize: 11, color: '#6366f1' }}>🔄 Phase 7: Weekly Review</div>
-                  <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 8: Mobile PWA</div>
-                  <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 9: Voice Capture</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 7: Weekly Review</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 8: Mobile PWA</div>
+                  <div style={{ fontSize: 11, color: '#6366f1' }}>🔄 Phase 9: Voice Capture</div>
                   <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 10: Cross-Space Search</div>
                   <div style={{ fontSize: 11, color: '#666' }}>⏳ Phase 11: Cost Prediction</div>
                 </div>
@@ -708,6 +709,7 @@ export default function HomePage() {
           <div style={{ position: 'fixed', bottom: 70, left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 32px)', maxWidth: 468, zIndex: 50 }}>
             <div style={{ background: t.bgCard, border: `1px solid ${t.borderLight}`, borderRadius: 14, padding: '8px 10px', backdropFilter: 'blur(12px)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <VoiceCapture onTranscript={(text) => { setQuickInput(text); setTimeout(() => handleQuickChatSend(), 100) }} />
                 <input value={quickInput} onChange={e => setQuickInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleQuickChatSend() } }} placeholder="Ask anything..." style={{ flex: 1, background: t.bgInput, border: `1px solid ${t.borderLight}`, borderRadius: 10, height: 34, color: t.text, fontSize: 13, padding: '0 10px', outline: 'none' }} />
                 <button onClick={handleQuickChatSend} disabled={quickLoading || !quickInput.trim()} style={{ width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(99,102,241,0.35)', background: quickLoading ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.28)', color: '#E9E6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: quickLoading ? 'default' : 'pointer', opacity: quickInput.trim() ? 1 : 0.55 }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
