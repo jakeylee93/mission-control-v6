@@ -15,6 +15,7 @@ import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
 import { useTheme } from '@/lib/theme'
 import PWAInstall from '@/components/PWAInstall'
 import VoiceCapture from '@/components/VoiceCapture'
+import LiveFeed from '@/components/LiveFeed'
 
 type SpaceId = 'today' | 'work' | 'life' | 'lab' | 'review'
 type ActiveApp = string | null
@@ -826,6 +827,12 @@ export default function HomePage() {
                 )}
               </Card>
 
+              {/* Live Feed */}
+              <SectionHeader title="Live Feed" />
+              <Card>
+                <LiveFeed />
+              </Card>
+
               <SectionHeader title="Agent Activity" />
               <Card>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -864,7 +871,8 @@ export default function HomePage() {
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 8: Mobile PWA</div>
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 9: Voice Capture</div>
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 10: Cross-Space Search</div>
-                  <div style={{ fontSize: 11, color: '#6366f1' }}>🔄 Phase 11: Cost Prediction</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 11: Cost Prediction</div>
+                  <div style={{ fontSize: 11, color: '#6366f1' }}>🔄 Phase 12: Real-time Sync</div>
                 </div>
               </Card>
             </>
