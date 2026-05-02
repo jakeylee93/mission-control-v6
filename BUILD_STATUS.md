@@ -4,6 +4,13 @@
 **Current Phase:** Phase 12 🔄 IN PROGRESS
 **Automation:** 7/3 sprint active (builder every 7min, witness every 3min)
 
+## 2026-05-02 — Mission Control Lite MVP (Home Page)
+- **What changed:** Added a new mobile-first Mission Control Lite dashboard on the home page focused on AI credits/capacity, agents, system health, projects/life areas, and a staged roadmap. Preserved the previous full workspace at `/legacy`.
+- **Files touched:** `src/app/page.tsx`, `src/app/legacy/page.tsx`, `BUILD_STATUS.md`
+- **Data labeling:** Added explicit `Live checked` vs `Manual / needs integration` tags across cards; no secret values surfaced.
+- **Build result:** `npm run build` passes. Build logs include an existing dynamic-route warning for `/api/memory/journal`, but the production build completes successfully.
+- **Next steps:** Wire live OpenClaw/provider usage APIs next, then add alert thresholds and command-centre controls.
+
 ---
 
 ## Phase 1: Foundation ✅
