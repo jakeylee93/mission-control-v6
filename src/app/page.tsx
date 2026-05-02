@@ -16,6 +16,7 @@ import { useTheme } from '@/lib/theme'
 import PWAInstall from '@/components/PWAInstall'
 import VoiceCapture from '@/components/VoiceCapture'
 import LiveFeed from '@/components/LiveFeed'
+import DataExport from '@/components/DataExport'
 
 type SpaceId = 'today' | 'work' | 'life' | 'lab' | 'review'
 type ActiveApp = string | null
@@ -849,15 +850,21 @@ export default function HomePage() {
                 </div>
               </Card>
 
+              {/* Data Export */}
+              <SectionHeader title="Export & Backup" />
+              <Card>
+                <DataExport />
+              </Card>
+
               <SectionHeader title="Build Progress" />
               <Card>
                 <div style={{ marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 12, color: '#aaa' }}>Mission Control v7</span>
-                    <span style={{ fontSize: 12, color: '#6366f1', fontWeight: 600 }}>6 / 11 phases</span>
+                    <span style={{ fontSize: 12, color: '#6366f1', fontWeight: 600 }}>13 / 21 phases</span>
                   </div>
                   <div style={{ width: '100%', height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ width: '55%', height: '100%', background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: 3 }} />
+                    <div style={{ width: '62%', height: '100%', background: 'linear-gradient(90deg, #6366f1, #8b5cf6)', borderRadius: 3 }} />
                   </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -872,7 +879,8 @@ export default function HomePage() {
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 9: Voice Capture</div>
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 10: Cross-Space Search</div>
                   <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 11: Cost Prediction</div>
-                  <div style={{ fontSize: 11, color: '#6366f1' }}>🔄 Phase 12: Real-time Sync</div>
+                  <div style={{ fontSize: 11, color: '#22c55e' }}>✅ Phase 12: Real-time Sync</div>
+                  <div style={{ fontSize: 11, color: '#6366f1' }}>🔄 Phase 13: Data Export & Backup</div>
                 </div>
               </Card>
             </>
