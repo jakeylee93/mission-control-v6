@@ -11,6 +11,13 @@
 - **Build result:** `npm run build` passes. Build logs include an existing dynamic-route warning for `/api/memory/journal`, but the production build completes successfully.
 - **Next steps:** Wire live OpenClaw/provider usage APIs next, then add alert thresholds and command-centre controls.
 
+## 2026-05-02 — Apps & Data Integration
+- **What changed:** Added an Apps & Data launch section to the new Mission Control home page and wired the preserved app components back in as in-page overlays.
+- **Apps restored:** Calendar, Plans, Health, Memory, Docs, News Hub, Media List, Maps, Lovely, Skill Shop, Roadmap, Cost History, Live Feed, and Data Export.
+- **Data handling:** Reuses the original components and API routes, so existing Supabase/local data is not duplicated or migrated. `/legacy` remains available as a safety net.
+- **Build result:** `npm run build` passes. Existing `/api/memory/journal` dynamic route warning still appears but does not fail the build.
+- **Next steps:** Split heavy apps into lazy chunks if needed, then wire real provider credit APIs and alerts.
+
 ---
 
 ## Phase 1: Foundation ✅

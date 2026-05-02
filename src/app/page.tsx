@@ -1,4 +1,20 @@
-import type { ReactNode } from 'react'
+'use client'
+
+import { useState, type ReactNode } from 'react'
+import CalendarTab from '@/components/tabs/CalendarTab'
+import LovelyTab from '@/components/tabs/LovelyTab'
+import MapsApp from '@/components/apps/MapsApp'
+import { HealthApp } from '@/components/HealthApp'
+import { MemoryView } from '@/components/tabs/MemoryView'
+import DocsTab from '@/components/tabs/DocsTab'
+import PlansTab from '@/components/tabs/PlansTab'
+import NewsHubApp from '@/components/apps/NewsHubApp'
+import MediaListApp from '@/components/apps/MediaListApp'
+import SkillShopApp from '@/components/apps/SkillShopApp'
+import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
+import CostHistoryPanel from '@/components/CostHistoryPanel'
+import LiveFeed from '@/components/LiveFeed'
+import DataExport from '@/components/DataExport'
 
 type DataFreshness = 'live' | 'manual'
 type Tone = 'ok' | 'warn' | 'error' | 'neutral'
@@ -43,6 +59,32 @@ type RoadmapItem = {
   phase: string
   title: string
   note: string
+}
+
+type AppId =
+  | 'calendar'
+  | 'plans'
+  | 'health'
+  | 'memory'
+  | 'docs'
+  | 'news'
+  | 'media'
+  | 'maps'
+  | 'lovely'
+  | 'skillshop'
+  | 'roadmap'
+  | 'costs'
+  | 'live'
+  | 'export'
+
+type AppDefinition = {
+  id: AppId
+  name: string
+  group: 'Work' | 'Life' | 'Lab' | 'Data'
+  icon: string
+  description: string
+  dataSource: string
+  status: 'Live data' | 'Local data' | 'Needs connection' | 'Utility'
 }
 
 const capacity: CapacityItem[] = [
@@ -213,6 +255,24 @@ const roadmap: RoadmapItem[] = [
     title: 'Command centre',
     note: 'Live controls, alerting, and decision automation.',
   },
+
+]
+
+const apps: AppDefinition[] = [
+  { id: 'calendar', name: 'Calendar', group: 'Work', icon: '📅', description: 'Google Calendar events, week/agenda view and reconnect flow.', dataSource: 'Google Calendar API via existing routes', status: 'Live data' },
+  { id: 'plans', name: 'Plans', group: 'Work', icon: '✅', description: 'Tasks, ventures, planning tiers and active priorities.', dataSource: 'Existing plans/categories APIs', status: 'Live data' },
+  { id: 'news', name: 'News Hub', group: 'Work', icon: '📰', description: 'Sources, campaigns, newsletters, AI drafts and saved items.', dataSource: 'News Hub API + Supabase where configured', status: 'Live data' },
+  { id: 'health', name: 'Health', group: 'Life', icon: '❤️', description: 'Daily health, nutrition, drinks and quick actions.', dataSource: 'Health APIs + Supabase tables', status: 'Live data' },
+  { id: 'maps', name: 'Maps', group: 'Life', icon: '🗺️', description: 'Places and location workflows preserved from the old app.', dataSource: 'Existing maps component data', status: 'Local data' },
+  { id: 'lovely', name: 'Lovely', group: 'Life', icon: '🌙', description: 'Personal wellbeing, water, lager, affirmations and check-ins.', dataSource: 'Lovely APIs + Supabase tables', status: 'Live data' },
+  { id: 'media', name: 'Media List', group: 'Life', icon: '🎧', description: 'Books, podcasts, films and saved recommendations.', dataSource: 'Media list API + Supabase tables', status: 'Live data' },
+  { id: 'memory', name: 'Memory', group: 'Lab', icon: '🧠', description: 'Search and browse the memory layer without leaving Mission Control.', dataSource: 'Existing memory APIs/files', status: 'Live data' },
+  { id: 'docs', name: 'Docs', group: 'Lab', icon: '📁', description: 'Document vault, folders, uploads and search.', dataSource: 'Docs API + local workspace storage', status: 'Live data' },
+  { id: 'skillshop', name: 'Skill Shop', group: 'Lab', icon: '🧩', description: 'Skill discovery, queue and favourites.', dataSource: 'Skill Shop APIs', status: 'Live data' },
+  { id: 'roadmap', name: 'Roadmap', group: 'Lab', icon: '🚀', description: 'App roadmap and build pipeline view.', dataSource: 'Existing app roadmap API', status: 'Live data' },
+  { id: 'costs', name: 'Cost History', group: 'Data', icon: '💷', description: 'AI cost history, trends and budget pressure.', dataSource: 'Costs APIs + Supabase/local fallback', status: 'Live data' },
+  { id: 'live', name: 'Live Feed', group: 'Data', icon: '📡', description: 'Realtime events and system activity stream.', dataSource: 'SSE /api/socket', status: 'Live data' },
+  { id: 'export', name: 'Data Export', group: 'Data', icon: '📦', description: 'Export calendar, tasks and full backups.', dataSource: 'Export API', status: 'Utility' },
 ]
 
 function freshnessLabel(freshness: DataFreshness): string {
@@ -227,6 +287,8 @@ function toneClasses(tone: Tone): string {
 }
 
 export default function HomePage() {
+  const [activeApp, setActiveApp] = useState<AppId | null>(null)
+
   return (
     <main className="min-h-screen bg-[#05070c] text-[#f4f6fb]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(57,87,142,0.28),_transparent_48%),radial-gradient(circle_at_80%_20%,_rgba(50,124,92,0.2),_transparent_42%)]" />
@@ -250,6 +312,37 @@ export default function HomePage() {
               </a>
             </div>
           </div>
+        </section>
+
+        <section className="mt-6">
+          <Panel title="Apps & Data" subtitle="All the old working tools, now available from the new command centre">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {apps.map((app) => (
+                <button
+                  key={app.id}
+                  type="button"
+                  onClick={() => setActiveApp(app.id)}
+                  className="group rounded-xl border border-white/10 bg-[#0b1220]/85 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-[#101a2d]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-2xl" aria-hidden="true">{app.icon}</div>
+                    <span className="rounded-full border border-white/15 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-300">
+                      {app.group}
+                    </span>
+                  </div>
+                  <h3 className="mt-3 text-sm font-semibold text-white">{app.name}</h3>
+                  <p className="mt-1 min-h-[2.5rem] text-xs leading-5 text-slate-400">{app.description}</p>
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
+                    <span className="text-[11px] text-slate-500">{app.status}</span>
+                    <span className="text-[11px] text-cyan-200 transition group-hover:translate-x-0.5">Open →</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 rounded-xl border border-indigo-300/20 bg-indigo-500/10 p-3 text-xs text-indigo-100">
+              Data is not being duplicated here — these cards open the original components and API routes, so existing Supabase/local data stays attached.
+            </div>
+          </Panel>
         </section>
 
         <section className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -346,6 +439,7 @@ export default function HomePage() {
           </Panel>
         </section>
       </div>
+      {activeApp && <ActiveAppOverlay appId={activeApp} onClose={() => setActiveApp(null)} />}
     </main>
   )
 }
@@ -382,3 +476,62 @@ function Row({ term, value }: { term: string; value: string }) {
     </div>
   )
 }
+function ActiveAppOverlay({ appId, onClose }: { appId: AppId; onClose: () => void }) {
+  const app = apps.find((item) => item.id === appId)
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#05070c] text-[#f4f6fb]">
+      <div className="sticky top-0 z-10 border-b border-white/10 bg-[#05070c]/90 px-4 py-3 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-200/75">Mission Control App</p>
+            <h2 className="text-base font-semibold text-white">{app?.name ?? 'App'}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:border-white/25 hover:bg-white/10"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+      <div className="mx-auto min-h-[calc(100vh-4rem)] w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
+        {app && (
+          <div className="mb-4 rounded-2xl border border-white/10 bg-[#0a101c]/75 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-slate-300">{app.description}</p>
+                <p className="mt-1 text-xs text-slate-500">Data source: {app.dataSource}</p>
+              </div>
+              <span className="w-fit rounded-full border border-emerald-300/25 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
+                {app.status}
+              </span>
+            </div>
+          </div>
+        )}
+        <div className="rounded-2xl border border-white/10 bg-[#080d18]/65 p-3 sm:p-4">
+          {renderActiveApp(appId, onClose)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function renderActiveApp(appId: AppId, onClose: () => void) {
+  if (appId === 'calendar') return <CalendarTab />
+  if (appId === 'plans') return <PlansTab />
+  if (appId === 'health') return <HealthApp onBack={onClose} />
+  if (appId === 'memory') return <MemoryView />
+  if (appId === 'docs') return <DocsTab />
+  if (appId === 'news') return <NewsHubApp onBack={onClose} />
+  if (appId === 'media') return <MediaListApp onBack={onClose} />
+  if (appId === 'maps') return <MapsApp onBack={onClose} />
+  if (appId === 'lovely') return <LovelyTab />
+  if (appId === 'skillshop') return <SkillShopApp onBack={onClose} />
+  if (appId === 'roadmap') return <AppRoadmapApp onBack={onClose} />
+  if (appId === 'costs') return <CostHistoryPanel />
+  if (appId === 'live') return <LiveFeed />
+  return <DataExport />
+}
+
