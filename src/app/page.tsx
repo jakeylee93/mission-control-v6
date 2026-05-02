@@ -87,6 +87,8 @@ type AppDefinition = {
   status: 'Live data' | 'Local data' | 'Needs connection' | 'Utility'
 }
 
+type MainTab = 'today' | 'work' | 'life' | 'agents' | 'data'
+
 const capacity: CapacityItem[] = [
   {
     provider: 'OpenAI API',
@@ -288,159 +290,303 @@ function toneClasses(tone: Tone): string {
 
 export default function HomePage() {
   const [activeApp, setActiveApp] = useState<AppId | null>(null)
+  const [activeTab, setActiveTab] = useState<MainTab>('today')
 
   return (
-    <main className="min-h-screen bg-[#05070c] text-[#f4f6fb]">
+    <main className="min-h-screen bg-[#05070c] pb-24 text-[#f4f6fb]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(57,87,142,0.28),_transparent_48%),radial-gradient(circle_at_80%_20%,_rgba(50,124,92,0.2),_transparent_42%)]" />
-      <div className="relative mx-auto w-full max-w-6xl px-4 pb-10 pt-6 sm:px-6 lg:px-8 lg:pt-10">
-        <section className="rounded-2xl border border-white/10 bg-[linear-gradient(140deg,rgba(9,13,23,0.95),rgba(10,17,30,0.82))] p-5 shadow-[0_20px_80px_rgba(1,6,18,0.55)] sm:p-7">
-          <p className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">Jake&apos;s Life Mission Control</p>
-          <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <h1 className="font-heading text-2xl font-semibold text-white sm:text-3xl">Mission Control Lite</h1>
-              <p className="mt-2 max-w-2xl text-sm text-slate-300">
-                First MVP dashboard for credits, agents, system health, and life areas. Values are explicitly tagged as
-                live checked vs manual placeholders. The previous full workspace is preserved at /legacy.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 sm:items-end">
-              <div className="rounded-xl border border-cyan-300/25 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
-                Snapshot date: May 2, 2026
-              </div>
-              <a href="/legacy" className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 transition hover:border-white/25 hover:bg-white/10">
-                Open legacy workspace
-              </a>
-            </div>
-          </div>
-        </section>
-
-        <section className="mt-6">
-          <Panel title="Apps & Data" subtitle="All the old working tools, now available from the new command centre">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {apps.map((app) => (
-                <button
-                  key={app.id}
-                  type="button"
-                  onClick={() => setActiveApp(app.id)}
-                  className="group rounded-xl border border-white/10 bg-[#0b1220]/85 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-[#101a2d]"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="text-2xl" aria-hidden="true">{app.icon}</div>
-                    <span className="rounded-full border border-white/15 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-300">
-                      {app.group}
-                    </span>
-                  </div>
-                  <h3 className="mt-3 text-sm font-semibold text-white">{app.name}</h3>
-                  <p className="mt-1 min-h-[2.5rem] text-xs leading-5 text-slate-400">{app.description}</p>
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
-                    <span className="text-[11px] text-slate-500">{app.status}</span>
-                    <span className="text-[11px] text-cyan-200 transition group-hover:translate-x-0.5">Open →</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 rounded-xl border border-indigo-300/20 bg-indigo-500/10 p-3 text-xs text-indigo-100">
-              Data is not being duplicated here — these cards open the original components and API routes, so existing Supabase/local data stays attached.
-            </div>
-          </Panel>
-        </section>
-
-        <section className="mt-6 grid gap-4 lg:grid-cols-2">
-          <Panel title="AI Credits / Capacity" subtitle="Do not expose secrets. Show confidence level clearly.">
-            <div className="space-y-3">
-              {capacity.map((item) => (
-                <article key={item.provider} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">{item.provider}</p>
-                      <p className="mt-1 text-base font-medium text-white">{item.headline}</p>
-                    </div>
-                    <Tag label={freshnessLabel(item.freshness)} tone={item.tone} />
-                  </div>
-                  <p className="mt-2 text-sm text-slate-300">{item.detail}</p>
-                  <p className="mt-2 text-xs text-slate-500">{item.checkedAt}</p>
-                </article>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel title="System Health" subtitle="Operational status with integration boundaries">
-            <div className="space-y-3">
-              {health.map((item) => (
-                <article key={item.label} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-slate-400">{item.label}</p>
-                      <p className="mt-1 text-base font-medium text-white">{item.value}</p>
-                    </div>
-                    <Tag label={freshnessLabel(item.freshness)} tone={item.tone} />
-                  </div>
-                  <p className="mt-2 text-sm text-slate-300">{item.note}</p>
-                  <p className="mt-2 text-xs text-slate-500">{item.checkedAt}</p>
-                </article>
-              ))}
-            </div>
-          </Panel>
-        </section>
-
-        <section className="mt-4">
-          <Panel title="Agents" subtitle="Role, model stack, plan, remaining capacity, and immediate next action">
-            <div className="grid gap-3 md:grid-cols-3">
-              {agents.map((agent) => (
-                <article key={agent.name} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-lg font-medium text-white">{agent.name}</p>
-                    <span className="rounded-full border border-sky-300/30 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-200">
-                      {agent.status}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-slate-300">{agent.role}</p>
-                  <dl className="mt-3 space-y-2 text-sm">
-                    <Row term="Provider" value={agent.provider} />
-                    <Row term="Primary" value={agent.primaryModel} />
-                    <Row term="Fallback" value={agent.fallbackModel} />
-                    <Row term="Plan" value={agent.plan} />
-                    <Row term="Remaining" value={agent.remaining} />
-                  </dl>
-                  <p className="mt-3 rounded-lg border border-indigo-300/20 bg-indigo-500/10 p-2 text-xs text-indigo-100">
-                    Next: {agent.nextAction}
-                  </p>
-                </article>
-              ))}
-            </div>
-          </Panel>
-        </section>
-
-        <section className="mt-4 grid gap-4 lg:grid-cols-2">
-          <Panel title="Projects / Life Areas" subtitle="Simple status sweep across active domains">
-            <div className="space-y-3">
-              {projects.map((project) => (
-                <article key={project.name} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-white">{project.name}</p>
-                    <span className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-slate-200">{project.status}</span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-300">{project.note}</p>
-                </article>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel title="Roadmap" subtitle="Incremental path from static dashboard to command centre">
-            <ol className="space-y-3">
-              {roadmap.map((item) => (
-                <li key={item.phase} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">{item.phase}</p>
-                  <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
-                  <p className="mt-2 text-sm text-slate-300">{item.note}</p>
-                </li>
-              ))}
-            </ol>
-          </Panel>
-        </section>
+      <div className="relative mx-auto w-full max-w-6xl px-4 pb-6 pt-5 sm:px-6 lg:px-8 lg:pt-8">
+        <HeaderBar />
+        <div className="mt-5">
+          {activeTab === 'today' && <TodayTab onOpenApp={setActiveApp} />}
+          {activeTab === 'work' && <WorkTab onOpenApp={setActiveApp} />}
+          {activeTab === 'life' && <LifeTab onOpenApp={setActiveApp} />}
+          {activeTab === 'agents' && <AgentsTab />}
+          {activeTab === 'data' && <DataTab onOpenApp={setActiveApp} />}
+        </div>
       </div>
+      <BottomNav activeTab={activeTab} onChange={setActiveTab} />
       {activeApp && <ActiveAppOverlay appId={activeApp} onClose={() => setActiveApp(null)} />}
     </main>
+  )
+}
+
+function HeaderBar() {
+  return (
+    <section className="rounded-2xl border border-white/10 bg-[linear-gradient(140deg,rgba(9,13,23,0.95),rgba(10,17,30,0.82))] p-4 shadow-[0_20px_80px_rgba(1,6,18,0.55)] sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">Jake&apos;s Life Mission Control</p>
+          <h1 className="mt-1 font-heading text-2xl font-semibold text-white sm:text-3xl">Today&apos;s run</h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-300">
+            Short briefing first. Work, Life, Agents and Data live behind the bottom tabs — no endless wall of cards.
+          </p>
+        </div>
+        <a href="/legacy" className="w-fit rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 transition hover:border-white/25 hover:bg-white/10">
+          Legacy workspace
+        </a>
+      </div>
+    </section>
+  )
+}
+
+function TodayTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
+  const openAi = capacity.find((item) => item.provider === 'OpenAI API')
+  const urgentProjects = projects.slice(0, 3)
+
+  return (
+    <div className="space-y-4">
+      <section className="grid gap-3 md:grid-cols-3">
+        <BriefCard label="Next up" value="Check calendar" note="Open Calendar for the live day run." action="Calendar" onClick={() => onOpenApp('calendar')} />
+        <BriefCard label="Priority" value="Keep builds moving" note="Plans holds the working task list." action="Plans" onClick={() => onOpenApp('plans')} />
+        <BriefCard label="AI balance" value={openAi?.headline ?? 'Unknown'} note={openAi?.detail ?? 'Needs usage sync.'} action="Agents" />
+      </section>
+
+      <Panel title="Good run of the day" subtitle="The only things that should be on the home dashboard">
+        <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
+            <p className="text-xs uppercase tracking-wide text-slate-400">Today</p>
+            <h2 className="mt-1 text-lg font-semibold text-white">Start with the calendar, then the top tasks.</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Mission Control should behave like a chief of staff: tell you what matters, then get out of the way. The old apps are still present, just tucked into their proper tabs.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <ActionButton onClick={() => onOpenApp('calendar')}>Open Calendar</ActionButton>
+              <ActionButton onClick={() => onOpenApp('plans')}>Open Plans</ActionButton>
+              <ActionButton onClick={() => onOpenApp('costs')}>AI Spend</ActionButton>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {urgentProjects.map((project) => (
+              <article key={project.name} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-white">{project.name}</p>
+                  <span className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-slate-200">{project.status}</span>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-400">{project.note}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </Panel>
+
+      <Panel title="Attention strip" subtitle="Tiny status bar, not a dashboard avalanche">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <MiniStatus title="OpenClaw" value="Running" tone="ok" />
+          <MiniStatus title="Anthropic" value="Auth issue" tone="error" />
+          <MiniStatus title="Auto recharge" value="Off" tone="warn" />
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
+function WorkTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
+  return (
+    <div className="space-y-4">
+      <Panel title="Work" subtitle="Business tools and working data">
+        <AppGrid apps={apps.filter((app) => app.group === 'Work')} onOpenApp={onOpenApp} />
+      </Panel>
+      <Panel title="Work areas" subtitle="The business lanes to keep moving">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {projects.filter((project) => project.name !== 'Personal Ops').map((project) => <ProjectCard key={project.name} project={project} />)}
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
+function LifeTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
+  return (
+    <div className="space-y-4">
+      <Panel title="Life" subtitle="Personal operating system, health and places">
+        <AppGrid apps={apps.filter((app) => app.group === 'Life')} onOpenApp={onOpenApp} />
+      </Panel>
+      <Panel title="Personal ops" subtitle="Keep the non-work stuff visible but calm">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <ProjectCard project={projects.find((project) => project.name === 'Personal Ops') ?? projects[0]} />
+          <div className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
+            <p className="text-sm font-medium text-white">Today&apos;s life check</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">Health, Lovely, Maps and Media are one tap away — no need for them to clutter the morning briefing.</p>
+          </div>
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
+function AgentsTab() {
+  return (
+    <div className="space-y-4">
+      <Panel title="Agents" subtitle="Models, providers, capacity and next action">
+        <div className="grid gap-3 md:grid-cols-3">
+          {agents.map((agent) => (
+            <article key={agent.name} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-lg font-medium text-white">{agent.name}</p>
+                <span className="rounded-full border border-sky-300/30 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-200">{agent.status}</span>
+              </div>
+              <p className="mt-1 text-sm text-slate-300">{agent.role}</p>
+              <dl className="mt-3 space-y-2 text-sm">
+                <Row term="Provider" value={agent.provider} />
+                <Row term="Primary" value={agent.primaryModel} />
+                <Row term="Fallback" value={agent.fallbackModel} />
+                <Row term="Remaining" value={agent.remaining} />
+              </dl>
+              <p className="mt-3 rounded-lg border border-indigo-300/20 bg-indigo-500/10 p-2 text-xs text-indigo-100">Next: {agent.nextAction}</p>
+            </article>
+          ))}
+        </div>
+      </Panel>
+      <Panel title="AI Credits / Capacity" subtitle="Provider balances and auth state">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {capacity.map((item) => <CapacityCard key={item.provider} item={item} />)}
+        </div>
+      </Panel>
+    </div>
+  )
+}
+
+function DataTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
+  return (
+    <div className="space-y-4">
+      <Panel title="Data & Lab" subtitle="Memory, costs, exports, roadmap and system tools">
+        <AppGrid apps={apps.filter((app) => app.group === 'Data' || app.group === 'Lab')} onOpenApp={onOpenApp} />
+      </Panel>
+      <Panel title="System health" subtitle="Small status snapshot">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {health.map((item) => (
+            <article key={item.label} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">{item.label}</p>
+                  <p className="mt-1 text-sm font-medium text-white">{item.value}</p>
+                </div>
+                <Tag label={freshnessLabel(item.freshness)} tone={item.tone} />
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-400">{item.note}</p>
+            </article>
+          ))}
+        </div>
+      </Panel>
+      <Panel title="Roadmap" subtitle="What this grows into next">
+        <ol className="grid gap-3 md:grid-cols-5">
+          {roadmap.map((item) => (
+            <li key={item.phase} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-3">
+              <p className="text-[11px] uppercase tracking-wide text-slate-400">{item.phase}</p>
+              <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
+              <p className="mt-2 text-xs leading-5 text-slate-400">{item.note}</p>
+            </li>
+          ))}
+        </ol>
+      </Panel>
+    </div>
+  )
+}
+
+function AppGrid({ apps, onOpenApp }: { apps: AppDefinition[]; onOpenApp: (app: AppId) => void }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {apps.map((app) => (
+        <button
+          key={app.id}
+          type="button"
+          onClick={() => onOpenApp(app.id)}
+          className="group rounded-xl border border-white/10 bg-[#0b1220]/85 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-[#101a2d]"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="text-2xl" aria-hidden="true">{app.icon}</div>
+            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-300">{app.status}</span>
+          </div>
+          <h3 className="mt-3 text-sm font-semibold text-white">{app.name}</h3>
+          <p className="mt-1 min-h-[2.5rem] text-xs leading-5 text-slate-400">{app.description}</p>
+          <p className="mt-3 border-t border-white/10 pt-3 text-[11px] text-slate-500">{app.dataSource}</p>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function BottomNav({ activeTab, onChange }: { activeTab: MainTab; onChange: (tab: MainTab) => void }) {
+  const tabs: { id: MainTab; label: string; icon: string }[] = [
+    { id: 'today', label: 'Today', icon: '☀️' },
+    { id: 'work', label: 'Work', icon: '💼' },
+    { id: 'life', label: 'Life', icon: '🌿' },
+    { id: 'agents', label: 'Agents', icon: '🤖' },
+    { id: 'data', label: 'Data', icon: '📊' },
+  ]
+
+  return (
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#070b13]/95 px-3 py-2 backdrop-blur-xl">
+      <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">
+        {tabs.map((tab) => {
+          const active = activeTab === tab.id
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onChange(tab.id)}
+              className={`rounded-2xl px-2 py-2 text-center text-[11px] transition ${active ? 'bg-cyan-500/15 text-cyan-100' : 'text-slate-500 hover:bg-white/5 hover:text-slate-200'}`}
+            >
+              <div className="text-lg leading-none" aria-hidden="true">{tab.icon}</div>
+              <div className="mt-1 font-medium">{tab.label}</div>
+            </button>
+          )
+        })}
+      </div>
+    </nav>
+  )
+}
+
+function BriefCard({ label, value, note, action, onClick }: { label: string; value: string; note: string; action?: string; onClick?: () => void }) {
+  return (
+    <article className="rounded-2xl border border-white/10 bg-[#0a101c]/75 p-4 shadow-[0_12px_40px_rgba(2,8,20,0.45)]">
+      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-base font-semibold text-white">{value}</p>
+      <p className="mt-2 min-h-[2.5rem] text-xs leading-5 text-slate-400">{note}</p>
+      {action && onClick && <button type="button" onClick={onClick} className="mt-3 text-xs font-medium text-cyan-200">{action} →</button>}
+    </article>
+  )
+}
+
+function ActionButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="rounded-xl border border-cyan-300/25 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-500/15">{children}</button>
+}
+
+function MiniStatus({ title, value, tone }: { title: string; value: string; tone: Tone }) {
+  return (
+    <div className={`rounded-xl border p-3 ${toneClasses(tone)}`}>
+      <p className="text-xs uppercase tracking-wide opacity-75">{title}</p>
+      <p className="mt-1 text-sm font-semibold">{value}</p>
+    </div>
+  )
+}
+
+function ProjectCard({ project }: { project: ProjectItem }) {
+  return (
+    <article className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium text-white">{project.name}</p>
+        <span className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-slate-200">{project.status}</span>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-slate-300">{project.note}</p>
+    </article>
+  )
+}
+
+function CapacityCard({ item }: { item: CapacityItem }) {
+  return (
+    <article className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-slate-400">{item.provider}</p>
+          <p className="mt-1 text-base font-medium text-white">{item.headline}</p>
+        </div>
+        <Tag label={freshnessLabel(item.freshness)} tone={item.tone} />
+      </div>
+      <p className="mt-2 text-sm text-slate-300">{item.detail}</p>
+      <p className="mt-2 text-xs text-slate-500">{item.checkedAt}</p>
+    </article>
   )
 }
 

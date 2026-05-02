@@ -18,6 +18,13 @@
 - **Build result:** `npm run build` passes. Existing `/api/memory/journal` dynamic route warning still appears but does not fail the build.
 - **Next steps:** Split heavy apps into lazy chunks if needed, then wire real provider credit APIs and alerts.
 
+## 2026-05-02 — Bottom Tab Shell Refinement
+- **What changed:** Refactored the new Mission Control home into a short Today briefing with persistent bottom tabs: Today, Work, Life, Agents, and Data.
+- **Structure:** Work/Life/Data tabs now hold the sub-app buttons instead of one long app feed. Agents holds provider/model/credit cards. Today is deliberately short and focused on the day run.
+- **Data handling:** Existing app components and API routes remain wired through overlays; `/legacy` remains available as a fallback.
+- **Build result:** `npm run build` passes. Existing `/api/memory/journal` dynamic route warning still appears but does not fail the build.
+- **Next steps:** Add live Today data cards from calendar/tasks once the layout feels right.
+
 ---
 
 ## Phase 1: Foundation ✅
