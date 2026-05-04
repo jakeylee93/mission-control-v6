@@ -15,6 +15,13 @@ import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
 import CostHistoryPanel from '@/components/CostHistoryPanel'
 import LiveFeed from '@/components/LiveFeed'
 import DataExport from '@/components/DataExport'
+import { useRealtimeSync, type UseRealtimeSyncState } from '@/hooks/useRealtimeSync'
+import {
+  LocalNotificationSettings,
+  RealtimeEventList,
+  RealtimeStatusPill,
+  RealtimeSummaryStrip,
+} from '@/components/realtime/RealtimeWidgets'
 
 type DataFreshness = 'live' | 'manual'
 type Tone = 'ok' | 'warn' | 'error' | 'neutral'
@@ -273,7 +280,7 @@ const apps: AppDefinition[] = [
   { id: 'skillshop', name: 'Skill Shop', group: 'Lab', icon: '🧩', description: 'Skill discovery, queue and favourites.', dataSource: 'Skill Shop APIs', status: 'Live data' },
   { id: 'roadmap', name: 'Roadmap', group: 'Lab', icon: '🚀', description: 'App roadmap and build pipeline view.', dataSource: 'Existing app roadmap API', status: 'Live data' },
   { id: 'costs', name: 'Cost History', group: 'Data', icon: '💷', description: 'AI cost history, trends and budget pressure.', dataSource: 'Costs APIs + Supabase/local fallback', status: 'Live data' },
-  { id: 'live', name: 'Live Feed', group: 'Data', icon: '📡', description: 'Realtime events and system activity stream.', dataSource: 'SSE /api/socket', status: 'Live data' },
+  { id: 'live', name: 'Live Feed', group: 'Data', icon: '📡', description: 'Realtime events and system activity stream.', dataSource: 'SSE /api/realtime/stream', status: 'Live data' },
   { id: 'export', name: 'Data Export', group: 'Data', icon: '📦', description: 'Export calendar, tasks and full backups.', dataSource: 'Export API', status: 'Utility' },
 ]
 
@@ -291,18 +298,19 @@ function toneClasses(tone: Tone): string {
 export default function HomePage() {
   const [activeApp, setActiveApp] = useState<AppId | null>(null)
   const [activeTab, setActiveTab] = useState<MainTab>('today')
+  const realtime = useRealtimeSync()
 
   return (
     <main className="min-h-screen bg-[#05070c] pb-24 text-[#f4f6fb]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(57,87,142,0.28),_transparent_48%),radial-gradient(circle_at_80%_20%,_rgba(50,124,92,0.2),_transparent_42%)]" />
       <div className="relative mx-auto w-full max-w-6xl px-4 pb-6 pt-5 sm:px-6 lg:px-8 lg:pt-8">
-        <HeaderBar />
+        <HeaderBar realtime={realtime} />
         <div className="mt-5">
-          {activeTab === 'today' && <TodayTab onOpenApp={setActiveApp} />}
+          {activeTab === 'today' && <TodayTab onOpenApp={setActiveApp} realtime={realtime} />}
           {activeTab === 'work' && <WorkTab onOpenApp={setActiveApp} />}
           {activeTab === 'life' && <LifeTab onOpenApp={setActiveApp} />}
-          {activeTab === 'agents' && <AgentsTab />}
-          {activeTab === 'data' && <DataTab onOpenApp={setActiveApp} />}
+          {activeTab === 'agents' && <AgentsTab realtime={realtime} />}
+          {activeTab === 'data' && <DataTab onOpenApp={setActiveApp} realtime={realtime} />}
         </div>
       </div>
       <BottomNav activeTab={activeTab} onChange={setActiveTab} />
@@ -311,7 +319,7 @@ export default function HomePage() {
   )
 }
 
-function HeaderBar() {
+function HeaderBar({ realtime }: { realtime: UseRealtimeSyncState }) {
   return (
     <section className="rounded-2xl border border-white/10 bg-[linear-gradient(140deg,rgba(9,13,23,0.95),rgba(10,17,30,0.82))] p-4 shadow-[0_20px_80px_rgba(1,6,18,0.55)] sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -322,15 +330,18 @@ function HeaderBar() {
             Short briefing first. Work, Life, Agents and Data live behind the bottom tabs — no endless wall of cards.
           </p>
         </div>
-        <a href="/legacy" className="w-fit rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 transition hover:border-white/25 hover:bg-white/10">
-          Legacy workspace
-        </a>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <RealtimeStatusPill realtime={realtime} />
+          <a href="/legacy" className="w-fit rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 transition hover:border-white/25 hover:bg-white/10">
+            Legacy workspace
+          </a>
+        </div>
       </div>
     </section>
   )
 }
 
-function TodayTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
+function TodayTab({ onOpenApp, realtime }: { onOpenApp: (app: AppId) => void; realtime: UseRealtimeSyncState }) {
   const openAi = capacity.find((item) => item.provider === 'OpenAI API')
   const urgentProjects = projects.slice(0, 3)
 
@@ -377,6 +388,12 @@ function TodayTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
           <MiniStatus title="Auto recharge" value="Off" tone="warn" />
         </div>
       </Panel>
+      <Panel title="Realtime pulse" subtitle="Live task/calendar/agent feed with explicit source labels">
+        <div className="space-y-3">
+          <RealtimeSummaryStrip realtime={realtime} />
+          <RealtimeEventList events={realtime.events} title="Latest updates" maxItems={5} />
+        </div>
+      </Panel>
     </div>
   )
 }
@@ -415,7 +432,9 @@ function LifeTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
   )
 }
 
-function AgentsTab() {
+function AgentsTab({ realtime }: { realtime: UseRealtimeSyncState }) {
+  const agentEvents = realtime.events.filter((event) => event.kind === 'agent' || event.kind === 'activity')
+
   return (
     <div className="space-y-4">
       <Panel title="Agents" subtitle="Models, providers, capacity and next action">
@@ -443,15 +462,27 @@ function AgentsTab() {
           {capacity.map((item) => <CapacityCard key={item.provider} item={item} />)}
         </div>
       </Panel>
+      <Panel title="Agent activity feed" subtitle="Realtime stream from local activity + demo fallback where unavailable">
+        <RealtimeEventList events={agentEvents} title="Recent agent events" maxItems={8} />
+      </Panel>
     </div>
   )
 }
 
-function DataTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
+function DataTab({ onOpenApp, realtime }: { onOpenApp: (app: AppId) => void; realtime: UseRealtimeSyncState }) {
   return (
     <div className="space-y-4">
       <Panel title="Data & Lab" subtitle="Memory, costs, exports, roadmap and system tools">
         <AppGrid apps={apps.filter((app) => app.group === 'Data' || app.group === 'Lab')} onOpenApp={onOpenApp} />
+      </Panel>
+      <Panel title="Realtime sync status" subtitle="SSE stream, event semantics and local notification controls">
+        <div className="space-y-3">
+          <RealtimeSummaryStrip realtime={realtime} />
+          <div className="grid gap-3 lg:grid-cols-2">
+            <RealtimeEventList events={realtime.events} title="All live events" maxItems={10} />
+            <LocalNotificationSettings />
+          </div>
+        </div>
       </Panel>
       <Panel title="System health" subtitle="Small status snapshot">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -680,4 +711,3 @@ function renderActiveApp(appId: AppId, onClose: () => void) {
   if (appId === 'live') return <LiveFeed />
   return <DataExport />
 }
-

@@ -4,6 +4,14 @@
 **Current Phase:** Phase 12 🔄 IN PROGRESS
 **Automation:** 7/3 sprint active (builder every 7min, witness every 3min)
 
+## 2026-05-04 — Phase 12 Realtime Sync Foundation
+- **What changed:** Added a typed SSE realtime stream at `/api/realtime/stream` with snapshot + delta events for tasks, calendar, alerts, and agent activity. Added a client realtime hook and integrated live status/feed cards into the Today, Agents, and Data tabs without changing bottom-tab or overlay app behavior.
+- **Compatibility:** Kept `/api/socket` as a redirect alias to `/api/realtime/stream` for older clients.
+- **Data semantics:** Realtime payloads now explicitly label sources as `live`, `demo`, or `unavailable`. Calendar and activity gracefully fall back to demo semantics when local credentials/files are missing.
+- **Notifications:** Added local browser notification permission/status UI. External push delivery (service worker + provider credentials) is still pending.
+- **Build result:** `npm run build` passes. Build logs still include the pre-existing `/api/memory/journal` dynamic-route warning, but production build completes successfully.
+- **Next steps:** Add authenticated external push transport and event publishing webhooks if credentials and deployment settings are available.
+
 ## 2026-05-02 — Mission Control Lite MVP (Home Page)
 - **What changed:** Added a new mobile-first Mission Control Lite dashboard on the home page focused on AI credits/capacity, agents, system health, projects/life areas, and a staged roadmap. Preserved the previous full workspace at `/legacy`.
 - **Files touched:** `src/app/page.tsx`, `src/app/legacy/page.tsx`, `BUILD_STATUS.md`
@@ -133,10 +141,10 @@
 ---
 
 ## Phase 12: Real-time Sync
-- [ ] Add WebSocket connection for live updates
-- [ ] Real-time calendar event notifications
-- [ ] Live task status updates
-- [ ] Instant agent activity feed
+- [x] Add WebSocket connection for live updates
+- [x] Real-time calendar event notifications
+- [x] Live task status updates
+- [x] Instant agent activity feed
 - [ ] Push notifications for alerts
 
 ---
