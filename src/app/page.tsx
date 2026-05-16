@@ -1,713 +1,449 @@
-'use client'
+import type { ReactNode } from 'react'
 
-import { useState, type ReactNode } from 'react'
-import CalendarTab from '@/components/tabs/CalendarTab'
-import LovelyTab from '@/components/tabs/LovelyTab'
-import MapsApp from '@/components/apps/MapsApp'
-import { HealthApp } from '@/components/HealthApp'
-import { MemoryView } from '@/components/tabs/MemoryView'
-import DocsTab from '@/components/tabs/DocsTab'
-import PlansTab from '@/components/tabs/PlansTab'
-import NewsHubApp from '@/components/apps/NewsHubApp'
-import MediaListApp from '@/components/apps/MediaListApp'
-import SkillShopApp from '@/components/apps/SkillShopApp'
-import AppRoadmapApp from '@/components/apps/AppRoadmapApp'
-import CostHistoryPanel from '@/components/CostHistoryPanel'
-import LiveFeed from '@/components/LiveFeed'
-import DataExport from '@/components/DataExport'
-import { useRealtimeSync, type UseRealtimeSyncState } from '@/hooks/useRealtimeSync'
-import {
-  LocalNotificationSettings,
-  RealtimeEventList,
-  RealtimeStatusPill,
-  RealtimeSummaryStrip,
-} from '@/components/realtime/RealtimeWidgets'
+type AccessState = 'yes' | 'partial' | 'no'
 
-type DataFreshness = 'live' | 'manual'
-type Tone = 'ok' | 'warn' | 'error' | 'neutral'
-
-type CapacityItem = {
-  provider: string
-  headline: string
-  detail: string
-  freshness: DataFreshness
-  checkedAt: string
-  tone: Tone
-}
-
-type AgentItem = {
+type Agent = {
   name: string
+  system: 'Hermes' | 'OpenClaw'
+  profile: string
   role: string
   provider: string
-  primaryModel: string
-  fallbackModel: string
-  plan: string
-  remaining: string
-  status: string
-  nextAction: string
+  model: string
+  gateway: string
+  auth: string
+  access: {
+    discord: AccessState
+    email: AccessState
+    githubVercel: AccessState
+    supabase: AccessState
+    terminalFileBrowser: AccessState
+    memory: AccessState
+    voiceMedia: AccessState
+  }
+  notes: string
 }
 
-type HealthItem = {
-  label: string
-  value: string
-  note: string
-  freshness: DataFreshness
-  checkedAt: string
-  tone: Tone
-}
-
-type ProjectItem = {
-  name: string
-  status: string
-  note: string
-}
-
-type RoadmapItem = {
-  phase: string
-  title: string
-  note: string
-}
-
-type AppId =
-  | 'calendar'
-  | 'plans'
-  | 'health'
-  | 'memory'
-  | 'docs'
-  | 'news'
-  | 'media'
-  | 'maps'
-  | 'lovely'
-  | 'skillshop'
-  | 'roadmap'
-  | 'costs'
-  | 'live'
-  | 'export'
-
-type AppDefinition = {
-  id: AppId
-  name: string
-  group: 'Work' | 'Life' | 'Lab' | 'Data'
-  icon: string
-  description: string
-  dataSource: string
-  status: 'Live data' | 'Local data' | 'Needs connection' | 'Utility'
-}
-
-type MainTab = 'today' | 'work' | 'life' | 'agents' | 'data'
-
-const capacity: CapacityItem[] = [
+const agents: Agent[] = [
   {
-    provider: 'OpenAI API',
-    headline: '$19.41 remaining',
-    detail: 'Auto recharge is off.',
-    freshness: 'live',
-    checkedAt: 'May 2, 2026',
-    tone: 'ok',
+    name: 'Peach',
+    system: 'Hermes',
+    profile: 'default',
+    role: 'Main day-to-day business agent and coordinator',
+    provider: 'OpenAI Codex',
+    model: 'gpt-5.5',
+    gateway: 'Discord gateway running',
+    auth: 'Codex logged in; Microsoft 365 email configured for jake@thebarpeople.co.uk',
+    access: {
+      discord: 'yes',
+      email: 'yes',
+      githubVercel: 'yes',
+      supabase: 'partial',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Primary controller for inbox-approved email, deployments, research, schedules, and agent coordination.',
   },
   {
-    provider: 'Anthropic API',
-    headline: 'Unknown balance',
-    detail: 'Usage check failed with HTTP 401 invalid bearer token.',
-    freshness: 'live',
-    checkedAt: 'May 2, 2026',
-    tone: 'error',
+    name: 'Honey',
+    system: 'Hermes',
+    profile: 'honey',
+    role: 'Project-capable build agent',
+    provider: 'OpenAI Codex',
+    model: 'gpt-5.5',
+    gateway: 'Discord gateway running',
+    auth: 'Fresh Codex OAuth credential added today',
+    access: {
+      discord: 'yes',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'yes',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Can build, test, push, deploy and use shared anyOS Supabase environment through machine-level auth.',
   },
   {
-    provider: 'Moonshot API',
-    headline: 'Unknown balance',
-    detail: 'Needs provider usage integration.',
-    freshness: 'manual',
-    checkedAt: 'Needs integration',
-    tone: 'warn',
-  },
-  {
-    provider: 'ElevenLabs',
-    headline: 'Key present',
-    detail: 'Credits unknown until API usage check is wired.',
-    freshness: 'manual',
-    checkedAt: 'Needs integration',
-    tone: 'warn',
-  },
-  {
-    provider: 'Brave',
-    headline: 'Enabled',
-    detail: 'Usage and quota visibility not integrated yet.',
-    freshness: 'manual',
-    checkedAt: 'Needs integration',
-    tone: 'neutral',
-  },
-]
-
-const agents: AgentItem[] = [
-  {
-    name: 'Marg',
-    role: 'Main orchestrator',
-    provider: 'Anthropic',
-    primaryModel: 'Claude Opus 4.6',
-    fallbackModel: 'Moonshot Kimi',
-    plan: 'Anthropic API (auth issue currently)',
-    remaining: 'Unknown until auth is fixed',
-    status: 'Active',
-    nextAction: 'Rotate bearer token and re-run Anthropic usage check.',
-  },
-  {
-    name: 'Doc',
-    role: 'Builder / implementation agent',
-    provider: 'OpenAI',
-    primaryModel: 'GPT-5.5',
-    fallbackModel: 'GPT-4o',
-    plan: 'OpenAI API credit balance',
-    remaining: '$19.41 shared API credit',
-    status: 'Active',
-    nextAction: 'Keep $ threshold alerting and optional auto-recharge decision.',
+    name: 'Nivi',
+    system: 'Hermes',
+    profile: 'nivi',
+    role: 'Project-capable build agent',
+    provider: 'OpenAI Codex',
+    model: 'gpt-5.5',
+    gateway: 'Discord gateway running',
+    auth: 'Fresh Codex OAuth credential added today',
+    access: {
+      discord: 'yes',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'yes',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Smoke-tested today after re-auth; ready for branch/worktree/build/deploy tasks.',
   },
   {
     name: 'Cindy',
-    role: 'Ops assistant',
-    provider: 'Moonshot',
-    primaryModel: 'Kimi K2.6',
-    fallbackModel: 'None configured',
-    plan: 'Moonshot API usage pending integration',
-    remaining: 'Unknown until Moonshot usage endpoint is wired',
-    status: 'Standing by',
-    nextAction: 'Add Moonshot usage endpoint and surface monthly burn trend.',
+    system: 'Hermes',
+    profile: 'cindy',
+    role: 'Ops assistant and build-capable helper',
+    provider: 'OpenAI Codex',
+    model: 'gpt-5.5',
+    gateway: 'Discord gateway running',
+    auth: 'Fresh Codex OAuth credential added today',
+    access: {
+      discord: 'yes',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'yes',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Smoke-tested today after re-auth; Hermes Cindy is separate from the older OpenClaw Cindy token issue.',
+  },
+  {
+    name: 'Doc',
+    system: 'Hermes',
+    profile: 'docs',
+    role: 'Documentation and implementation helper',
+    provider: 'OpenAI Codex',
+    model: 'gpt-5.5',
+    gateway: 'Discord gateway running',
+    auth: 'Codex profile configured',
+    access: {
+      discord: 'yes',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'yes',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Hermes Doc token is distinct from Honey; older OpenClaw Doc is a different system.',
+  },
+  {
+    name: 'Alhambra',
+    system: 'Hermes',
+    profile: 'alhambra',
+    role: 'Gemini-backed research/build agent',
+    provider: 'Gemini',
+    model: 'gemini-2.5-pro',
+    gateway: 'Discord gateway running',
+    auth: 'Gemini API key configured',
+    access: {
+      discord: 'yes',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'yes',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Useful when Codex profiles are busy or need a non-Codex viewpoint.',
+  },
+  {
+    name: 'Clobber',
+    system: 'Hermes',
+    profile: 'clobber',
+    role: 'Claude-backed builder/reviewer',
+    provider: 'Anthropic',
+    model: 'claude-sonnet-4-5',
+    gateway: 'Discord gateway running',
+    auth: 'Anthropic API key configured',
+    access: {
+      discord: 'yes',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'yes',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Best for code review, careful reasoning and non-Codex fallback work.',
+  },
+  {
+    name: 'Lippy',
+    system: 'Hermes',
+    profile: 'lippy',
+    role: 'Kimi-backed builder and fixer',
+    provider: 'Kimi / Moonshot',
+    model: 'kimi-k2.6',
+    gateway: 'Discord gateway running',
+    auth: 'Kimi API key configured',
+    access: {
+      discord: 'yes',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'yes',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Good fallback route when Codex OAuth needs attention or capacity is stretched.',
+  },
+  {
+    name: 'Rusty',
+    system: 'Hermes',
+    profile: 'rusty',
+    role: 'Kimi-backed support agent',
+    provider: 'Kimi / Moonshot',
+    model: 'kimi-k2.6',
+    gateway: 'Discord gateway running',
+    auth: 'Kimi API key configured',
+    access: {
+      discord: 'yes',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'yes',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Project-capable support profile with the same shared machine GitHub/Vercel path.',
+  },
+  {
+    name: 'Margarita',
+    system: 'Hermes',
+    profile: 'margarita',
+    role: 'Separate Hermes Margarita profile',
+    provider: 'OpenAI Codex',
+    model: 'gpt-5.5',
+    gateway: 'Gateway stopped at last inventory',
+    auth: 'Codex profile configured; not currently a live Discord responder',
+    access: {
+      discord: 'partial',
+      email: 'no',
+      githubVercel: 'partial',
+      supabase: 'no',
+      terminalFileBrowser: 'yes',
+      memory: 'yes',
+      voiceMedia: 'yes',
+    },
+    notes: 'Do not confuse with OpenClaw Margarita/main. This is a Hermes profile with a separate bot identity.',
+  },
+  {
+    name: 'Margarita / main',
+    system: 'OpenClaw',
+    profile: 'main',
+    role: 'Older OpenClaw main agent',
+    provider: 'Anthropic via OpenClaw',
+    model: 'claude-opus-4-6 with Kimi fallback',
+    gateway: 'OpenClaw Discord token returned 401 in last audit',
+    auth: 'Model route configured; Discord bot token needs repair before live use',
+    access: {
+      discord: 'no',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'partial',
+      terminalFileBrowser: 'yes',
+      memory: 'partial',
+      voiceMedia: 'no',
+    },
+    notes: 'Older OpenClaw runtime still exists. Keep separate from Hermes Margarita to avoid name confusion.',
+  },
+  {
+    name: 'Doc / doc',
+    system: 'OpenClaw',
+    profile: 'doc',
+    role: 'Older OpenClaw documentation/build agent',
+    provider: 'OpenAI via OpenClaw',
+    model: 'gpt-4o with gpt-4.1-mini and Kimi fallbacks',
+    gateway: 'OpenClaw Discord token returned 401 in last audit',
+    auth: 'Needs Discord token repair before live Discord use',
+    access: {
+      discord: 'no',
+      email: 'no',
+      githubVercel: 'yes',
+      supabase: 'partial',
+      terminalFileBrowser: 'yes',
+      memory: 'partial',
+      voiceMedia: 'no',
+    },
+    notes: 'Distinct from Hermes Doc/docs. Keep both visible until OpenClaw tokens are fixed or retired.',
   },
 ]
 
-const health: HealthItem[] = [
-  {
-    label: 'OpenClaw runtime',
-    value: 'Running',
-    note: 'Core orchestration process appears healthy.',
-    freshness: 'live',
-    checkedAt: 'May 2, 2026',
-    tone: 'ok',
-  },
-  {
-    label: 'Gateway',
-    value: 'Reachable',
-    note: 'Routing path available for agent activity.',
-    freshness: 'live',
-    checkedAt: 'May 2, 2026',
-    tone: 'ok',
-  },
-  {
-    label: 'Active sessions',
-    value: 'Observed (count not yet wired)',
-    note: 'Placeholder until direct OpenClaw session count integration.',
-    freshness: 'manual',
-    checkedAt: 'Last checked: May 2, 2026',
-    tone: 'warn',
-  },
-  {
-    label: 'Memory note',
-    value: 'Persistence available',
-    note: 'Long-term memory metrics are not yet surfaced in this view.',
-    freshness: 'manual',
-    checkedAt: 'Needs integration',
-    tone: 'neutral',
-  },
+const accessColumns: Array<{ key: keyof Agent['access']; label: string }> = [
+  { key: 'discord', label: 'Discord' },
+  { key: 'email', label: 'Email' },
+  { key: 'githubVercel', label: 'GitHub/Vercel' },
+  { key: 'supabase', label: 'Supabase' },
+  { key: 'terminalFileBrowser', label: 'Tools' },
+  { key: 'memory', label: 'Memory' },
+  { key: 'voiceMedia', label: 'Voice/media' },
 ]
 
-const projects: ProjectItem[] = [
-  {
-    name: 'The Bar People',
-    status: 'In progress',
-    note: 'Execution active, keep weekly KPI pulse visible.',
-  },
-  {
-    name: 'AnyVendor',
-    status: 'Stabilizing',
-    note: 'Prioritize current delivery blockers and quick wins.',
-  },
-  {
-    name: 'Mission Control',
-    status: 'MVP build',
-    note: 'This dashboard is Phase 1 baseline.',
-  },
-  {
-    name: 'Client Sites',
-    status: 'Maintenance',
-    note: 'Track support queue and launch windows.',
-  },
-  {
-    name: 'Personal Ops',
-    status: 'Active',
-    note: 'Keep habits, admin and planning in one loop.',
-  },
-]
-
-const roadmap: RoadmapItem[] = [
-  {
-    phase: 'Phase 1',
-    title: 'Static useful dashboard',
-    note: 'Shippable command-center baseline with trusted labels.',
-  },
-  {
-    phase: 'Phase 2',
-    title: 'OpenClaw status integration',
-    note: 'Wire live session counts and heartbeat details.',
-  },
-  {
-    phase: 'Phase 3',
-    title: 'Provider APIs',
-    note: 'Add OpenAI, Anthropic, Moonshot, ElevenLabs usage calls.',
-  },
-  {
-    phase: 'Phase 4',
-    title: 'Tasks and waiting-on',
-    note: 'Track commitments, blockers, and owners per area.',
-  },
-  {
-    phase: 'Phase 5',
-    title: 'Command centre',
-    note: 'Live controls, alerting, and decision automation.',
-  },
-
-]
-
-const apps: AppDefinition[] = [
-  { id: 'calendar', name: 'Calendar', group: 'Work', icon: '📅', description: 'Google Calendar events, week/agenda view and reconnect flow.', dataSource: 'Google Calendar API via existing routes', status: 'Live data' },
-  { id: 'plans', name: 'Plans', group: 'Work', icon: '✅', description: 'Tasks, ventures, planning tiers and active priorities.', dataSource: 'Existing plans/categories APIs', status: 'Live data' },
-  { id: 'news', name: 'News Hub', group: 'Work', icon: '📰', description: 'Sources, campaigns, newsletters, AI drafts and saved items.', dataSource: 'News Hub API + Supabase where configured', status: 'Live data' },
-  { id: 'health', name: 'Health', group: 'Life', icon: '❤️', description: 'Daily health, nutrition, drinks and quick actions.', dataSource: 'Health APIs + Supabase tables', status: 'Live data' },
-  { id: 'maps', name: 'Maps', group: 'Life', icon: '🗺️', description: 'Places and location workflows preserved from the old app.', dataSource: 'Existing maps component data', status: 'Local data' },
-  { id: 'lovely', name: 'Lovely', group: 'Life', icon: '🌙', description: 'Personal wellbeing, water, lager, affirmations and check-ins.', dataSource: 'Lovely APIs + Supabase tables', status: 'Live data' },
-  { id: 'media', name: 'Media List', group: 'Life', icon: '🎧', description: 'Books, podcasts, films and saved recommendations.', dataSource: 'Media list API + Supabase tables', status: 'Live data' },
-  { id: 'memory', name: 'Memory', group: 'Lab', icon: '🧠', description: 'Search and browse the memory layer without leaving Mission Control.', dataSource: 'Existing memory APIs/files', status: 'Live data' },
-  { id: 'docs', name: 'Docs', group: 'Lab', icon: '📁', description: 'Document vault, folders, uploads and search.', dataSource: 'Docs API + local workspace storage', status: 'Live data' },
-  { id: 'skillshop', name: 'Skill Shop', group: 'Lab', icon: '🧩', description: 'Skill discovery, queue and favourites.', dataSource: 'Skill Shop APIs', status: 'Live data' },
-  { id: 'roadmap', name: 'Roadmap', group: 'Lab', icon: '🚀', description: 'App roadmap and build pipeline view.', dataSource: 'Existing app roadmap API', status: 'Live data' },
-  { id: 'costs', name: 'Cost History', group: 'Data', icon: '💷', description: 'AI cost history, trends and budget pressure.', dataSource: 'Costs APIs + Supabase/local fallback', status: 'Live data' },
-  { id: 'live', name: 'Live Feed', group: 'Data', icon: '📡', description: 'Realtime events and system activity stream.', dataSource: 'SSE /api/realtime/stream', status: 'Live data' },
-  { id: 'export', name: 'Data Export', group: 'Data', icon: '📦', description: 'Export calendar, tasks and full backups.', dataSource: 'Export API', status: 'Utility' },
-]
-
-function freshnessLabel(freshness: DataFreshness): string {
-  return freshness === 'live' ? 'Live checked' : 'Manual / needs integration'
+function badgeClass(state: AccessState) {
+  if (state === 'yes') return 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
+  if (state === 'partial') return 'border-amber-400/30 bg-amber-400/10 text-amber-200'
+  return 'border-red-400/30 bg-red-400/10 text-red-200'
 }
 
-function toneClasses(tone: Tone): string {
-  if (tone === 'ok') return 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-  if (tone === 'warn') return 'border-amber-400/40 bg-amber-500/10 text-amber-200'
-  if (tone === 'error') return 'border-rose-400/40 bg-rose-500/10 text-rose-200'
-  return 'border-zinc-500/40 bg-zinc-500/10 text-zinc-200'
+function labelFor(state: AccessState) {
+  if (state === 'yes') return 'Yes'
+  if (state === 'partial') return 'Partial'
+  return 'No'
 }
 
-export default function HomePage() {
-  const [activeApp, setActiveApp] = useState<AppId | null>(null)
-  const [activeTab, setActiveTab] = useState<MainTab>('today')
-  const realtime = useRealtimeSync()
+const liveHermes = agents.filter((agent) => agent.system === 'Hermes' && agent.gateway.includes('running')).length
+const codexAgents = agents.filter((agent) => agent.provider.includes('Codex')).length
+const projectReady = agents.filter(
+  (agent) => agent.access.githubVercel === 'yes' && agent.access.terminalFileBrowser === 'yes',
+).length
+const emailAgents = agents.filter((agent) => agent.access.email === 'yes').length
 
+export default function MissionControlV10() {
   return (
-    <main className="min-h-screen bg-[#05070c] pb-24 text-[#f4f6fb]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,_rgba(57,87,142,0.28),_transparent_48%),radial-gradient(circle_at_80%_20%,_rgba(50,124,92,0.2),_transparent_42%)]" />
-      <div className="relative mx-auto w-full max-w-6xl px-4 pb-6 pt-5 sm:px-6 lg:px-8 lg:pt-8">
-        <HeaderBar realtime={realtime} />
-        <div className="mt-5">
-          {activeTab === 'today' && <TodayTab onOpenApp={setActiveApp} realtime={realtime} />}
-          {activeTab === 'work' && <WorkTab onOpenApp={setActiveApp} />}
-          {activeTab === 'life' && <LifeTab onOpenApp={setActiveApp} />}
-          {activeTab === 'agents' && <AgentsTab realtime={realtime} />}
-          {activeTab === 'data' && <DataTab onOpenApp={setActiveApp} realtime={realtime} />}
-        </div>
-      </div>
-      <BottomNav activeTab={activeTab} onChange={setActiveTab} />
-      {activeApp && <ActiveAppOverlay appId={activeApp} onClose={() => setActiveApp(null)} />}
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.18),transparent_32%),radial-gradient(circle_at_top_right,rgba(34,197,94,0.12),transparent_28%),#05040a] px-4 py-6 text-stone-100 sm:px-6 lg:px-8">
+      <section className="mx-auto flex max-w-7xl flex-col gap-6">
+        <header className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/40 backdrop-blur md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-3xl">
+              <p className="mb-3 inline-flex rounded-full border border-purple-300/20 bg-purple-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-purple-100">
+                Mission Control v10 - agent fleet dashboard
+              </p>
+              <h1 className="font-heading text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
+                Who is online, what they run on, and what they can touch.
+              </h1>
+              <p className="mt-4 max-w-2xl text-base leading-7 text-stone-300 sm:text-lg">
+                First cut of the new Mission Control: a clean smart list of the Hermes and OpenClaw agents, their models, gateway state and practical access levels. No secrets are shown.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[460px]">
+              <Stat label="Live Hermes" value={String(liveHermes)} tone="green" />
+              <Stat label="Codex profiles" value={String(codexAgents)} tone="purple" />
+              <Stat label="Build/deploy ready" value={String(projectReady)} tone="gold" />
+              <Stat label="Email agents" value={String(emailAgents)} tone="blue" />
+            </div>
+          </div>
+        </header>
+
+        <section className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-[1.5rem] border border-white/10 bg-black/30 p-5 backdrop-blur">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="font-heading text-2xl text-white">Smart agent list</h2>
+                <p className="text-sm text-stone-400">Sorted by practical readiness first, then older OpenClaw items needing attention.</p>
+              </div>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-stone-300">{agents.length} agents tracked</span>
+            </div>
+
+            <div className="space-y-3">
+              {agents.map((agent) => (
+                <article key={`${agent.system}-${agent.profile}`} className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 transition hover:border-purple-300/40 hover:bg-white/[0.06]">
+                  <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${agent.gateway.includes('running') ? 'bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]' : agent.gateway.includes('401') ? 'bg-red-400 shadow-[0_0_12px_rgba(248,113,113,0.8)]' : 'bg-amber-300 shadow-[0_0_12px_rgba(252,211,77,0.7)]'}`} />
+                        <h3 className="font-heading text-xl font-semibold text-white">{agent.name}</h3>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-stone-300">{agent.system}</span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-stone-300">{agent.profile}</span>
+                      </div>
+                      <p className="mt-2 text-sm text-stone-300">{agent.role}</p>
+                      <p className="mt-2 text-xs leading-5 text-stone-500">{agent.notes}</p>
+                    </div>
+                    <div className="grid min-w-[260px] gap-2 rounded-xl border border-white/10 bg-black/25 p-3 text-sm">
+                      <Info label="Provider" value={agent.provider} />
+                      <Info label="Model" value={agent.model} />
+                      <Info label="Gateway" value={agent.gateway} />
+                      <Info label="Auth" value={agent.auth} />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                    {accessColumns.map((column) => (
+                      <div key={column.key} className={`rounded-xl border px-3 py-2 ${badgeClass(agent.access[column.key])}`}>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-75">{column.label}</div>
+                        <div className="mt-1 text-sm font-semibold">{labelFor(agent.access[column.key])}</div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <aside className="space-y-4">
+            <Panel title="What this version is for">
+              <ul className="space-y-3 text-sm leading-6 text-stone-300">
+                <li>• Give Jake one plain-English view of all current agents.</li>
+                <li>• Separate Hermes profiles from older OpenClaw agents so Doc/Honey/Margarita confusion is obvious.</li>
+                <li>• Show model/provider choices without exposing tokens or credential details.</li>
+                <li>• Make access visible: Discord, email, GitHub/Vercel, Supabase, tools, memory and media.</li>
+              </ul>
+            </Panel>
+
+            <Panel title="Current go / no-go">
+              <div className="space-y-3">
+                <Callout tone="green" title="Go" text="Hermes Honey, Nivi and Cindy have been freshly re-authenticated on Codex and smoke-tested." />
+                <Callout tone="green" title="Go" text="Most Hermes agents have Discord, terminal, file, browser, code, memory, skills, cron and messaging toolsets enabled." />
+                <Callout tone="amber" title="Watch" text="Codex OAuth can still collide if many profiles reuse rotating OAuth credentials. API-key providers are safer for long-running secondary bots." />
+                <Callout tone="red" title="No-go" text="Older OpenClaw Discord tokens for main/doc/cindy returned 401 in the latest audit, so those Discord bots need token repair before use." />
+              </div>
+            </Panel>
+
+            <Panel title="Next v10 phases">
+              <ol className="space-y-3 text-sm leading-6 text-stone-300">
+                <li><strong className="text-white">1.</strong> Live status collector from Hermes/OpenClaw config and gateway health.</li>
+                <li><strong className="text-white">2.</strong> Filter chips for provider, live/broken, build-ready and email-capable agents.</li>
+                <li><strong className="text-white">3.</strong> Safe action buttons: re-auth guide, restart gateway, smoke test.</li>
+                <li><strong className="text-white">4.</strong> Audit trail showing who changed models/tokens and when, without revealing secrets.</li>
+                <li><strong className="text-white">5.</strong> Agent task launcher for branch, build, deploy and witness checks.</li>
+              </ol>
+            </Panel>
+          </aside>
+        </section>
+      </section>
     </main>
   )
 }
 
-function HeaderBar({ realtime }: { realtime: UseRealtimeSyncState }) {
+function Stat({ label, value, tone }: { label: string; value: string; tone: 'green' | 'purple' | 'gold' | 'blue' }) {
+  const tones = {
+    green: 'from-emerald-300/20 to-emerald-500/5 text-emerald-100',
+    purple: 'from-purple-300/20 to-purple-500/5 text-purple-100',
+    gold: 'from-amber-300/20 to-amber-500/5 text-amber-100',
+    blue: 'from-sky-300/20 to-sky-500/5 text-sky-100',
+  }
   return (
-    <section className="rounded-2xl border border-white/10 bg-[linear-gradient(140deg,rgba(9,13,23,0.95),rgba(10,17,30,0.82))] p-4 shadow-[0_20px_80px_rgba(1,6,18,0.55)] sm:p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">Jake&apos;s Life Mission Control</p>
-          <h1 className="mt-1 font-heading text-2xl font-semibold text-white sm:text-3xl">Today&apos;s run</h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Short briefing first. Work, Life, Agents and Data live behind the bottom tabs — no endless wall of cards.
-          </p>
-        </div>
-        <div className="flex flex-col items-start gap-2 sm:items-end">
-          <RealtimeStatusPill realtime={realtime} />
-          <a href="/legacy" className="w-fit rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200 transition hover:border-white/25 hover:bg-white/10">
-            Legacy workspace
-          </a>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function TodayTab({ onOpenApp, realtime }: { onOpenApp: (app: AppId) => void; realtime: UseRealtimeSyncState }) {
-  const openAi = capacity.find((item) => item.provider === 'OpenAI API')
-  const urgentProjects = projects.slice(0, 3)
-
-  return (
-    <div className="space-y-4">
-      <section className="grid gap-3 md:grid-cols-3">
-        <BriefCard label="Next up" value="Check calendar" note="Open Calendar for the live day run." action="Calendar" onClick={() => onOpenApp('calendar')} />
-        <BriefCard label="Priority" value="Keep builds moving" note="Plans holds the working task list." action="Plans" onClick={() => onOpenApp('plans')} />
-        <BriefCard label="AI balance" value={openAi?.headline ?? 'Unknown'} note={openAi?.detail ?? 'Needs usage sync.'} action="Agents" />
-      </section>
-
-      <Panel title="Good run of the day" subtitle="The only things that should be on the home dashboard">
-        <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-            <p className="text-xs uppercase tracking-wide text-slate-400">Today</p>
-            <h2 className="mt-1 text-lg font-semibold text-white">Start with the calendar, then the top tasks.</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Mission Control should behave like a chief of staff: tell you what matters, then get out of the way. The old apps are still present, just tucked into their proper tabs.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <ActionButton onClick={() => onOpenApp('calendar')}>Open Calendar</ActionButton>
-              <ActionButton onClick={() => onOpenApp('plans')}>Open Plans</ActionButton>
-              <ActionButton onClick={() => onOpenApp('costs')}>AI Spend</ActionButton>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {urgentProjects.map((project) => (
-              <article key={project.name} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium text-white">{project.name}</p>
-                  <span className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-slate-200">{project.status}</span>
-                </div>
-                <p className="mt-1 text-xs leading-5 text-slate-400">{project.note}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </Panel>
-
-      <Panel title="Attention strip" subtitle="Tiny status bar, not a dashboard avalanche">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <MiniStatus title="OpenClaw" value="Running" tone="ok" />
-          <MiniStatus title="Anthropic" value="Auth issue" tone="error" />
-          <MiniStatus title="Auto recharge" value="Off" tone="warn" />
-        </div>
-      </Panel>
-      <Panel title="Realtime pulse" subtitle="Live task/calendar/agent feed with explicit source labels">
-        <div className="space-y-3">
-          <RealtimeSummaryStrip realtime={realtime} />
-          <RealtimeEventList events={realtime.events} title="Latest updates" maxItems={5} />
-        </div>
-      </Panel>
+    <div className={`rounded-2xl border border-white/10 bg-gradient-to-br ${tones[tone]} p-4`}>
+      <div className="text-3xl font-semibold text-white">{value}</div>
+      <div className="mt-1 text-xs uppercase tracking-[0.18em] opacity-80">{label}</div>
     </div>
   )
 }
 
-function WorkTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
+function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-4">
-      <Panel title="Work" subtitle="Business tools and working data">
-        <AppGrid apps={apps.filter((app) => app.group === 'Work')} onOpenApp={onOpenApp} />
-      </Panel>
-      <Panel title="Work areas" subtitle="The business lanes to keep moving">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.filter((project) => project.name !== 'Personal Ops').map((project) => <ProjectCard key={project.name} project={project} />)}
-        </div>
-      </Panel>
+    <div className="grid gap-1">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-stone-500">{label}</span>
+      <span className="text-stone-200">{value}</span>
     </div>
   )
 }
 
-function LifeTab({ onOpenApp }: { onOpenApp: (app: AppId) => void }) {
+function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="space-y-4">
-      <Panel title="Life" subtitle="Personal operating system, health and places">
-        <AppGrid apps={apps.filter((app) => app.group === 'Life')} onOpenApp={onOpenApp} />
-      </Panel>
-      <Panel title="Personal ops" subtitle="Keep the non-work stuff visible but calm">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ProjectCard project={projects.find((project) => project.name === 'Personal Ops') ?? projects[0]} />
-          <div className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-            <p className="text-sm font-medium text-white">Today&apos;s life check</p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">Health, Lovely, Maps and Media are one tap away — no need for them to clutter the morning briefing.</p>
-          </div>
-        </div>
-      </Panel>
-    </div>
-  )
-}
-
-function AgentsTab({ realtime }: { realtime: UseRealtimeSyncState }) {
-  const agentEvents = realtime.events.filter((event) => event.kind === 'agent' || event.kind === 'activity')
-
-  return (
-    <div className="space-y-4">
-      <Panel title="Agents" subtitle="Models, providers, capacity and next action">
-        <div className="grid gap-3 md:grid-cols-3">
-          {agents.map((agent) => (
-            <article key={agent.name} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-lg font-medium text-white">{agent.name}</p>
-                <span className="rounded-full border border-sky-300/30 bg-sky-500/10 px-2 py-1 text-[11px] text-sky-200">{agent.status}</span>
-              </div>
-              <p className="mt-1 text-sm text-slate-300">{agent.role}</p>
-              <dl className="mt-3 space-y-2 text-sm">
-                <Row term="Provider" value={agent.provider} />
-                <Row term="Primary" value={agent.primaryModel} />
-                <Row term="Fallback" value={agent.fallbackModel} />
-                <Row term="Remaining" value={agent.remaining} />
-              </dl>
-              <p className="mt-3 rounded-lg border border-indigo-300/20 bg-indigo-500/10 p-2 text-xs text-indigo-100">Next: {agent.nextAction}</p>
-            </article>
-          ))}
-        </div>
-      </Panel>
-      <Panel title="AI Credits / Capacity" subtitle="Provider balances and auth state">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {capacity.map((item) => <CapacityCard key={item.provider} item={item} />)}
-        </div>
-      </Panel>
-      <Panel title="Agent activity feed" subtitle="Realtime stream from local activity + demo fallback where unavailable">
-        <RealtimeEventList events={agentEvents} title="Recent agent events" maxItems={8} />
-      </Panel>
-    </div>
-  )
-}
-
-function DataTab({ onOpenApp, realtime }: { onOpenApp: (app: AppId) => void; realtime: UseRealtimeSyncState }) {
-  return (
-    <div className="space-y-4">
-      <Panel title="Data & Lab" subtitle="Memory, costs, exports, roadmap and system tools">
-        <AppGrid apps={apps.filter((app) => app.group === 'Data' || app.group === 'Lab')} onOpenApp={onOpenApp} />
-      </Panel>
-      <Panel title="Realtime sync status" subtitle="SSE stream, event semantics and local notification controls">
-        <div className="space-y-3">
-          <RealtimeSummaryStrip realtime={realtime} />
-          <div className="grid gap-3 lg:grid-cols-2">
-            <RealtimeEventList events={realtime.events} title="All live events" maxItems={10} />
-            <LocalNotificationSettings />
-          </div>
-        </div>
-      </Panel>
-      <Panel title="System health" subtitle="Small status snapshot">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {health.map((item) => (
-            <article key={item.label} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-400">{item.label}</p>
-                  <p className="mt-1 text-sm font-medium text-white">{item.value}</p>
-                </div>
-                <Tag label={freshnessLabel(item.freshness)} tone={item.tone} />
-              </div>
-              <p className="mt-2 text-xs leading-5 text-slate-400">{item.note}</p>
-            </article>
-          ))}
-        </div>
-      </Panel>
-      <Panel title="Roadmap" subtitle="What this grows into next">
-        <ol className="grid gap-3 md:grid-cols-5">
-          {roadmap.map((item) => (
-            <li key={item.phase} className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-3">
-              <p className="text-[11px] uppercase tracking-wide text-slate-400">{item.phase}</p>
-              <p className="mt-1 text-sm font-medium text-white">{item.title}</p>
-              <p className="mt-2 text-xs leading-5 text-slate-400">{item.note}</p>
-            </li>
-          ))}
-        </ol>
-      </Panel>
-    </div>
-  )
-}
-
-function AppGrid({ apps, onOpenApp }: { apps: AppDefinition[]; onOpenApp: (app: AppId) => void }) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {apps.map((app) => (
-        <button
-          key={app.id}
-          type="button"
-          onClick={() => onOpenApp(app.id)}
-          className="group rounded-xl border border-white/10 bg-[#0b1220]/85 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-[#101a2d]"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="text-2xl" aria-hidden="true">{app.icon}</div>
-            <span className="rounded-full border border-white/15 bg-white/5 px-2 py-1 text-[10px] uppercase tracking-wide text-slate-300">{app.status}</span>
-          </div>
-          <h3 className="mt-3 text-sm font-semibold text-white">{app.name}</h3>
-          <p className="mt-1 min-h-[2.5rem] text-xs leading-5 text-slate-400">{app.description}</p>
-          <p className="mt-3 border-t border-white/10 pt-3 text-[11px] text-slate-500">{app.dataSource}</p>
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function BottomNav({ activeTab, onChange }: { activeTab: MainTab; onChange: (tab: MainTab) => void }) {
-  const tabs: { id: MainTab; label: string; icon: string }[] = [
-    { id: 'today', label: 'Today', icon: '☀️' },
-    { id: 'work', label: 'Work', icon: '💼' },
-    { id: 'life', label: 'Life', icon: '🌿' },
-    { id: 'agents', label: 'Agents', icon: '🤖' },
-    { id: 'data', label: 'Data', icon: '📊' },
-  ]
-
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#070b13]/95 px-3 py-2 backdrop-blur-xl">
-      <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">
-        {tabs.map((tab) => {
-          const active = activeTab === tab.id
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onChange(tab.id)}
-              className={`rounded-2xl px-2 py-2 text-center text-[11px] transition ${active ? 'bg-cyan-500/15 text-cyan-100' : 'text-slate-500 hover:bg-white/5 hover:text-slate-200'}`}
-            >
-              <div className="text-lg leading-none" aria-hidden="true">{tab.icon}</div>
-              <div className="mt-1 font-medium">{tab.label}</div>
-            </button>
-          )
-        })}
-      </div>
-    </nav>
-  )
-}
-
-function BriefCard({ label, value, note, action, onClick }: { label: string; value: string; note: string; action?: string; onClick?: () => void }) {
-  return (
-    <article className="rounded-2xl border border-white/10 bg-[#0a101c]/75 p-4 shadow-[0_12px_40px_rgba(2,8,20,0.45)]">
-      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-1 text-base font-semibold text-white">{value}</p>
-      <p className="mt-2 min-h-[2.5rem] text-xs leading-5 text-slate-400">{note}</p>
-      {action && onClick && <button type="button" onClick={onClick} className="mt-3 text-xs font-medium text-cyan-200">{action} →</button>}
-    </article>
-  )
-}
-
-function ActionButton({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="rounded-xl border border-cyan-300/25 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-100 transition hover:bg-cyan-500/15">{children}</button>
-}
-
-function MiniStatus({ title, value, tone }: { title: string; value: string; tone: Tone }) {
-  return (
-    <div className={`rounded-xl border p-3 ${toneClasses(tone)}`}>
-      <p className="text-xs uppercase tracking-wide opacity-75">{title}</p>
-      <p className="mt-1 text-sm font-semibold">{value}</p>
-    </div>
-  )
-}
-
-function ProjectCard({ project }: { project: ProjectItem }) {
-  return (
-    <article className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-medium text-white">{project.name}</p>
-        <span className="rounded-full border border-white/15 px-2 py-1 text-[11px] text-slate-200">{project.status}</span>
-      </div>
-      <p className="mt-2 text-sm leading-6 text-slate-300">{project.note}</p>
-    </article>
-  )
-}
-
-function CapacityCard({ item }: { item: CapacityItem }) {
-  return (
-    <article className="rounded-xl border border-white/10 bg-[#0b1220]/85 p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">{item.provider}</p>
-          <p className="mt-1 text-base font-medium text-white">{item.headline}</p>
-        </div>
-        <Tag label={freshnessLabel(item.freshness)} tone={item.tone} />
-      </div>
-      <p className="mt-2 text-sm text-slate-300">{item.detail}</p>
-      <p className="mt-2 text-xs text-slate-500">{item.checkedAt}</p>
-    </article>
-  )
-}
-
-function Panel({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string
-  subtitle: string
-  children: ReactNode
-}) {
-  return (
-    <section className="rounded-2xl border border-white/10 bg-[#0a101c]/75 p-4 shadow-[0_12px_40px_rgba(2,8,20,0.55)] sm:p-5">
-      <div className="mb-3">
-        <h2 className="font-heading text-lg font-semibold text-white">{title}</h2>
-        <p className="mt-1 text-xs text-slate-400">{subtitle}</p>
-      </div>
+    <section className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-5 backdrop-blur">
+      <h2 className="font-heading mb-4 text-xl font-semibold text-white">{title}</h2>
       {children}
     </section>
   )
 }
 
-function Tag({ label, tone }: { label: string; tone: Tone }) {
-  return <span className={`rounded-full border px-2 py-1 text-[11px] ${toneClasses(tone)}`}>{label}</span>
-}
-
-function Row({ term, value }: { term: string; value: string }) {
+function Callout({ tone, title, text }: { tone: 'green' | 'amber' | 'red'; title: string; text: string }) {
+  const tones = {
+    green: 'border-emerald-400/20 bg-emerald-400/10 text-emerald-100',
+    amber: 'border-amber-400/20 bg-amber-400/10 text-amber-100',
+    red: 'border-red-400/20 bg-red-400/10 text-red-100',
+  }
   return (
-    <div className="grid grid-cols-[5.2rem_1fr] gap-2">
-      <dt className="text-slate-400">{term}</dt>
-      <dd className="text-slate-200">{value}</dd>
+    <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
+      <div className="text-sm font-semibold uppercase tracking-[0.16em]">{title}</div>
+      <p className="mt-2 text-sm leading-6 text-stone-200">{text}</p>
     </div>
   )
-}
-function ActiveAppOverlay({ appId, onClose }: { appId: AppId; onClose: () => void }) {
-  const app = apps.find((item) => item.id === appId)
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#05070c] text-[#f4f6fb]">
-      <div className="sticky top-0 z-10 border-b border-white/10 bg-[#05070c]/90 px-4 py-3 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-200/75">Mission Control App</p>
-            <h2 className="text-base font-semibold text-white">{app?.name ?? 'App'}</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:border-white/25 hover:bg-white/10"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-      <div className="mx-auto min-h-[calc(100vh-4rem)] w-full max-w-6xl px-4 py-5 sm:px-6 lg:px-8">
-        {app && (
-          <div className="mb-4 rounded-2xl border border-white/10 bg-[#0a101c]/75 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-slate-300">{app.description}</p>
-                <p className="mt-1 text-xs text-slate-500">Data source: {app.dataSource}</p>
-              </div>
-              <span className="w-fit rounded-full border border-emerald-300/25 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
-                {app.status}
-              </span>
-            </div>
-          </div>
-        )}
-        <div className="rounded-2xl border border-white/10 bg-[#080d18]/65 p-3 sm:p-4">
-          {renderActiveApp(appId, onClose)}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function renderActiveApp(appId: AppId, onClose: () => void) {
-  if (appId === 'calendar') return <CalendarTab />
-  if (appId === 'plans') return <PlansTab />
-  if (appId === 'health') return <HealthApp onBack={onClose} />
-  if (appId === 'memory') return <MemoryView />
-  if (appId === 'docs') return <DocsTab />
-  if (appId === 'news') return <NewsHubApp onBack={onClose} />
-  if (appId === 'media') return <MediaListApp onBack={onClose} />
-  if (appId === 'maps') return <MapsApp onBack={onClose} />
-  if (appId === 'lovely') return <LovelyTab />
-  if (appId === 'skillshop') return <SkillShopApp onBack={onClose} />
-  if (appId === 'roadmap') return <AppRoadmapApp onBack={onClose} />
-  if (appId === 'costs') return <CostHistoryPanel />
-  if (appId === 'live') return <LiveFeed />
-  return <DataExport />
 }

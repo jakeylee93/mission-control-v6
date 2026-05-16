@@ -5,13 +5,13 @@ import { ThemeProvider } from '@/lib/theme'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Mission Control v7',
-  description: 'Your life & business command centre',
+  title: 'Mission Control v10',
+  description: 'Agent fleet dashboard for Hermes and OpenClaw',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Mission Control',
+    title: 'Mission Control v10',
   },
 }
 

@@ -5,6 +5,7 @@ export function middleware(req: NextRequest) {
 
   // Allow the auth API, static files, and Next internals
   if (
+    pathname === '/' ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
